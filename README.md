@@ -240,9 +240,29 @@ Numbers a human glances at belong in the status line, and installing it is one c
 deadweight --setup-statusline
 ```
 
-It prints `audit 0E 27W · 4m ago · deadweight` — red on errors, yellow on warnings, green at zero,
-dimmed once the number is a day old — and nothing at all where no audit has ever run. The template
-it installs is `skills/config-auditor/templates/statusline.py`, readable and yours to edit.
+It prints `deadweight 0E 19W`, and two rules govern it.
+
+**Colour encodes what needs an action, not the size of the count.** A repository sitting exactly at
+its floor is in the accepted state — there is nothing to do — so it is dim, not yellow. A signal
+that is always on teaches the eye to skip it.
+
+| | |
+| --- | --- |
+| dim | at the floor: the accepted state |
+| green | below the floor: `deadweight 0E 15W ▼ floor 0/19` |
+| yellow | errors, even under the floor — an error is always worth seeing |
+| red | above the floor: `deadweight 2E 25W ▲ floor 0/19`, the only urgent case |
+| dim | superseded auditor, or a measurement the configuration has outlived |
+
+**Freshness is measured, not guessed from age.** The audit runs once at session start, so the number
+is frozen while looking live: fix five warnings and it still shows the old count. An earlier version
+flagged the *age* past a threshold, but age is a proxy — a three-day-old measurement in a repository
+nobody touched is still true, a two-minute-old one in a repository you just edited is already false.
+So the segment compares the measurement against the newest mtime of the configuration itself, about
+6 ms over 500 files against a 300 ms debounce, and says `(config changed since, run deadweight
+--fresh)` when it matters.
+
+The plugin's name leads the segment and doubles as the command that shows the detail.
 
 
 ### Seeing the detail behind the count

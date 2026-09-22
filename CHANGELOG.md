@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.6.0 — 2026-09-22
+
+The status line template was two designs behind the one its author runs. Improving your own copy
+and leaving the shipped one behind is the same defect as removing a feature and leaving its
+documentation — found the same way, by a reader rather than by a check.
+
+- **Colour encodes what needs an action, not the size of the count.** A repository at its floor
+  showed yellow every day, for the state where there is nothing to do. It is dim now; yellow is
+  reserved for errors, red for the one urgent case — a count above the floor.
+- **Freshness is measured, not guessed from age.** A threshold on age answered "is this number
+  old?" when the question is "is it still true?": three days in an untouched repository is exact,
+  two minutes in one you just edited is already false. The segment now compares the measurement
+  against the newest mtime of the configuration — ~6 ms over 500 files, against a 300 ms debounce —
+  and `.claude/audit/` is excluded, since setting a floor would otherwise invalidate the
+  measurement that produced it.
+- **The plugin's name leads the segment** and doubles as the command that shows the detail, which
+  makes the word `audit` redundant.
+- Two signals for one fact are one too many: the age no longer prints next to a staleness message.
+
 ## 0.5.1 — 2026-09-22
 
 - **Check 37 reads fenced code blocks only.** Released an hour earlier, it read any line containing
