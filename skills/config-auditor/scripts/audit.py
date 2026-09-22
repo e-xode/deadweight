@@ -1035,8 +1035,20 @@ def check_documented_flags(root: Path, report: Report) -> None:
             texte = f.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
+        # FENCED CODE BLOCKS ONLY. A first version read any line containing
+        # `audit.py` and returned five findings across the fleet, all five false:
+        # « This is why `audit.py` has no `--fix` flag » - flagged for asserting
+        # exactly what the check wants to be true - and two lines where prose put
+        # two different commands side by side. The defect this check exists for is
+        # a flag inside a block someone COPIES AND RUNS; prose that mentions a flag
+        # is a lesser problem and not this one. A detector that is wrong five times
+        # out of five is one nobody keeps.
+        dans_bloc = False
         for i, ligne in enumerate(texte.splitlines(), 1):
-            if "audit.py" not in ligne:
+            if ligne.lstrip().startswith("```"):
+                dans_bloc = not dans_bloc
+                continue
+            if not dans_bloc or "audit.py" not in ligne:
                 continue
             for flag in re.findall(r"(?<![\w-])(--[a-z0-9-]+)", ligne):
                 if flag not in reels:

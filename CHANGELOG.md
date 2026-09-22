@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.1 — 2026-09-22
+
+- **Check 37 reads fenced code blocks only.** Released an hour earlier, it read any line containing
+  `audit.py` and produced five findings across a fleet of sixteen repositories — **five false, none
+  true**. The best of them flagged the sentence « This is why `audit.py` has no `--fix` flag »:
+  reported for asserting exactly what the check wants to be true. The other two were prose putting
+  two different commands on one line.
+
+  The defect this check exists for is a flag inside a block someone **copies and runs**. Prose that
+  mentions a flag is a lesser problem and not this one. A detector wrong five times out of five is
+  one nobody keeps — and a check that is skipped protects nothing.
+
 ## 0.5.0 — 2026-09-22
 
 **This release changes `audit.py`, so a floor set with an earlier version stops comparing.**
