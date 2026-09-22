@@ -15,18 +15,17 @@
 # start and writes inside the project leaves one more untracked file in every
 # repository, forever. A measurement is not configuration.
 #
-# AND WHY THIS HOOK DOES NOT WRITE THE HISTORY SERIES. `audit.py --record`
-# appends one line per run to .claude/audit/history.jsonl, dated to the DAY and
-# never deduplicated. Driven by a session-start hook, twenty sessions in a day
-# produce twenty near-identical lines and the series stops being readable. A
-# series is worth keeping when it is written rarely - in CI, or by hand. So
-# `--record` stays a deliberate act and this hook never performs it.
+# AND WHY IT WRITES NOTHING INSIDE THE PROJECT AT ALL. An earlier version appended
+# one line per run to `.claude/audit/history.jsonl`, dated to the DAY and never
+# deduplicated: twenty sessions produced twenty near-identical lines. That file is
+# gone since 0.3.0 - the git history of the committed floor is the same trajectory,
+# with a timestamp, an author and a commit message saying why the floor moved.
 #
-# Two earlier attempts are worth remembering: writing it unconditionally (noise
-# in every repository), then gating on `.claude/audit/` existing - a directory
+# Two earlier attempts are worth remembering: writing it unconditionally (noise in
+# every repository), then gating on `.claude/audit/` existing - a directory
 # `--set-floor` creates, so every project that set a floor was opted in without
-# asking. A guard whose condition is produced by a routine operation is not a
-# guard. The fix was not a better condition; it was removing the write.
+# asking. A guard whose condition is produced by a routine operation is not a guard.
+# The fix was not a better condition; it was removing the write.
 
 # Matchers: `startup` and `resume` only. `clear` and `compact` reset the
 # conversation, not the configuration on disk.

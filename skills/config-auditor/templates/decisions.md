@@ -8,9 +8,10 @@ is recorded as an exemption in `.claude/audit.local.json`, with its `reason` and
 puts the decision at the exact place the model looks when the check fires, and check 31 keeps the
 shape honest.
 
-Run-by-run results are not written here either — `audit.py --record` appends them to
-`.claude/audit/history.jsonl`. A journal entrusted to a model is forgotten, and when it is not
-forgotten it is embellished. The script records what it measured; this file records what was
+Run-by-run results are not written here either — they are the git history of
+`.claude/audit/floor.json`, which carries a timestamp, an author and the commit message that
+says why the floor moved. A journal entrusted to a model is forgotten, and when it is not
+forgotten it is embellished. Git records what was measured; this file records what was
 decided.
 
 | Date | Decision | Why | Revisit when |

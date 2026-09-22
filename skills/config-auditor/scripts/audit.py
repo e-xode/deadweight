@@ -203,6 +203,7 @@ CHECKS = (
     "ratchet: counts against the recorded floor, same instrument only",
     "hooks: known events, resolvable commands, timeouts, and what their stdout costs",
     "plugin routing to skills it does not ship",
+    "flags the documentation shows must exist in the script",
 )
 FRENCH_HEURISTIC_WORDS = {
     "avec", "pour", "dans", "cette", "celui", "celle", "ceux", "celles",
@@ -995,6 +996,60 @@ def check_see_skill_targets(root: Path, report: Report, skills: dict[str, dict])
                     f"Cross-reference '➜ See skill: {name}' points to a non-existent skill.",
                     str(path),
                 )
+
+
+def check_documented_flags(root: Path, report: Report) -> None:
+    """Every flag the documentation shows must exist in the script.
+
+    Removing a feature and leaving its documentation is the same defect as renaming
+    a skill and leaving its mentions: the code is right, the reader is wrong, and
+    nothing fails. Measured on this plugin on 2026-09-22, after `--record` was
+    removed one release earlier: SIX live references survived, including two inside
+    COMMAND BLOCKS a reader would copy and run, and a README that contradicted
+    itself - one section said the feature was removed while two others described it
+    as present. Thirty-six checks saw none of it.
+
+    Only flags on a line that invokes the audit script are read. A document
+    legitimately shows `claude plugin eval --allow-tools` or `git log -p`, and a
+    check that flagged those would be noise - and noise is how a check gets skipped.
+    """
+    script = root / SKILLS_DIR / "config-auditor" / "scripts" / "audit.py"
+    if not script.is_file():
+        script = Path(__file__)
+    try:
+        src = script.read_text(encoding="utf-8")
+    except OSError:
+        return
+    reels = set(re.findall(r'add_argument\(\s*"(--[a-z0-9-]+)"', src))
+    if not reels:
+        return
+    base = root / SKILLS_DIR
+    fichiers = sorted(base.rglob("*.md")) if base.is_dir() else []
+    for extra in ("README.md", "CHANGELOG.md"):
+        p = root / extra
+        if p.is_file():
+            fichiers.append(p)
+    vus: dict[str, list[str]] = {}
+    for f in fichiers:
+        try:
+            texte = f.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for i, ligne in enumerate(texte.splitlines(), 1):
+            if "audit.py" not in ligne:
+                continue
+            for flag in re.findall(r"(?<![\w-])(--[a-z0-9-]+)", ligne):
+                if flag not in reels:
+                    vus.setdefault(flag, []).append(f"{f.relative_to(root)}:{i}")
+    for flag, ou in sorted(vus.items()):
+        # CHANGELOG excepte : il DOIT nommer ce qui a ete retire, c'est son metier.
+        vivants = [x for x in ou if not x.startswith("CHANGELOG.md")]
+        if not vivants:
+            continue
+        report.add("37-documented-flag", "ERROR",
+                   f"`{flag}` is shown with audit.py in {len(vivants)} place(s) "
+                   f"({', '.join(vivants[:4])}) but the script does not accept it. A reader "
+                   "copying that line gets an error, and nothing else fails.", str(root))
 
 
 def check_foreign_skill_mentions(root: Path, report: Report, skills: dict[str, dict]) -> None:
@@ -2577,6 +2632,7 @@ def main(argv: list[str]) -> int:
     run(check_always_loaded_budget, root, report, skills, agents)
     check_see_skill_targets(root, report, skills)
     check_foreign_skill_mentions(root, report, skills)
+    check_documented_flags(root, report)
     check_frontmatter_quoting(root, report)
     check_all_relative_links(root, report)
     run(check_rule_globs, root, report)

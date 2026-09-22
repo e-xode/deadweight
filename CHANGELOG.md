@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.5.0 — 2026-09-22
+
+**This release changes `audit.py`, so a floor set with an earlier version stops comparing.**
+
+- **Check 37 — a flag the documentation shows must exist in the script.** Removing a feature and
+  leaving its documentation is the same defect as renaming a skill and leaving its mentions: the
+  code is right, the reader is wrong, and nothing fails. Found by a reader, not by the audit:
+  `--record` was removed in 0.3.0 and **six live references survived**, two of them inside command
+  blocks someone would copy and run, and a README that contradicted itself — one section said the
+  feature was gone while two others described it as present. Thirty-six checks saw none of it.
+  Only flags on a line that invokes the audit script are read; the CHANGELOG is exempt, since
+  naming what was removed is its job.
+- The orphaned `.claude/audit/history.jsonl` is deleted and ignored, and its six mentions are
+  rewritten to point at the git history of the committed floor.
+- The README now says plainly that `.claude/audit/floor.json` **in this repository** is this
+  plugin's own floor, not something a consuming project receives — and that a floor is one value a
+  human replaces, which is why it is committed while a run history is not. The author of this
+  plugin misread it; a stranger would too.
+- `evals/README.md` records how to run the suite (`--allow-tools Bash` is not optional) and that
+  `max_turns` and `allowed_tools` are the author's choices, not measurements: a first run had four
+  of five failures reporting `Reached maximum number of turns`.
+
 ## 0.4.0 — 2026-09-22
 
 **This release changes `audit.py`, so a floor set with an earlier version stops comparing.

@@ -81,7 +81,6 @@ python3 ${CLAUDE_SKILL_DIR}/scripts/audit.py
 python3 ${CLAUDE_SKILL_DIR}/scripts/audit.py --json          # adds layout + audit_sha
 python3 ${CLAUDE_SKILL_DIR}/scripts/audit.py --set-floor     # freeze today's counts
 python3 ${CLAUDE_SKILL_DIR}/scripts/audit.py --check-floor   # fail if they rose (CI)
-python3 ${CLAUDE_SKILL_DIR}/scripts/audit.py --record        # append the run to history
 ```
 
 The script's `CHECKS` tuple is the authoritative inventory of what it covers — read it there rather
@@ -145,7 +144,7 @@ ceiling of core rule 3.
 | Known anti-patterns and corrections                     | [references/antipatterns.md](./references/antipatterns.md)                                                                                                   |
 | Why the project is organised this way (its own decisions) | `.claude/audit/decisions.md` — **in the consuming project**, absent by default |
 | What each exemption was granted for, and when            | `.claude/audit.local.json` — in the consuming project |
-| What the audit reported, run by run                     | `.claude/audit/history.jsonl` — written by `audit.py --record` |
+| What the audit reported, run by run                     | the git history of `.claude/audit/floor.json` — timestamped, with an author and a reason |
 | Skill/agent runtime mechanisms available in Claude Code | [references/skill-runtime-mechanisms.md](./references/skill-runtime-mechanisms.md)                                                                           |
 | Anthropic official documentation                        | [references/official-links.md](./references/official-links.md)                                                                                               |
 | The step-by-step procedure for a given change           | the project's own notes — not this skill |

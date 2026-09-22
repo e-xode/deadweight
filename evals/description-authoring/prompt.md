@@ -1,5 +1,5 @@
 ---
-max_turns: 6
+max_turns: 15
 allowed_tools: [Read, Glob, Grep, Bash, Skill]
 ---
 

@@ -7,3 +7,7 @@ __pycache__/
 # accident on 2026-09-22: 13 occurrences of a home directory reached a public
 # repository through a tag. A run's output is a measurement, not a deliverable.
 evals/results/
+
+# The run-history file, removed in 0.3.0: `git log -p` on the committed floor is
+# the same trajectory, with a timestamp, an author and a reason.
+.claude/audit/history.jsonl

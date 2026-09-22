@@ -160,7 +160,7 @@ What it holds is the schema and the detector; the content lives in the consuming
 | --- | --- | --- |
 | Exemptions, each with its reason and date | `.claude/audit.local.json` | you |
 | Decisions that attach to no single check | `.claude/audit/decisions.md` | you |
-| What the audit reported, run by run | `.claude/audit/history.jsonl` | `audit.py --record` |
+| What the audit reported, run by run | the git history of `.claude/audit/floor.json` | you, each time you re-set it |
 
 Templates for the first two are in `skills/config-auditor/templates/`. All three are optional:
 absent means "this project has recorded nothing", which is a valid state, not a missing file.
@@ -201,7 +201,7 @@ exists: a stale exemption is a dead anchor in the overlay.
 ## Two channels, two prices
 
 The plugin ships a `SessionStart` hook (`hooks/session-audit.sh`). It runs the audit against the
-consuming project and appends one line to `.claude/audit/history.jsonl`. It prints **nothing**.
+consuming project and caches the result outside the repository. It prints **nothing**.
 
 That silence is deliberate, and it rests on a measurement rather than on taste. A plugin-declared
 `SessionStart` hook does fire, `${CLAUDE_PROJECT_DIR}` is defined inside it and points at the
@@ -282,7 +282,6 @@ the skill and refuse the hook.
 ```bash
 python3 skills/config-auditor/scripts/audit.py --root . --set-floor    # freeze today's counts
 python3 skills/config-auditor/scripts/audit.py --root . --check-floor  # fail if they rose
-python3 skills/config-auditor/scripts/audit.py --root . --record       # append the run to history
 ```
 
 A measurement with no floor is a measurement people learn to ignore: the numbers move, nobody owns
@@ -296,6 +295,11 @@ progress. Same reason the run history carries the sha on every line.
 
 This repository runs its own ratchet in CI (`.github/workflows/audit.yml`), because a repository that
 ships an auditor and does not run it on itself has the exact defect it exists to catch.
+
+So `.claude/audit/floor.json` **in this repository is this plugin's own floor**, not something a
+consuming project receives — you set yours, in your own repository. And a floor is not a log: it
+is one value, replaced only when a human runs `--set-floor`, with the reason in the commit
+message. That is why it is committed while a run history is not.
 
 ## Check ids are a public API
 
