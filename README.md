@@ -112,11 +112,36 @@ One file, in **your** project, never in the plugin:
 ```jsonc
 // .claude/audit.local.json
 {
-  "english_only_exempt": [
-    "translate/references/glossary.md"
-  ]
+  "exemptions": [
+    {
+      "check": "11-english-only",
+      "path": "translate/references/glossary.md",
+      "reason": "a glossary of source-language terms; translating it removes its subject",
+      "date": "2026-09-22"
+    },
+    {
+      "check": "22-rule-glob-match",
+      "path": ".claude/rules/admin-api-guard.md",
+      "reason": "guards a route that ships next quarter; the rule lands before the code",
+      "date": "2026-09-22",
+      "severity": "INFO"          // downgrade instead of erase - the count stays visible
+    }
+  ],
+  "thresholds": {
+    "CLAUDE_MD_MAX_BYTES": { "value": 14000, "reason": "bilingual repo", "date": "2026-09-22" }
+  }
 }
 ```
+
+`reason` and `date` are required: an exemption without a reason is a decision nobody can review,
+and one without a date is a decision nobody can age out. `severity` is optional and accepts only
+`WARN` or `INFO` — with it the finding stays in the report, marked `[excused by overlay]`, at a
+level that does not fail CI; without it the finding is dropped outright. Prefer the downgrade:
+an erased finding is one `--check-floor` can no longer watch grow.
+
+An exemption may not silence the checks that audit the overlay, nor the ratchet itself
+(`31-*`, `34-audit-sha`, `00-layout`). A release valve able to disconnect its own pressure gauge
+is not a valve.
 
 Shared logic and thresholds, locally declared exceptions. That seam is the whole point: a project
 that needs a real exception declares it, instead of forking the auditor.

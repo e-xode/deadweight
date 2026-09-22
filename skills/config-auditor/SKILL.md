@@ -1,6 +1,6 @@
 ---
 name: config-auditor
-description: "Audit and govern a Claude Code configuration - a project's (CLAUDE.md, skills under .claude/skills/, sub-agents, path-scoped rules, settings, the always-loaded context budget) or a plugin's (manifest plus the skills it ships). Trigger when authoring or auditing a skill, an agent or a rule, when a description is being written or trimmed, when CLAUDE.md or the context budget grows, when packaging skills as a plugin, or when asked whether a configuration is sound. Runs scripts/audit.py for the mechanical checks. Do not use for writing application code, reviewing a diff, or anything outside .claude/ and the plugin manifest."
+description: "Audit and govern a Claude Code configuration - a project's (CLAUDE.md, skills under .claude/skills/, sub-agents, path-scoped rules, settings, the always-loaded context budget) or a plugin's (manifest plus the skills it ships). Trigger when authoring or auditing a skill, an agent or a rule, when a description is being written or trimmed, when CLAUDE.md or the context budget grows, when a plugin manifest or marketplace entry needs checking, or when asked whether a configuration is sound. Runs scripts/audit.py for the mechanical checks. Do not use to author or scaffold a configuration - it judges one that exists - nor to build, tag or ship a release, review a diff, write application code, or anything outside .claude/ and the plugin manifest."
 ---
 
 # Config auditor — audit and doctrine for a project's Claude Code configuration
@@ -79,6 +79,7 @@ method on Anthropic's cadence — **every three to six months, and after any maj
 ```bash
 python3 ${CLAUDE_SKILL_DIR}/scripts/audit.py
 python3 ${CLAUDE_SKILL_DIR}/scripts/audit.py --json          # adds layout + audit_sha
+python3 ${CLAUDE_SKILL_DIR}/scripts/audit.py --all          # no roll-up: every finding
 python3 ${CLAUDE_SKILL_DIR}/scripts/audit.py --set-floor     # freeze today's counts
 python3 ${CLAUDE_SKILL_DIR}/scripts/audit.py --check-floor   # fail if they rose (CI)
 ```
@@ -86,7 +87,9 @@ python3 ${CLAUDE_SKILL_DIR}/scripts/audit.py --check-floor   # fail if they rose
 The script's `CHECKS` tuple is the authoritative inventory of what it covers — read it there rather
 than trusting a count copied into prose; a clean run prints the number it executed (`Executed N
 check groups … All checks passed.`). Most checks report only on failure; the always-loaded budget
-always prints its total as INFO. Exit code 1 on any error.
+always prints its total as INFO. Exit code 1 on any error. A check that fires more than
+five times is rolled up in the text report - `--all` or `--json` show every finding, and the
+floor always counts every one, because the ceiling is a display decision, not a detection one.
 
 `claude plugin validate --strict --json <dir>` is the upstream opinion and inspects nothing here —
 measured 2026-09-03, details in [references/agent-anatomy.md](./references/agent-anatomy.md) §

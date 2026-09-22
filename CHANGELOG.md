@@ -1,5 +1,77 @@
 # Changelog
 
+## 0.8.0 — 2026-09-22
+
+**This release changes `audit.py`, so a floor set with an earlier version stops comparing.**
+
+Measured against a sample of **15 third-party public repositories** cloned for the purpose —
+configurations this auditor had never seen. On that sample it reported **38 errors before, 7
+after, and all 7 are real**. The 31 it stopped reporting were its own defects, not theirs.
+
+- **The frontmatter parser lost every field that followed a YAML comment.** A `# SECTION` line
+  above `name:` was glued onto the name, so every downstream check judged a value the file does
+  not contain. One sampled repository produced **422 false errors** from this alone, and 179 of
+  the sample's `SKILL.md` files carry such a comment. A second defect sat beside it: the flush
+  discarded nothing when no key had been seen yet, which is how the comment leaked forward.
+
+- **Half the checks escaped the dispatch.** `PROJECT_ONLY` and `PLUGIN_ONLY` only governed the
+  checks called through the `run()` wrapper; the other eighteen were called directly and ran
+  everywhere. A dispatch that decides for some of its subjects is not a dispatch. Every check
+  now goes through it, and a `marketplace` layout — a repository whose `.claude-plugin/` holds
+  only a catalogue — runs the one check that has a subject there instead of thirty-seven.
+
+- **Nested skill folders are found.** A repository that groups skills by category
+  (`skills/<domain>/<skill>/SKILL.md`) had **none** of them audited, and was told its skills were
+  missing. 165 skills in one sampled repository were invisible. Directories named `assets`,
+  `templates`, `scripts`, `references`, `shared`, `common`, or prefixed `_`, are support folders
+  and no longer reported as malformed skills.
+
+- **A plugin that ships only commands, agents or hooks is valid.** It was an ERROR. Telling an
+  author their working plugin is broken is how an auditor gets uninstalled rather than heeded.
+
+- **Links inside fenced code blocks are specimens, not references.** A reference file showing a
+  reader how to write a context map links to the `src/` the reader will create. Links that climb
+  above the repository root are no longer checked either: `../../../-/issues/174` resolves on a
+  forge, and nothing outside the repository can be verified from inside it.
+
+- **The overlay reached exactly one check.** An exemption written for any id other than
+  `11-english-only` was schema-checked, counted in the summary, and applied to nothing. Nobody
+  had been bitten because nobody had written one. It now applies to every check — and `severity`
+  is the addition that makes the file worth writing: `WARN` or `INFO` **downgrades** a finding
+  instead of erasing it, so the count stays visible and `--check-floor` still watches it grow.
+  No exemption can silence `31-*`, `34-audit-sha` or `00-layout`: a valve able to disconnect its
+  own pressure gauge is not a valve.
+
+- **The README documented a schema the auditor rejects.** It still showed `english_only_exempt`,
+  a key nothing has read since the structured `exemptions` list landed. A project following the
+  README earned a `31-overlay-schema` error for doing so.
+
+- **`36-foreign-skill` accepted a bare arrow, and a bare arrow means transition.** On the same
+  15-repository sample it returned **140 findings of which roughly 130 were false**: `running →
+  `success``, `→ `not-started``, `→ `8867-4`` — state tables, enum values, status strings. Only
+  the stated `➜ See skill:` convention is read now, and an agent the plugin ships is no longer
+  reported as a skill it lacks. The sample drops from 140 findings to 0; a synthetic control
+  confirms the check still fires on a genuine dangling route.
+
+- **A check that fires more than five times is rolled up** in the text report. One repository
+  produced 188 dead-anchor warnings: the reader learns the number, not the anchors, and pays 188
+  lines for it. `--all` and `--json` still show everything, and the floor always counted
+  everything — the ceiling is a display decision, never a detection one.
+
+- **`04-skill-description-antitrigger` now states its register.** It demands a practice whose
+  benefit this project tried to measure and could not: at 3 runs per arm the eval harness's own
+  noise (±0.67 on a control arm that no edit can reach) exceeds the effect, and the one direction
+  the numbers leaned was the counter-intuitive one. The message says it is doctrine, says the
+  measurement was inconclusive, and names the sample size that would settle it.
+
+- **The two anti-trigger eval cases were retired and rewritten from the sample.** The old ones
+  were echoes of the description *and* too easy — "refactor a controller" sits nowhere near a
+  configuration audit, so it passed whatever the description said. The new ones are near misses
+  drawn from real public repositories: scaffolding a `.claude/` tree, and shipping a release.
+  Writing the first of them exposed a real defect — the description offered `packaging skills as
+  a plugin` as a trigger, which a release task matches — now narrowed to `a plugin manifest or
+  marketplace entry needs checking`.
+
 ## 0.7.1 — 2026-09-22
 
 - **An exemption now covers every path check 11 reports.** The `src/` branch never consulted the

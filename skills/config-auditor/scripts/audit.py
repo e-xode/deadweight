@@ -407,6 +407,70 @@ def exemption_paths(local: dict, check: str) -> set[str]:
 ENGLISH_ONLY_EXEMPT: set[str] = set()   # filled from audit.local.json in main()
 
 
+# An exemption may never silence the checks that audit the exemptions, nor the
+# ratchet. A release valve able to disconnect its own pressure gauge is not a
+# valve: it is a way of not knowing.
+UNEXEMPTABLE = frozenset({
+    "31-overlay", "31-overlay-parse", "31-overlay-schema", "31-overlay-stale",
+    "31-overlay-alias", "31-overlay-unknown-check", "31-overlay-threshold",
+    "34-audit-sha", "00-layout",
+})
+DOWNGRADE_TO = ("WARN", "INFO")
+
+
+def apply_overlay(report: "Report", local: dict, root: Path) -> None:
+    """Drop or downgrade findings the project has formally excused.
+
+    Until 2026-09-22 the overlay reached exactly one check, `11-english-only`:
+    an exemption written for any other id was schema-checked, counted in the
+    summary, and applied to nothing. Nobody had been bitten because nobody had
+    written one - the only exemption anyone wrote was the one that worked.
+
+    `severity` is the addition that makes the file worth writing: without it an
+    exemption erases the finding, and the project loses the count it excused.
+    With it, the finding stays visible at a severity that does not fail CI, and
+    `--check-floor` still watches it grow.
+    """
+    entries = [e for e in (local.get("exemptions") or ()) if isinstance(e, dict)]
+    if not entries:
+        return
+    resolus: list[tuple[str, Path, str | None]] = []
+    for e in entries:
+        chk = CHECK_ID_ALIASES.get(e.get("check"), e.get("check"))
+        pth = e.get("path")
+        if not isinstance(chk, str) or not isinstance(pth, str) or not pth:
+            continue
+        if chk in UNEXEMPTABLE:
+            continue
+        sev = e.get("severity")
+        sev = sev if isinstance(sev, str) and sev.upper() in DOWNGRADE_TO else None
+        for base in (root / SKILLS_DIR / pth, root / pth):
+            if base.exists():
+                resolus.append((chk, base.resolve(), sev and sev.upper()))
+                break
+    if not resolus:
+        return
+    gardees: list[Finding] = []
+    for f in report.findings:
+        cible = None
+        if f.location:
+            try:
+                cible = Path(f.location).resolve()
+            except OSError:
+                cible = None
+        couvert = next(
+            (sev for chk, base, sev in resolus
+             if chk == f.check and cible is not None
+             and (cible == base or base in cible.parents)),
+            "__rien__")
+        if couvert == "__rien__":
+            gardees.append(f)
+        elif couvert is not None:
+            gardees.append(Finding(f.check, couvert, f.message + " [excused by overlay]",
+                                   f.location))
+    report.findings = gardees
+
+
 # --- Layout -----------------------------------------------------------------
 # Two containers hold skills, and they are not the same object.
 #
@@ -442,11 +506,26 @@ PROJECT_ONLY = (
     "check_listing_budget_derived",
 )
 PLUGIN_ONLY = ("check_plugin_cost",)
+# The only things worth saying about a marketplace repository: what it is, and
+# whether its own catalogue is coherent. Everything else has no subject here.
+MARKETPLACE_CHECKS = ("check_skills",)
 
 
 def detect_layout(root: Path) -> str:
-    """`plugin` when a plugin manifest is present at the root, else `project`."""
-    return "plugin" if (root / ".claude-plugin" / "plugin.json").is_file() else "project"
+    """Which container this is: `marketplace`, `plugin`, or `project`.
+
+    A repository whose root carries a marketplace manifest and whose plugins live in
+    subdirectories is NEITHER a project NOR a plugin. Measured 2026-09-22 on 15
+    public plugins from the community catalogue: auditing one as a project produced
+    two confident errors - "CLAUDE.md not found" and ".claude/skills/ not found" -
+    about files a marketplace has no reason to carry. An auditor that does not know
+    a shape reports its own ignorance as the subject's defect.
+    """
+    if (root / ".claude-plugin" / "plugin.json").is_file():
+        return "plugin"
+    if (root / ".claude-plugin" / "marketplace.json").is_file():
+        return "marketplace"
+    return "project"
 
 
 def apply_layout(root: Path, layout: str) -> None:
@@ -461,6 +540,11 @@ def apply_layout(root: Path, layout: str) -> None:
                 SKILLS_DIR = declared.strip("./") or "skills"
         except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             pass
+    elif layout == "marketplace":
+        # A marketplace carries a catalogue, not a configuration. It has no CLAUDE.md,
+        # no settings and no skills of its own - the plugins it lists have those.
+        # Pointing the project paths at it would report every absence as a defect.
+        CLAUDE_DIR, SKILLS_DIR, AGENTS_DIR = ".", "skills", "agents"
     else:
         CLAUDE_DIR, SKILLS_DIR, AGENTS_DIR = ".claude", ".claude/skills", ".claude/agents"
 
@@ -512,6 +596,13 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str] | None, int]:
     def flush() -> None:
         nonlocal buf, block_style
         if current_key is None:
+            # Anything before the first key - a stray comment, a blank line - is
+            # discarded rather than left in the buffer. Until 2026-09-22 this branch
+            # returned without clearing `buf`, so a comment above `name:` was glued
+            # onto the name, and every downstream check then judged a value the file
+            # does not contain: 422 false errors on one sampled public repository.
+            buf = []
+            block_style = None
             return
         if block_style == ">":
             value = " ".join(part for part in (s.strip() for s in buf) if part)
@@ -522,6 +613,10 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str] | None, int]:
         block_style = None
 
     for raw in lines[1:end]:
+        # A YAML comment at column 0 is a comment. Indented, it may be content
+        # inside a block scalar, so it is only dropped when no block is open.
+        if raw.lstrip().startswith("#") and (block_style is None or not raw[:1].isspace()):
+            continue
         if re.match(r"^[A-Za-z_][A-Za-z0-9_-]*\s*:", raw):
             flush()
             key, _, value = raw.partition(":")
@@ -543,12 +638,52 @@ def strip_code_fences(text: str) -> str:
     return text
 
 
+def _fenced_spans(text: str) -> list[tuple[int, int]]:
+    """Character ranges covered by fenced code blocks, opening fence included."""
+    spans: list[tuple[int, int]] = []
+    ouvert: int | None = None
+    pos = 0
+    for line in text.splitlines(keepends=True):
+        if line.lstrip().startswith("```"):
+            if ouvert is None:
+                ouvert = pos
+            else:
+                spans.append((ouvert, pos + len(line)))
+                ouvert = None
+        pos += len(line)
+    if ouvert is not None:
+        spans.append((ouvert, len(text)))
+    return spans
+
+
 def iter_relative_links(text: str) -> Iterable[tuple[str, int]]:
+    # A link inside a fenced block is a specimen, not a reference: the file that
+    # shows a reader how to write a context map links to the `src/ordering/`
+    # the reader will create, not to one that exists here. Verified 2026-09-22
+    # on a sampled public repository, where 3 of 9 link errors were examples.
+    spans = _fenced_spans(text)
     for m in re.finditer(r"\]\((\.[^)\s]+)", text):
+        if any(a <= m.start() < b for a, b in spans):
+            continue
         link = m.group(1)
         link = link.split("#", 1)[0]
         if link:
             yield link, m.start()
+
+
+def sort_du_depot(depuis: Path, link: str, root: Path) -> bool:
+    """True when `link` climbs above the repository root.
+
+    `../../../-/issues/174` is a GitLab issue reference that resolves on the
+    forge, never on disk. Nothing outside the repository can be checked here,
+    so claiming it is broken states an opinion the auditor cannot hold.
+    """
+    try:
+        cible = (depuis / link).resolve()
+        racine = root.resolve()
+    except OSError:
+        return True
+    return racine != cible and racine not in cible.parents
 
 
 def frontmatter_keys(text: str) -> list[str]:
@@ -687,25 +822,72 @@ def check_claude_md(root: Path, report: Report) -> None:
         )
 
 
+# Directories under `skills/` that are not skills. `_`-prefixed is the widespread
+# convention for shared material; the rest are the names the Agent Skills spec
+# itself uses for a skill's own subdirectories, which appear one level up in
+# repositories that share them between skills.
+SUPPORT_DIR_NAMES = {"assets", "templates", "scripts", "references", "shared", "common"}
+
+
+def dossiers_de_skill(base: Path, report: Report) -> list[Path]:
+    """Every directory that holds a SKILL.md, however the author nested them.
+
+    A first version assumed exactly one level - `skills/<name>/SKILL.md` - and
+    reported every other directory as a missing SKILL.md. Measured on 15 public
+    plugins: 21 of 38 errors came from that assumption alone, against repositories
+    that group skills by category (`skills/<category>/<skill>/SKILL.md`) or keep a
+    `_shared/` directory beside them. Neither is a defect; both are organisation.
+
+    A directory is reported only when it holds NEITHER a SKILL.md NOR any descendant
+    that does - that is the case where something really is missing.
+    """
+    trouves: list[Path] = []
+    for entry in sorted(base.iterdir()):
+        if not entry.is_dir():
+            continue
+        if (entry / "SKILL.md").is_file():
+            trouves.append(entry)
+            continue
+        descendants = sorted(p.parent for p in entry.rglob("SKILL.md"))
+        if descendants:
+            trouves.extend(descendants)          # category, not a skill
+            continue
+        if entry.name.startswith("_") or entry.name.lower() in SUPPORT_DIR_NAMES:
+            continue                             # support material, not a skill
+        report.add("02-skill-md-exists", "ERROR",
+                   f"Directory '{entry.name}' under the skills directory holds no SKILL.md "
+                   "and no descendant that does. A skill needs one; a support directory "
+                   "should be named with a leading underscore so it reads as one.",
+                   str(entry))
+    return trouves
+
+
 def check_skills(root: Path, report: Report) -> dict[str, dict]:
     skills_dir = root / SKILLS_DIR
     if not skills_dir.is_dir():
-        report.add("02-skills-dir", "ERROR", ".claude/skills/ not found", str(skills_dir))
+        if LAYOUT == "marketplace":
+            report.add("02-skills-dir", "INFO",
+                       "A marketplace repository ships no skills of its own; the plugins it "
+                       "lists carry them. Audit each plugin directory separately.",
+                       str(root))
+            return {}
+        # A plugin may legitimately ship only commands, agents or hooks. Calling
+        # that an error tells an author their working plugin is broken, which is
+        # how an auditor gets uninstalled rather than heeded.
+        autre = [d for d in ("commands", "agents", "hooks") if (root / d).exists()]
+        if autre:
+            report.add("02-skills-dir", "INFO",
+                       f"No {SKILLS_DIR}/ — this one ships {', '.join(autre)} instead. "
+                       "Skill checks have no subject here.", str(root))
+        else:
+            report.add("02-skills-dir", "WARN",
+                       f"{SKILLS_DIR}/ not found, and no commands/, agents/ or hooks/ either "
+                       "— nothing here declares anything.", str(skills_dir))
         return {}
     skills: dict[str, dict] = {}
     seen_names: dict[str, str] = {}
-    for entry in sorted(skills_dir.iterdir()):
-        if not entry.is_dir():
-            continue
+    for entry in sorted(dossiers_de_skill(skills_dir, report)):
         skill_md = entry / "SKILL.md"
-        if not skill_md.exists():
-            report.add(
-                "02-skill-md-exists",
-                "ERROR",
-                f"Skill folder '{entry.name}' has no SKILL.md",
-                str(entry),
-            )
-            continue
         text = skill_md.read_text(encoding="utf-8")
         fm, _ = parse_frontmatter(text)
         if not fm:
@@ -752,7 +934,8 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
                     "04-skill-description-length",
                     "WARN",
                     f"Skill '{entry.name}' description is {len(desc)} chars (> {DESCRIPTION_MAX_CHARS}). "
-                    "The Agent Skills spec caps 'description' at 1,024 chars; the 1,536 figure is a "
+                    "The Agent Skills spec caps 'description' at 1,024 chars "
+                    "(agentskills.io/specification); the 1,536 figure is a "
                     "different mechanism - the listing cutoff for 'description' + 'when_to_use' "
                     "combined, not a per-field limit.",
                     str(skill_md),
@@ -763,7 +946,13 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
                 report.add(
                     "04-skill-description-antitrigger",
                     "WARN",
-                    f"Skill '{entry.name}' description has no anti-trigger clause",
+                    f"Skill '{entry.name}' description has no anti-trigger clause. This is "
+                    "DOCTRINE, not measurement: an attempt to measure the effect on "
+                    "2026-09-22 was inconclusive, because the eval harness's own run-to-run "
+                    "noise (+-0.67 on an arm that cannot be affected by the edit, at 3 runs "
+                    "per arm) exceeded the effect. One suggestive observation ran the other "
+                    "way - removing the clause raised the score - and n=25 per arm would be "
+                    "needed to tell. Weigh it as doctrine until someone pays for that run.",
                     str(skill_md),
                 )
 
@@ -846,7 +1035,14 @@ def check_agents(root: Path, report: Report) -> dict[str, dict]:
                 str(entry),
             )
             continue
-        missing = [k for k in ("name", "description", "tools") if not fm.get(k)]
+        # `tools` and `model` are OPTIONAL. Verified 2026-09-22 against
+        # code.claude.com/docs/en/sub-agents: "tools | Required: No - Inherits every
+        # tool available to subagents if omitted." Requiring it was house doctrine
+        # emitted as an ERROR, and measured on 15 public plugins it produced a false
+        # error on somebody else's repository while contradicting the official docs.
+        # An audit that is wrong is a nuisance; an audit that is wrong while citing a
+        # spec teaches a false rule, with the authority of an error.
+        missing = [k for k in ("name", "description") if not fm.get(k)]
         if missing:
             report.add(
                 "08-agent-frontmatter",
@@ -1106,7 +1302,14 @@ def check_foreign_skill_mentions(root: Path, report: Report, skills: dict[str, d
     # A hyphen is not mandatory in a skill name: a first version required one and
     # missed `hooks`, `review`, `translate`, `release`. The arrow is what qualifies
     # the context; the shape of the name does not have to.
-    routing = re.compile(r"(?:➜\s*See skill:\s*|→\s*`)([a-z0-9]+(?:-[a-z0-9]+)*)")
+    #
+    # A generic `→ `name`` was accepted here until 2026-09-22 and had to go. Measured
+    # on 15 third-party public repositories it produced 140 findings of which some
+    # 130 were false, because a bare arrow is how everyone writes a state table:
+    # `running → `success``, `→ `not-started``, `→ `8867-4``. An arrow means
+    # transition far more often than it means routing. `➜ See skill:` is a stated
+    # convention and carries the intent; `→` carries none.
+    routing = re.compile(r"➜\s*See skill:\s*([a-z0-9]+(?:-[a-z0-9]+)*)")
     seen: dict[str, list[str]] = {}
     base = root / SKILLS_DIR
     if not base.is_dir():
@@ -1119,6 +1322,11 @@ def check_foreign_skill_mentions(root: Path, report: Report, skills: dict[str, d
         for m in routing.finditer(text):
             name = m.group(1)
             if name in skills or name.startswith(example_prefixes):
+                continue
+            # An agent this plugin ships is a legitimate routing target, and half
+            # the composite names the old regex caught were agents: `code-implementer`,
+            # `test-writer`, `design-reviewer`, `session-reviewer`.
+            if (root / "agents" / f"{name}.md").is_file():
                 continue
             seen.setdefault(name, []).append(str(path.relative_to(root)))
     for name, where in sorted(seen.items(), key=lambda kv: -len(kv[1])):
@@ -1475,6 +1683,8 @@ def check_all_relative_links(root: Path, report: Report) -> None:
         except UnicodeDecodeError:
             continue
         for link, _ in iter_relative_links(text):
+            if sort_du_depot(md.parent, link, root):
+                continue
             if not (md.parent / link).exists():
                 report.add(
                     "20-relative-links",
@@ -2148,7 +2358,15 @@ def check_twin_division_tables(root: Path, report: Report, skills: dict[str, dic
                 )
 
 
-def print_text_report(report: Report) -> None:
+# How many findings of one check the text report shows before rolling up the
+# rest. A report that prints 188 dead anchors is not read: the reader learns
+# the number, not the anchors, and pays 188 lines for it. The JSON output and
+# the floor still carry every finding - this ceiling is a display decision, not
+# a detection one, which is why it belongs here and not in a check.
+ROLLUP_AFTER = 5
+
+
+def print_text_report(report: Report, tout: bool = False) -> None:
     by_sev: dict[str, list[Finding]] = {"ERROR": [], "WARN": [], "INFO": [], "OK": []}
     for f in report.findings:
         by_sev.setdefault(f.severity, []).append(f)
@@ -2157,9 +2375,18 @@ def print_text_report(report: Report) -> None:
         if not items:
             continue
         print(f"\n=== {sev} ({len(items)}) ===")
+        vus: dict[str, int] = {}
         for f in items:
+            vus[f.check] = vus.get(f.check, 0) + 1
+            if not tout and vus[f.check] > ROLLUP_AFTER:
+                continue
             loc = f" [{f.location}]" if f.location else ""
             print(f"  [{f.check}] {f.message}{loc}")
+        if not tout:
+            for chk, n in vus.items():
+                if n > ROLLUP_AFTER:
+                    print(f"  [{chk}] ... and {n - ROLLUP_AFTER} more of the same "
+                          f"({n} total). Run with --all, or --json, to see them.")
     counts = report.counts()
     print(
         f"\nExecuted {len(CHECKS)} check groups. "
@@ -2343,19 +2570,31 @@ def check_skill_names(root: Path, report: Report, skills: dict[str, dict]) -> No
         if not SKILL_NAME_RE.match(declared):
             report.add("32-skill-name-shape", "ERROR" if hard else "WARN",
                        f"Skill name `{declared}` is not lowercase letters, digits and single "
-                       "hyphens. The spec rejects it when the skill is packaged.", loc)
+                       "hyphens (agentskills.io/specification). The spec rejects it when the "
+                       "skill is packaged.", loc)
         if len(declared) > SKILL_NAME_MAX_CHARS:
             report.add("32-skill-name-shape", "ERROR" if hard else "WARN",
                        f"Skill name `{declared}` is {len(declared)} chars (max "
                        f"{SKILL_NAME_MAX_CHARS}).", loc)
+        # The Agent Skills specification enumerates the `name` constraints in full -
+        # 1-64 characters, lowercase alphanumerics and hyphens, no leading, trailing
+        # or consecutive hyphen, and it must match the parent directory. Verified
+        # 2026-09-22 at agentskills.io/specification: THERE IS NO RESERVED WORD.
+        #
+        # This check used to raise an ERROR saying "the spec forbids them", and it
+        # fired on a third party's plugin. A rule invented and attributed to a
+        # standard is worse than no rule: the reader learns it, and learns it wrong.
+        # Kept as INFO, sourced honestly, because the concern is real - a name
+        # carrying a vendor's is a poor name - but it is an opinion, not a rule.
         hit = [t for t in RESERVED_NAME_TOKENS if t in declared.lower()]
         if hit:
             report.add(
-                "32-skill-name-reserved", "ERROR" if hard else "WARN",
-                f"Skill name `{declared}` contains the reserved word(s) {', '.join(hit)}. "
-                "The spec forbids them in `name`; it works locally and is refused on "
-                "packaging. It also over-triggers: a skill named after a vendor matches "
-                "every prompt that mentions that vendor.", loc)
+                "32-skill-name-reserved", "INFO",
+                f"Skill name `{declared}` contains `{', '.join(hit)}`. No specification "
+                "forbids this - checked against agentskills.io/specification, which lists "
+                "the `name` constraints in full. It is an opinion: a name carrying a "
+                "vendor's says who made the skill rather than when to use it.",
+                loc)
 
 
 # --- Confusable descriptions -------------------------------------------------
@@ -2512,6 +2751,17 @@ def check_project_overlay(root: Path, report: Report, local: dict) -> None:
             report.add("31-overlay-unknown-check", "WARN",
                        f"{where} exempts `{chk}`, which this audit never emits. Stale entry, "
                        "or a typo that makes the exemption silently inert.", str(path))
+        sev = e.get("severity")
+        if sev is not None and (not isinstance(sev, str) or sev.upper() not in DOWNGRADE_TO):
+            report.add("31-overlay-schema", "WARN",
+                       f"{where} has severity `{sev}`, which is neither WARN nor INFO. An "
+                       "exemption may lower a finding, never raise or invent one; this one "
+                       "is ignored and the finding is dropped outright.", str(path))
+        if isinstance(chk, str) and chk in UNEXEMPTABLE:
+            report.add("31-overlay-schema", "WARN",
+                       f"{where} exempts `{chk}`, which audits the overlay or the ratchet "
+                       "itself. It is ignored: a valve that can disconnect its own gauge is "
+                       "not a valve.", str(path))
         if isinstance(e.get("date"), str) and not ISO_DATE_RE.match(e["date"]):
             report.add("31-overlay-schema", "WARN",
                        f"{where} date `{e['date']}` is not YYYY-MM-DD.", str(path))
@@ -2628,6 +2878,9 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Audit Claude configuration.")
     parser.add_argument("--root", default=".", help="Repository root (default: cwd)")
     parser.add_argument("--json", action="store_true", help="Output JSON instead of text")
+    parser.add_argument("--all", action="store_true",
+                        help="Show every finding; by default a check that fires more than "
+                             f"{ROLLUP_AFTER} times is rolled up")
     parser.add_argument(
         "--layout",
         choices=("auto", "project", "plugin"),
@@ -2675,40 +2928,51 @@ def main(argv: list[str]) -> int:
             return None
         if layout != "plugin" and name in PLUGIN_ONLY:
             return None
+        # A marketplace holds a catalogue. Everything that inspects a configuration -
+        # skills, agents, rules, references, budget - has no subject here, and running
+        # it reports the auditor's own ignorance as the repository's defect.
+        if layout == "marketplace" and name not in MARKETPLACE_CHECKS:
+            return None
+        # Every check goes through here. Until 2026-09-22 half of them were called
+        # directly, so PROJECT_ONLY and PLUGIN_ONLY governed only the half that
+        # happened to be wrapped - a dispatch that decides for some of its subjects
+        # is not a dispatch, and the hole was invisible because the two lists were
+        # written for checks that were wrapped.
         return fn(*a)
 
     run(check_claude_md, root, report)
     skills = check_skills(root, report)
     agents = check_agents(root, report)
-    check_agent_descriptions(report, agents)
+    run(check_agent_descriptions, report, agents)
     run(check_cross_refs, root, report, skills, agents)
-    check_english_only(root, report)
-    check_no_code_comments_in_skills(root, report)
+    run(check_english_only, root, report)
+    run(check_no_code_comments_in_skills, root, report)
     run(check_no_global_scripts, root, report)
     run(check_rules, root, report)
     run(check_skill_index, root, report, skills)
-    check_reference_sizes(root, report)
+    run(check_reference_sizes, root, report)
     run(check_always_loaded_budget, root, report, skills, agents)
-    check_see_skill_targets(root, report, skills)
-    check_foreign_skill_mentions(root, report, skills)
-    check_documented_flags(root, report)
-    check_frontmatter_quoting(root, report)
-    check_all_relative_links(root, report)
+    run(check_see_skill_targets, root, report, skills)
+    run(check_foreign_skill_mentions, root, report, skills)
+    run(check_documented_flags, root, report)
+    run(check_frontmatter_quoting, root, report)
+    run(check_all_relative_links, root, report)
     run(check_rule_globs, root, report)
-    check_agent_frontmatter_validity(root, report, skills)
+    run(check_agent_frontmatter_validity, root, report, skills)
     run(check_settings_scope, root, report)
-    check_hooks(root, report)
-    check_orphan_references(root, report)
-    check_evals(root, report)
-    check_twin_division_tables(root, report, skills)
+    run(check_hooks, root, report)
+    run(check_orphan_references, root, report)
+    run(check_evals, root, report)
+    run(check_twin_division_tables, root, report, skills)
 
-    check_skill_anchors(root, report)
+    run(check_skill_anchors, root, report)
     run(check_listing_budget_derived, root, report, skills)
     run(check_plugin_cost, root, report, skills, agents)
-    check_project_overlay(root, report, _local)
-    check_skill_names(root, report, skills)
-    check_description_overlap(root, report, skills)
+    run(check_project_overlay, root, report, _local)
+    run(check_skill_names, root, report, skills)
+    run(check_description_overlap, root, report, skills)
 
+    apply_overlay(report, _local, root)
     floor_rc = check_floor(root, report) if args.check_floor else 0
 
     if args.json:
@@ -2721,7 +2985,7 @@ def main(argv: list[str]) -> int:
         }
         print(json.dumps(out, indent=2))
     else:
-        print_text_report(report)
+        print_text_report(report, tout=args.all)
 
     if args.set_floor:
         written = set_floor(root, report, layout)
