@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.1 — 2026-09-22
+
+- **An exemption now covers every path check 11 reports.** The `src/` branch never consulted the
+  overlay, so a project could declare an exception on a file under `src/` and keep being reported
+  for it: the mechanism meant to remove the noise produced it instead. Paths there are relative to
+  the project root, which is how a reader names a file under `src/`; the template says so.
+
 ## 0.7.0 — 2026-09-22
 
 **This release changes `audit.py`, so a floor set with an earlier version stops comparing.**

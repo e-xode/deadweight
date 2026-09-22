@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to <your-project>/.claude/audit.local.json. This file is the project's, never the plugin's: shipped as a plugin, the auditor lives in a version-stamped cache that is replaced on every update, so anything written next to it is lost.",
+  "_comment": "Copy to <your-project>/.claude/audit.local.json. Exemption paths are relative to .claude/skills/ for a skill file, and to the project root for anything else, such as a file under src/ — name it the way the audit prints it. This file is the project's, never the plugin's: shipped as a plugin, the auditor lives in a version-stamped cache that is replaced on every update, so anything written next to it is lost.",
 
   "exemptions": [
     {

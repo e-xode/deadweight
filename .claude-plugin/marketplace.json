@@ -13,7 +13,7 @@
       "name": "deadweight",
       "source": "./",
       "description": "Audit the Claude Code configuration of a project or of a plugin: CLAUDE.md, skills, sub-agents, rules, settings, hooks, and the context budget a configuration spends on every turn.",
-      "version": "0.7.0",
+      "version": "0.7.1",
       "license": "MIT",
       "homepage": "https://github.com/e-xode/deadweight",
       "keywords": [

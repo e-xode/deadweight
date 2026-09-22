@@ -1201,6 +1201,14 @@ def check_english_only(root: Path, report: Report) -> None:
                     continue
                 if LOCALE_MARKED_RE.search(p.as_posix()):
                     continue          # declared as a locale: French there is correct
+                # An exemption must cover EVERY path the check reports. Until
+                # 2026-09-22 this branch never consulted the overlay, so a project
+                # could declare an exception on a file under src/ and keep being
+                # reported for it - the mechanism meant to remove the noise produced
+                # it instead. Paths here are relative to the project root, since
+                # that is how a reader names a file under src/.
+                if p.relative_to(root).as_posix() in ENGLISH_ONLY_EXEMPT:
+                    continue
                 if translate_dir not in p.parents:
                     targets.append(p)
     for path in targets:
