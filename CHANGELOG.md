@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.7.0 — 2026-09-22
+
+**This release changes `audit.py`, so a floor set with an earlier version stops comparing.**
+
+- **Check 11 reads scripts, not only Markdown.** The rule says English in every persisted artefact,
+  and a script is the most read file in a plugin after the README — but the check never opened a
+  `.py` or a `.sh`. This auditor's own source had drifted to **95 French words**, found by a reader
+  rather than by the check that exists for exactly this.
+
+  A first fix exempted `audit.py`, because the check's own French dictionary would otherwise trip
+  it. That would have made the one file where the drift happened the one file that cannot be
+  policed. The dictionary is fenced with `# i18n-data:` markers and skipped instead.
+
+- **Content declared as a locale is no longer flagged.** A multilingual project has to carry each
+  language properly, French included; a check that reports `pricing-fr.md` for being in French is
+  wrong in a way that costs it its credibility. What matters is that the language is **declared in
+  the name**. Measured on one repository: **11 of 19 findings under `src/` were locale-suffixed
+  files**, reported only because the convention there is `-fr.md` while the check exempted
+  `.fr.md`. Across four repositories the count went from 25 to 12, and everything that disappeared
+  was correctly-declared localised content.
+
+  The exemption rests on the **name**, not the content, and deliberately so: a French file with no
+  locale marker still reads as drift, which is precisely the defect worth seeing.
+
 ## 0.6.0 — 2026-09-22
 
 The status line template was two designs behind the one its author runs. Improving your own copy

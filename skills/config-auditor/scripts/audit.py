@@ -205,15 +205,26 @@ CHECKS = (
     "plugin routing to skills it does not ship",
     "flags the documentation shows must exist in the script",
 )
+# i18n-data: start — French on purpose, this is the check's own dictionary
 FRENCH_HEURISTIC_WORDS = {
     "avec", "pour", "dans", "cette", "celui", "celle", "ceux", "celles",
     "vous", "nous", "etre", "tres", "donc", "ainsi",
     "depuis", "toujours", "jamais", "ensuite", "alors", "parce", "lorsque",
     "fichier", "exemple", "doit", "peut", "faut", "selon",
 }
+# i18n-data: end
 FRENCH_HEURISTIC_THRESHOLD = 3
 ENGLISH_ONLY_EXEMPT: set[str] = set()   # filled from audit.local.json, see below
+# A file that IS the French version of localised content is not drift: a
+# multilingual project has to carry each language properly, French included, and a
+# check that flags `pricing-fr.md` for being in French is wrong in a way that costs
+# it its credibility. What matters is that the language is DECLARED in the name.
+# Measured 2026-09-22 on one repository: 11 of 19 findings under src/ were
+# locale-suffixed files, flagged only because the convention there is `-fr.md`
+# while this exempted `.fr.md`.
 ENGLISH_ONLY_SUFFIX_EXEMPT = ".fr.md"
+LOCALE_MARKED_RE = re.compile(r"(?:[-_.](?:fr|de|es|it|pt|nl|ja|zh|ru|ar)\.[a-z]+$)"
+                              r"|(?:/(?:fr|de|es|it|pt|nl|ja|zh|ru|ar)/)")
 
 KNOWN_TOOLS = {
     "Read", "Edit", "Write", "Glob", "Grep", "Bash", "PowerShell", "Skill", "Agent",
@@ -330,10 +341,10 @@ def apply_thresholds(local: dict, report: Report) -> None:
     sees is a doctrine quietly rewritten; one that prints itself is a decision
     anyone can re-open.
     """
-    # Une cle inconnue dans l'overlay etait ignoree en silence : un projet qui
-    # ecrivait `thresholds` sur une version anterieure ne recevait aucun signal et
-    # cherchait pourquoi rien ne bougeait. Un fichier de configuration qui accepte
-    # tout et n'applique qu'une partie est pire qu'un fichier qui refuse.
+    # An unknown key was ignored in silence, so a project writing `thresholds`
+    # against an older release got no signal and wondered why nothing moved. A
+    # configuration file that accepts everything and applies part of it is worse
+    # than one that refuses.
     connues = {"exemptions", "thresholds", "_comment"}
     for k in sorted(set(local) - connues):
         report.add("31-overlay-unknown", "WARN",
@@ -1043,18 +1054,18 @@ def check_documented_flags(root: Path, report: Report) -> None:
         # a flag inside a block someone COPIES AND RUNS; prose that mentions a flag
         # is a lesser problem and not this one. A detector that is wrong five times
         # out of five is one nobody keeps.
-        dans_bloc = False
-        for i, ligne in enumerate(texte.splitlines(), 1):
-            if ligne.lstrip().startswith("```"):
-                dans_bloc = not dans_bloc
+        in_block = False
+        for i, line in enumerate(texte.splitlines(), 1):
+            if line.lstrip().startswith("```"):
+                in_block = not in_block
                 continue
-            if not dans_bloc or "audit.py" not in ligne:
+            if not in_block or "audit.py" not in line:
                 continue
-            for flag in re.findall(r"(?<![\w-])(--[a-z0-9-]+)", ligne):
+            for flag in re.findall(r"(?<![\w-])(--[a-z0-9-]+)", line):
                 if flag not in reels:
                     vus.setdefault(flag, []).append(f"{f.relative_to(root)}:{i}")
     for flag, ou in sorted(vus.items()):
-        # CHANGELOG excepte : il DOIT nommer ce qui a ete retire, c'est son metier.
+        # The CHANGELOG is exempt: naming what was removed is its job.
         vivants = [x for x in ou if not x.startswith("CHANGELOG.md")]
         if not vivants:
             continue
@@ -1092,9 +1103,9 @@ def check_foreign_skill_mentions(root: Path, report: Report, skills: dict[str, d
     # than not having it. What makes a name a routing instruction is the arrow in
     # front of it, not its shape.
     example_prefixes = ("shop-", "ui-", "api-", "data-")
-    # Le tiret n'est pas obligatoire dans un nom de skill : une premiere version
-    # l'exigeait et ratait `hooks`, `review`, `translate`, `release`. La fleche
-    # suffit a qualifier le contexte ; la forme du nom n'a pas a le faire.
+    # A hyphen is not mandatory in a skill name: a first version required one and
+    # missed `hooks`, `review`, `translate`, `release`. The arrow is what qualifies
+    # the context; the shape of the name does not have to.
     routing = re.compile(r"(?:➜\s*See skill:\s*|→\s*`)([a-z0-9]+(?:-[a-z0-9]+)*)")
     seen: dict[str, list[str]] = {}
     base = root / SKILLS_DIR
@@ -1163,7 +1174,19 @@ def check_english_only(root: Path, report: Report) -> None:
         for skill in skills_dir.iterdir():
             if not skill.is_dir():
                 continue
-            for p in skill.rglob("*.md"):
+            # Scripts count. The rule says English in every persisted artefact, and
+            # a script is the most read file in a plugin after the README. Until
+            # 2026-09-22 this check looked only at `*.md`, so the auditor's own
+            # source drifted into another language - 95 French words, found by a
+            # reader, not by the check that exists for exactly this.
+            #
+            # The heuristic word list is DATA for this check and is French on
+            # purpose. It is fenced with `# i18n-data:` markers and skipped, rather
+            # than exempting the whole file: exempting `audit.py` would have made
+            # the one file where the drift happened the one file that cannot be
+            # policed.
+            for p in sorted(list(skill.rglob("*.md")) + list(skill.rglob("*.py"))
+                            + list(skill.rglob("*.sh"))):
                 if p.name.endswith(ENGLISH_ONLY_SUFFIX_EXEMPT):
                     continue
                 if p.relative_to(skills_dir).as_posix() in ENGLISH_ONLY_EXEMPT:
@@ -1176,6 +1199,8 @@ def check_english_only(root: Path, report: Report) -> None:
             for p in src_dir.rglob(pattern):
                 if p.name.endswith(ENGLISH_ONLY_SUFFIX_EXEMPT):
                     continue
+                if LOCALE_MARKED_RE.search(p.as_posix()):
+                    continue          # declared as a locale: French there is correct
                 if translate_dir not in p.parents:
                     targets.append(p)
     for path in targets:
@@ -1183,6 +1208,20 @@ def check_english_only(root: Path, report: Report) -> None:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
+        # Drop any `# i18n-data:` fenced block. A check whose own dictionary trips
+        # it would be unusable on the file that carries the dictionary - and
+        # exempting that file instead would make the one place where the drift
+        # happened the one place that cannot be policed.
+        if "i18n-data: start" in text:
+            kept, on = [], True
+            for ln in text.splitlines():
+                if "i18n-data: start" in ln:
+                    on = False
+                elif "i18n-data: end" in ln:
+                    on = True
+                elif on:
+                    kept.append(ln)
+            text = "\n".join(kept)
         stripped = strip_code_fences(text).lower()
         words = re.findall(r"[a-zàâçéèêëîïôûùüÿñæœ']+", stripped)
         hits = sum(1 for w in words if w in FRENCH_HEURISTIC_WORDS)
@@ -1838,13 +1877,13 @@ def check_evals(root: Path, report: Report) -> None:
     # `evals/`, each holding `case.yaml` or `prompt.md`. Until 2026-09-22 this check
     # knew only the first, so it reported 0% coverage on a plugin whose suite had just
     # been made executable - it punished the migration it had itself provoked.
-    officiel = root / "evals"
-    cas_officiels = ([p for p in sorted(officiel.iterdir())
+    official = root / "evals"
+    official_cases = ([p for p in sorted(official.iterdir())
                       if p.is_dir() and ((p / "case.yaml").is_file() or (p / "prompt.md").is_file())]
-                     if officiel.is_dir() else [])
+                     if official.is_dir() else [])
     withed = [d for d in dirs
               if (d / "evals" / "evals.json").is_file()
-              or (LAYOUT == "plugin" and len(cas_officiels) >= EVALS_MIN_COUNT)]
+              or (LAYOUT == "plugin" and len(official_cases) >= EVALS_MIN_COUNT)]
     if dirs:
         pct = len(withed) / len(dirs)
         missing = [d.name for d in dirs if d not in withed]
@@ -1886,9 +1925,9 @@ def check_evals(root: Path, report: Report) -> None:
         cases = data["evals"]
         # projection evals/1
         if isinstance(data, dict) and data.get("schema") == "evals/1":
-            # Schema evals/1 (2026-09-20) : les attendus vivent dans `assertions`.
-            # Projection en memoire sur les cles historiques, pour que les
-            # controles en aval restent inchanges. Le fichier n'est pas modifie.
+            # Schema evals/1 (2026-09-20): the expectations live under `assertions`.
+            # Projected onto the historical keys in memory, so the checks downstream
+            # stay unchanged. The file itself is never rewritten.
             cases = [
                 c if not isinstance(c, dict) else {
                     **c,
@@ -2123,7 +2162,7 @@ def print_text_report(report: Report) -> None:
 
 
 # ancrage
-ANCHOR_SEVERITY = "WARN"   # cliquet : passer a "ERROR" une fois ce depot a zero
+ANCHOR_SEVERITY = "WARN"   # ratchet: move to "ERROR" once this repository is at zero
 ANCHOR_PATH_RE = re.compile(
     r"\b(?:src|server|scripts|electron|docker|app|lib|packages|test|tests)"
     r"/[A-Za-z0-9_./-]+\.[a-z]{2,4}\b"
@@ -2607,8 +2646,8 @@ def main(argv: list[str]) -> int:
     _local = load_local_config(root)
     ENGLISH_ONLY_EXEMPT = exemption_paths(_local, "11-english-only")
     report = Report()
-    # Avant tout controle : un seuil deplace doit l'etre pour TOUS les controles
-    # qui le lisent, pas seulement pour ceux qui tournent apres.
+    # Before any check runs: a moved threshold must move for EVERY check that
+    # reads it, not only for the ones that happen to run afterwards.
     apply_thresholds(_local, report)
     report.add(
         "00-layout",
