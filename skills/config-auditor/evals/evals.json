@@ -1,0 +1,69 @@
+{
+  "schema": "evals/1",
+  "skill_name": "config-auditor",
+  "evals": [
+    {
+      "id": "budget-growth",
+      "prompt": "Our CLAUDE.md keeps growing and every session feels slower from the first turn. Can you look at what we are carrying?",
+      "expected_skill": "config-auditor",
+      "assertions": [
+        { "text": "loads config-auditor and runs scripts/audit.py rather than reading CLAUDE.md by hand" },
+        { "text": "reports the always-loaded budget as CLAUDE.md bytes plus skill and agent descriptions, not CLAUDE.md alone" }
+      ]
+    },
+    {
+      "id": "description-authoring",
+      "prompt": "I am writing the description for a new skill. How long can it be?",
+      "expected_skill": "config-auditor",
+      "assertions": [
+        { "text": "answers 1,024 characters as the spec cap on description alone" },
+        { "text": "distinguishes it from the 1,536 listing cutoff on description plus when_to_use combined, and says not to author against 1,536" }
+      ]
+    },
+    {
+      "id": "two-skills-compete",
+      "prompt": "Two of our skills keep firing on each other's requests. Nothing looks wrong in either file.",
+      "expected_skill": "config-auditor",
+      "assertions": [
+        { "text": "identifies the defect as living in the set rather than in either file" },
+        { "text": "runs the audit and reads check 33, the confusable-description pairs" }
+      ]
+    },
+    {
+      "id": "plugin-container",
+      "prompt": "I am packaging our skills as a plugin. Does the audit still apply, and what happens to the context budget check?",
+      "expected_skill": "config-auditor",
+      "assertions": [
+        { "text": "says the skill-level checks apply and the project-level ones are skipped on a plugin" },
+        { "text": "explains that the budget check inverts: a plugin's descriptions are paid by each consuming project" }
+      ]
+    },
+    {
+      "id": "exemption-request",
+      "prompt": "The audit warns about a file we deliberately keep in French. How do I silence that warning for good?",
+      "expected_skill": "config-auditor",
+      "assertions": [
+        { "text": "directs the exemption to the consuming project's .claude/audit.local.json, not to the plugin" },
+        { "text": "requires a reason and a date on the exemption, and says why a bare path list rots" }
+      ]
+    },
+    {
+      "id": "anti-trigger-application-code",
+      "prompt": "Refactor our checkout controller to use async/await instead of promise chains.",
+      "expected_skill": null,
+      "assertions": [
+        { "text": "does not trigger: this is application code, outside .claude/ and the plugin manifest" },
+        { "text": "should not load config-auditor for a code change that touches no configuration" }
+      ]
+    },
+    {
+      "id": "anti-trigger-diff-review",
+      "prompt": "Review this pull request diff and tell me if the logic is sound.",
+      "expected_skill": null,
+      "assertions": [
+        { "text": "does not trigger: reviewing a diff is a code-review task, not a configuration audit" },
+        { "text": "should not load config-auditor unless the diff changes CLAUDE.md, skills, agents, rules or settings" }
+      ]
+    }
+  ]
+}

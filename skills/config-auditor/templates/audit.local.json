@@ -1,0 +1,11 @@
+{
+  "_comment": "Copy to <your-project>/.claude/audit.local.json. Every exemption needs a reason and a date: check 31 rejects it otherwise. This file is the project's, never the plugin's.",
+  "exemptions": [
+    {
+      "check": "11-english-only",
+      "path": "translate/references/glossary.md",
+      "reason": "FR/EN glossary, bilingual by nature",
+      "date": "2026-09-22"
+    }
+  ]
+}

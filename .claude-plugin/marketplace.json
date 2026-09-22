@@ -1,0 +1,22 @@
+{
+  "name": "deadweight",
+  "owner": {
+    "name": "Christophe Bragard",
+    "url": "https://github.com/e-xode"
+  },
+  "metadata": {
+    "description": "Configuration auditing for Claude Code projects and plugins.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "deadweight",
+      "source": "./",
+      "description": "Audit the Claude Code configuration of a project or of a plugin: CLAUDE.md, skills, sub-agents, rules, settings, hooks, and the context budget a configuration spends on every turn.",
+      "version": "0.1.0",
+      "license": "MIT",
+      "homepage": "https://github.com/e-xode/deadweight",
+      "keywords": ["audit", "configuration", "skills", "context-budget", "hooks"]
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+name: audit
+
+# A repository that ships an auditor and does not run it on itself has the exact
+# defect it exists to catch. This workflow is the plugin's own ratchet: the floor
+# in .claude/audit/floor.json is the number the configuration may not rise above,
+# and --check-floor fails the build when it does.
+#
+# The floor records the sha of audit.py. Changing the auditor therefore does not
+# silently move the bar: --check-floor refuses to compare across two instruments
+# and says so, and the floor has to be re-set on purpose.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  self-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Audit this plugin against its own floor
+        run: python3 skills/config-auditor/scripts/audit.py --root . --check-floor
+      - name: Report as JSON
+        if: always()
+        run: python3 skills/config-auditor/scripts/audit.py --root . --json
