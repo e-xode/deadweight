@@ -5,8 +5,7 @@
     "url": "https://github.com/e-xode"
   },
   "metadata": {
-    "description": "Configuration auditing for Claude Code projects and plugins.",
-    "version": "1.0.0"
+    "description": "Configuration auditing for Claude Code projects and plugins."
   },
   "plugins": [
     {

@@ -204,6 +204,8 @@ CHECKS = (
     "hooks: known events, resolvable commands, timeouts, and what their stdout costs",
     "plugin routing to skills it does not ship",
     "flags the documentation shows must exist in the script",
+    "38-unreadable",
+    "39-eval-quality",
 )
 # i18n-data: start — French on purpose, this is the check's own dictionary
 FRENCH_HEURISTIC_WORDS = {
@@ -940,19 +942,18 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
                     "combined, not a per-field limit.",
                     str(skill_md),
                 )
-            # Accepts the three phrasings in use. It missed "Do not use" until
-            # 2026-09-22, which made a correctly written description look unguarded.
-            if not re.search(r"Do ?n'?o?t use|Not for:|Anti-?trigger", desc, re.IGNORECASE):
+            if not ANTI_TRIGGER_RE.search(desc):
                 report.add(
                     "04-skill-description-antitrigger",
                     "WARN",
-                    f"Skill '{entry.name}' description has no anti-trigger clause. This is "
-                    "DOCTRINE, not measurement: an attempt to measure the effect on "
-                    "2026-09-22 was inconclusive, because the eval harness's own run-to-run "
-                    "noise (+-0.67 on an arm that cannot be affected by the edit, at 3 runs "
-                    "per arm) exceeded the effect. One suggestive observation ran the other "
-                    "way - removing the clause raised the score - and n=25 per arm would be "
-                    "needed to tell. Weigh it as doctrine until someone pays for that run.",
+                    f"Skill '{entry.name}' description has no anti-trigger clause. MEASURED, "
+                    "2026-09-22: on a near-miss case that names the objects this skill audits "
+                    "but asks for them to be authored, the skill fired in 5 of 10 runs with the "
+                    "clause removed and 0 of 10 with it present (Fisher exact, p=0.033). The "
+                    "count is the Skill tool call itself, not a judge's opinion - with an LLM "
+                    "grader the same twenty runs looked like noise, and an earlier reading at "
+                    "3 runs per arm pointed the other way. One case moved, a second did not: "
+                    "a clause earns its place against the near misses it is written for.",
                     str(skill_md),
                 )
 
@@ -1081,7 +1082,7 @@ def check_agent_descriptions(report: Report, agents: dict[str, dict]) -> None:
                 f"Agent '{name}' description is {len(desc)} chars (> {AGENT_DESCRIPTION_MAX_CHARS}). Description = trigger surface; move knowledge to the body.",
                 meta["path"],
             )
-        if not re.search(r"Don'?t use|Anti-?trigger", desc, re.IGNORECASE):
+        if not ANTI_TRIGGER_RE.search(desc):
             report.add(
                 "08b-agent-description",
                 "WARN",
@@ -1181,6 +1182,42 @@ def check_always_loaded_budget(
         )
 
 
+def check_unreadable(root: Path, report: Report) -> None:
+    """Files under .claude/ the auditor could not open.
+
+    Until 2026-09-22 nine call sites caught only `UnicodeDecodeError`, so a file
+    the process may not read raised `PermissionError` and took the whole audit
+    down - found when an eval sandbox masked `.claude/loop.md` to mode 000 and
+    the run reported "the audit script crashes". The catches now include OSError,
+    which turns a crash into a skip; this check exists so the skip is not silent.
+    An auditor that says nothing about what it could not read is claiming a
+    coverage it does not have.
+    """
+    base = root / CLAUDE_DIR
+    if not base.is_dir():
+        return
+    muets: list[str] = []
+    for f in sorted(base.rglob("*")):
+        if not f.is_file():
+            continue
+        try:
+            with f.open("rb"):
+                pass
+        except OSError:
+            muets.append(str(f.relative_to(root)))
+    if muets:
+        report.add(
+            "38-unreadable",
+            "WARN",
+            f"{len(muets)} file(s) under {CLAUDE_DIR}/ could not be opened and were not "
+            f"audited: {', '.join(muets[:5])}"
+            + (f" and {len(muets) - 5} more" if len(muets) > 5 else "")
+            + ". Every check that would have read them reported nothing, which is not "
+            "the same as reporting that they are sound.",
+            str(base),
+        )
+
+
 def check_see_skill_targets(root: Path, report: Report, skills: dict[str, dict]) -> None:
     if not skills:
         return
@@ -1192,10 +1229,22 @@ def check_see_skill_targets(root: Path, report: Report, skills: dict[str, dict])
     for path in targets:
         try:
             text = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
+        except (OSError, UnicodeDecodeError):
             continue
-        for m in re.finditer(r"➜\s*See skill:\s*([a-z0-9][a-z0-9-]*)", text):
+        for m in re.finditer(
+            r"➜\s*See skill:\s*([a-z0-9][a-z0-9-]*(?::[a-z0-9][a-z0-9-]*)?)", text
+        ):
             name = m.group(1)
+            # `plugin:skill` names a skill that lives outside this repository. Whether
+            # it resolves depends on what the reader has installed, and nothing on disk
+            # says. Until 2026-09-22 the pattern stopped at the `:`, captured the plugin
+            # name alone, and reported it missing - so a project routing to this very
+            # plugin (`➜ See skill: deadweight:config-auditor`, the convention this
+            # plugin prescribes) earned an ERROR for following the doctrine it ships.
+            # Skipping is the same call made for a link that climbs above the root:
+            # claiming it is broken states an opinion the auditor cannot hold.
+            if ":" in name:
+                continue
             if name not in skills:
                 report.add(
                     "18-see-skill-target",
@@ -1309,7 +1358,9 @@ def check_foreign_skill_mentions(root: Path, report: Report, skills: dict[str, d
     # `running → `success``, `→ `not-started``, `→ `8867-4``. An arrow means
     # transition far more often than it means routing. `➜ See skill:` is a stated
     # convention and carries the intent; `→` carries none.
-    routing = re.compile(r"➜\s*See skill:\s*([a-z0-9]+(?:-[a-z0-9]+)*)")
+    routing = re.compile(
+        r"➜\s*See skill:\s*([a-z0-9]+(?:-[a-z0-9]+)*(?::[a-z0-9]+(?:-[a-z0-9]+)*)?)"
+    )
     seen: dict[str, list[str]] = {}
     base = root / SKILLS_DIR
     if not base.is_dir():
@@ -1321,6 +1372,11 @@ def check_foreign_skill_mentions(root: Path, report: Report, skills: dict[str, d
             continue
         for m in routing.finditer(text):
             name = m.group(1)
+            # A `plugin:skill` reference already tells the reader the target is
+            # external and where it comes from - which is the very remediation this
+            # check asks for. It is the bare name, readable as local, that misleads.
+            if ":" in name:
+                continue
             if name in skills or name.startswith(example_prefixes):
                 continue
             # An agent this plugin ships is a legitimate routing target, and half
@@ -1422,7 +1478,7 @@ def check_english_only(root: Path, report: Report) -> None:
     for path in targets:
         try:
             text = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
+        except (OSError, UnicodeDecodeError):
             continue
         # Drop any `# i18n-data:` fenced block. A check whose own dictionary trips
         # it would be unusable on the file that carries the dictionary - and
@@ -1599,7 +1655,7 @@ def check_reference_sizes(root: Path, report: Report) -> None:
         skill_dir = skills_dir / ref.relative_to(skills_dir).parts[0]
         try:
             text = ref.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
+        except (OSError, UnicodeDecodeError):
             continue
         lines = text.count("\n") + 1
         if lines <= REFERENCE_TOC_LINES:
@@ -1642,7 +1698,7 @@ def check_frontmatter_quoting(root: Path, report: Report) -> None:
     for path in targets:
         try:
             text = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
+        except (OSError, UnicodeDecodeError):
             continue
         if not text.startswith("---"):
             continue
@@ -1680,7 +1736,7 @@ def check_all_relative_links(root: Path, report: Report) -> None:
     for md in sorted(base.rglob("*.md")):
         try:
             text = md.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
+        except (OSError, UnicodeDecodeError):
             continue
         for link, _ in iter_relative_links(text):
             if sort_du_depot(md.parent, link, root):
@@ -1709,7 +1765,7 @@ def check_rule_globs(root: Path, report: Report) -> None:
     for entry in sorted(rules_dir.glob("*.md")):
         try:
             fm, _ = parse_frontmatter(entry.read_text(encoding="utf-8"))
-        except UnicodeDecodeError:
+        except (OSError, UnicodeDecodeError):
             continue
         if not fm:
             continue
@@ -1750,7 +1806,7 @@ def check_agent_frontmatter_validity(root: Path, report: Report, skills: dict[st
     for entry in sorted(agents_dir.glob("*.md")):
         try:
             text = entry.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
+        except (OSError, UnicodeDecodeError):
             continue
         fm, _ = parse_frontmatter(text)
         if not fm:
@@ -2031,7 +2087,7 @@ def check_orphan_references(root: Path, report: Report) -> None:
             continue
         try:
             text = skill_md.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
+        except (OSError, UnicodeDecodeError):
             continue
         linked = {(skill_md.parent / link).resolve() for link, _ in iter_relative_links(text)}
         routers: list[tuple[str, set[Path]]] = []
@@ -2041,7 +2097,7 @@ def check_orphan_references(root: Path, report: Report) -> None:
                 continue
             try:
                 router_text = router.read_text(encoding="utf-8")
-            except UnicodeDecodeError:
+            except (OSError, UnicodeDecodeError):
                 continue
             router_links = {(router.parent / link).resolve() for link, _ in iter_relative_links(router_text)}
             routers.append((router_text, router_links))
@@ -2063,6 +2119,23 @@ def check_orphan_references(root: Path, report: Report) -> None:
             )
 
 
+# One pattern, two checks. Until 2026-09-22 checks 04 and 08b carried two different
+# regexes - 08b's missed "Do not use" with a space, which 04 accepted - so the same
+# clause was seen on a skill and not on an agent. A detector that disagrees with its
+# twin is a detector nobody can act on.
+#
+# The non-English alternatives are deliberate. A project that has formally exempted
+# `11-english-only` writes its descriptions in its own language; refusing to see the
+# clause there fires this check on precisely the projects that already declared their
+# exception, which is how a criterion becomes unsatisfiable and then ignored. The list
+# is not a translation table - it holds the openers actually observed on the fleet.
+ANTI_TRIGGER_RE = re.compile(
+    r"Do ?n'?o?t use|Never use|Not for:|Out of scope|Anti-?trigger"
+    r"|Ne pas utiliser|N'utilisez? pas|Hors périmètre",
+    re.IGNORECASE,
+)
+
+
 def looks_like_anti_trigger(case: dict) -> bool:
     label = f"{case.get('id', '')} {case.get('name', '')}".lower()
     if any(token in label for token in EVALS_ANTI_NAME_TOKENS):
@@ -2074,6 +2147,106 @@ def looks_like_anti_trigger(case: dict) -> bool:
             if any(token in lowered for token in EVALS_ANTI_EXPECTATION_TOKENS):
                 return True
     return False
+
+
+# Wording that states a mechanical fact about the run: whether a tool was called.
+# `tool_used` answers it exactly; an llm grader reads the last message and may not
+# see the trajectory at all. Measured on this plugin 2026-09-22: a rubric opening
+# with "The run must load the `config-auditor` skill" passed 3 runs out of 5 in
+# which the skill was never loaded. The judge was not capricious - it was blind.
+JUDGED_FACT_RE = re.compile(
+    r"must (?:not |NOT )?(?:load|call|invoke|use) ", re.IGNORECASE
+)
+
+
+def _cas_deval(root: Path) -> list[Path]:
+    """Case directories `claude plugin eval` would run."""
+    base = root / "evals"
+    if not base.is_dir():
+        return []
+    return [p for p in sorted(base.iterdir())
+            if p.is_dir() and ((p / "case.yaml").is_file() or (p / "prompt.md").is_file())]
+
+
+def check_eval_quality(root: Path, report: Report) -> None:
+    """Whether a suite can fail - not whether it is well formed.
+
+    Check 26 says the suite parses. These three say it measures something. All
+    three come from defects found by hand on this plugin's own suite on
+    2026-09-22, each of which check 26 declared sound:
+
+    - a fact entrusted to a judge who cannot see it (the judge passed runs in
+      which the skill was never loaded);
+    - a case whose every grader is an opinion, so nothing about it is exact;
+    - a suite with no fixture, whose cases ask about files that do not exist.
+    """
+    cas = _cas_deval(root)
+    if not cas:
+        return
+    sans_fixture = 0
+    for dossier in cas:
+        types: list[str] = []
+        rubriques: list[str] = []
+        gdir = dossier / "graders"
+        if gdir.is_dir():
+            for g in sorted(gdir.glob("*.md")):
+                try:
+                    brut = g.read_text(encoding="utf-8")
+                except (OSError, UnicodeDecodeError):
+                    continue
+                # parse_frontmatter returns (fields, end line), not a body: the rubric
+                # is what follows, and searching the whole file is equivalent here
+                # because no frontmatter key carries that wording.
+                fm, _ = parse_frontmatter(brut)
+                t = str((fm or {}).get("type", ""))
+                types.append(t)
+                if t == "llm":
+                    rubriques.append(brut)
+        if not types:
+            continue
+        mecanique = [t for t in types if t != "llm" and t != "baseline"]
+        fait_juge = any(JUDGED_FACT_RE.search(r) for r in rubriques)
+        if fait_juge and not any(t == "tool_used" for t in types):
+            report.add(
+                "39-eval-judged-fact",
+                "WARN",
+                f"Case '{dossier.name}': an llm rubric states a fact about the run "
+                "(\"must load\" / \"must not call\") and the case carries no `tool_used` "
+                "grader. The judge reads the last message, not the trajectory, so it can "
+                "pass a run that did the opposite. Add `type: tool_used` with `tool: Skill` "
+                "(and `min: 0`, `max: 0`, `arm: both` when absence is the point) and let the "
+                "rubric grade only what has to be judged.",
+                str(dossier),
+            )
+        elif not mecanique:
+            report.add(
+                "39-eval-all-llm",
+                "INFO",
+                f"Case '{dossier.name}': every grader is an llm judge. Whatever in it can "
+                "be counted is being voted on instead - measured on this plugin, a judge "
+                "carries a standard deviation near 0.49 where a counter carries 0.000.",
+                str(dossier),
+            )
+        if not (dossier / "case.yaml").is_file():
+            sans_fixture += 1
+        else:
+            try:
+                if "scaffold_script" not in (dossier / "case.yaml").read_text(encoding="utf-8"):
+                    sans_fixture += 1
+            except (OSError, UnicodeDecodeError):
+                sans_fixture += 1
+    if sans_fixture == len(cas):
+        report.add(
+            "39-eval-no-fixture",
+            "INFO",
+            f"None of the {len(cas)} eval case(s) declares a `scaffold_script`, so every "
+            "case runs against an empty workspace. A rubric that asks the run to measure a "
+            "CLAUDE.md, a skill or a budget is asking about files that are not there, and "
+            "fails for a reason that has nothing to do with the skill. Either give the case "
+            "a fixture (`case.yaml`, run with --scaffold) or grade doctrine rather than a "
+            "measurement.",
+            str(root / "evals"),
+        )
 
 
 def check_evals(root: Path, report: Report) -> None:
@@ -2952,6 +3125,7 @@ def main(argv: list[str]) -> int:
     run(check_skill_index, root, report, skills)
     run(check_reference_sizes, root, report)
     run(check_always_loaded_budget, root, report, skills, agents)
+    run(check_unreadable, root, report)
     run(check_see_skill_targets, root, report, skills)
     run(check_foreign_skill_mentions, root, report, skills)
     run(check_documented_flags, root, report)
@@ -2963,6 +3137,7 @@ def main(argv: list[str]) -> int:
     run(check_hooks, root, report)
     run(check_orphan_references, root, report)
     run(check_evals, root, report)
+    run(check_eval_quality, root, report)
     run(check_twin_division_tables, root, report, skills)
 
     run(check_skill_anchors, root, report)

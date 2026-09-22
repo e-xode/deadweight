@@ -8,6 +8,8 @@ Measured against a sample of **15 third-party public repositories** cloned for t
 configurations this auditor had never seen. On that sample it reported **38 errors before, 7
 after, and all 7 are real**. The 31 it stopped reporting were its own defects, not theirs.
 
+### What it stops saying wrongly
+
 - **The frontmatter parser lost every field that followed a YAML comment.** A `# SECTION` line
   above `name:` was glued onto the name, so every downstream check judged a value the file does
   not contain. One sampled repository produced **422 false errors** from this alone, and 179 of
@@ -71,6 +73,69 @@ after, and all 7 are real**. The 31 it stopped reporting were its own defects, n
   Writing the first of them exposed a real defect — the description offered `packaging skills as
   a plugin` as a trigger, which a release task matches — now narrowed to `a plugin manifest or
   marketplace entry needs checking`.
+
+- **A cross-reference to a plugin skill was reported as broken.** Checks 18 and 36 read
+  `➜ See skill: deadweight:config-auditor` — the very form a consuming project must write to
+  route here — stopped at the `:`, kept `deadweight` alone, and reported a non-existent skill.
+  The plugin therefore manufactured an ERROR in any project that followed the convention the
+  plugin itself prescribes. A namespaced name now parses whole and is not resolved: whether it
+  exists depends on what the reader installed, and nothing on disk says. Same call already made
+  for a link that climbs above the repository root.
+
+- **`marketplace.json` no longer carries a second version number.** `metadata.version` said
+  `1.0.0` while the plugin entry said `0.8.0`. Written once at 0.1.0 and never touched across
+  eight releases, it was inert, the field is optional, and two numbers nothing synchronises are
+  two numbers that drift.
+
+### What it judges now
+
+**The auditor now judges whether an eval suite can fail.** Three checks, each born from a defect
+found by hand on this plugin's own suite on 2026-09-22 — every one of which `26-evals-schema`
+declared sound:
+
+- **`39-eval-judged-fact`** — an `llm` rubric that states a fact about the run (*"must load"*,
+  *"must not call"*) while the case carries no `tool_used` grader. The judge reads the last
+  message, not the trajectory, so it can pass a run that did the opposite. Measured here:
+  a rubric opening with *"The run must load the `config-auditor` skill"* passed **3 runs out of
+  5 in which the skill was never loaded**. The judge was not capricious, it was blind.
+- **`39-eval-all-llm`** — a case whose every grader is a judge. Measured on twenty runs: a
+  deterministic grader carries a standard deviation of **0.000**, the judge grading the same
+  runs **0.49**. Whatever can be counted is being voted on.
+- **`39-eval-no-fixture`** — no case declares a `scaffold_script`, so every case runs against an
+  empty workspace. A rubric that asks the run to measure a CLAUDE.md, a skill or a budget is
+  asking about files that are not there.
+
+**An unreadable file took the whole audit down.** Nine call sites caught only
+`UnicodeDecodeError`, so a file the process may not open raised `PermissionError` and ended the
+run — found when an eval sandbox masked `.claude/loop.md` and the transcript reported that the
+audit script crashes. The catches now include `OSError`, and the new **`38-unreadable`** reports
+what was skipped: an auditor that says nothing about what it could not read is claiming a
+coverage it does not have.
+
+**Checks 04 and 08b carried two different anti-trigger patterns.** 08b's missed `Do not use`
+with a space, which 04 accepted, so the same clause was seen on a skill and not on an agent.
+One shared `ANTI_TRIGGER_RE` now serves both, widened to the openers actually in use. It also
+accepts non-English openers: a project that has formally exempted `11-english-only` writes its
+descriptions in its own language, and refusing to see the clause there fires this check on
+precisely the projects that already declared their exception.
+
+**The skill's own description was under-triggering, measured.** Two requests squarely inside its
+subject did not load it: *"Two of our skills keep firing on each other's requests"* (**1 run in
+10**) and an exemption request (**0 in 10**). The diagnosis cost nothing — the first shared **no
+word of four letters or more** with the trigger surface, the second shared one. Two clauses were
+added (748 to 899 chars, cap 1,024), after which both reach **10 out of 10**, the first at a
+constant prompt (Fisher exact, **p = 0.000119**).
+
+**Three eval rubrics now grade doctrine rather than a measurement.** The eval sandbox masks the
+workspace's `.claude/` files, so no case can read a real CLAUDE.md, skill or agent:
+`33-description-overlap` reports `0 listed description(s)` there. `budget-growth` and
+`two-skills-compete` were failing every run for a reason unrelated to the skill.
+
+**`exemption-request` was a case that passed without the skill under test.** It asked how to
+silence a warning on a file kept in another language — answerable from general knowledge, and
+answered correctly in 3 runs of 5 in which the skill never loaded. It now asks for an exemption
+on `34-audit-sha`, which cannot be exempted: the overlay may not excuse the checks that audit
+the overlay or the ratchet themselves. The right answer is a reasoned refusal.
 
 ## 0.7.1 — 2026-09-22
 
