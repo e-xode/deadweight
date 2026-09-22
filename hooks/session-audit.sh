@@ -39,7 +39,7 @@ CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/claude-audit"
 mkdir -p "$CACHE" 2>/dev/null || exit 0
 # Basename plus a short digest of the full path: two checked-out copies of the
 # same repository are two projects, and must not overwrite each other's line.
-KEY="$(basename "$ROOT")-$(printf '%s' "$ROOT" | cksum | cut -d' ' -f1)"
+KEY="$(basename "$ROOT")-$(printf '%s' "$ROOT" | md5sum | cut -c1-8)"
 
 TMP="$(mktemp)" || exit 0
 trap 'rm -f "$TMP"' EXIT

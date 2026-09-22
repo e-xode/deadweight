@@ -38,7 +38,7 @@ if [ "$FRESH" = 1 ]; then
 fi
 
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/claude-audit"
-SRC="$CACHE/$(basename "$ROOT")-$(printf '%s' "$ROOT" | cksum | cut -d' ' -f1).json"
+SRC="$CACHE/$(basename "$ROOT")-$(printf '%s' "$ROOT" | md5sum | cut -c1-8).json"
 if [ ! -s "$SRC" ]; then
   echo "Aucune mesure en cache pour $ROOT."
   echo "Le hook SessionStart ecrit ce fichier a l'ouverture d'une session; « deadweight --fresh » mesure maintenant."

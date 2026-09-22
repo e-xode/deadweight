@@ -36,7 +36,7 @@ DIR=$(printf '%s' "$IN" | jq -r '.workspace.project_dir // .cwd // empty' 2>/dev
 [ -n "$DIR" ] || exit 0
 
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/claude-audit"
-KEY="$(basename "$DIR")-$(printf '%s' "$DIR" | cksum | cut -d' ' -f1)"
+KEY="$(basename "$DIR")-$(printf '%s' "$DIR" | md5sum | cut -c1-8)"
 SRC="$CACHE/$KEY.json"
 # The cache is the live value. The in-repository series is the fallback, for a
 # project that keeps the record but whose cache has been cleared.

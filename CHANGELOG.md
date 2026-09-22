@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.1.1 — 2026-09-22
+
+- Cache key for the status line switched from `cksum` to `md5`: the shell and a Python status line
+  must compute the same key, and `cksum` is not reproducible in Python without reimplementing it.
+- The hook now caches the **findings**, not only the counts, and `bin/deadweight` prints them. A
+  status line that says `3W` with no way to see which three is a number without a referent.
 
 - **Check 35 — hooks.** The one component that executes, and the one this auditor could not see.
   Catches event names that do not exist (a typo never fires and never complains), commands whose
