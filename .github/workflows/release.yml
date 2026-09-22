@@ -1,0 +1,72 @@
+name: release
+
+# Two jobs, and the split matters more than either of them.
+#
+# `verify` runs on every push to main and only LOOKS: does the manifest agree with
+# the marketplace entry, and does the version it declares carry a tag? A version
+# published without a tag resolves no semver range, so a dependent plugin is
+# disabled with `no-matching-tag` and its author has no idea why.
+#
+# `publish` runs on a tag and only DERIVES: it turns the CHANGELOG section into a
+# GitHub Release. The tag is a human act, produced locally by `claude plugin tag
+# --push`, which refuses when the manifest and the marketplace entry disagree, when
+# the tree is dirty, or when the tag already exists.
+#
+# WHY CI NEVER CREATES THE TAG. The release gate includes a check that cannot run
+# here by construction: the anonymity gate, which needs the list of private names
+# this public repository must not contain. A repository holding that list has
+# already leaked, so the check lives on the private side. CI is therefore never the
+# complete gate - and a CI that both judges and releases can release by changing
+# the judgement.
+
+on:
+  push:
+    branches: [main]
+    tags: ["*--v*"]
+
+jobs:
+  verify:
+    if: startsWith(github.ref, 'refs/heads/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Manifest and marketplace entry must agree, and the version must be tagged
+        run: |
+          set -euo pipefail
+          name=$(python3 -c "import json;print(json.load(open('.claude-plugin/plugin.json'))['name'])")
+          v=$(python3 -c "import json;print(json.load(open('.claude-plugin/plugin.json'))['version'])")
+          mv=$(python3 -c "import json;print(json.load(open('.claude-plugin/marketplace.json'))['plugins'][0].get('version',''))")
+          if [ "$v" != "$mv" ]; then
+            echo "::error::plugin.json says $v, the marketplace entry says '${mv:-none}'. A dependent resolves against the marketplace entry, so they cannot differ."
+            exit 1
+          fi
+          if ! git rev-parse -q --verify "refs/tags/$name--v$v" >/dev/null; then
+            echo "::error::version $v has no tag $name--v$v. Semver ranges resolve against tags: without one, a dependent plugin is disabled with no-matching-tag. Run 'claude plugin tag --push' locally - it validates what this job cannot."
+            exit 1
+          fi
+          echo "$name $v is tagged and consistent."
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cut the GitHub Release from the CHANGELOG section
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -euo pipefail
+          v="${GITHUB_REF_NAME##*--v}"
+          python3 - "$v" > notes.md <<'PY'
+          import re, sys
+          v = sys.argv[1]
+          t = open("CHANGELOG.md", encoding="utf-8").read()
+          m = re.search(rf"^## {re.escape(v)}[^\n]*\n(.*?)(?=^## |\Z)", t, re.S | re.M)
+          # No section is a failure, not a default: a release whose notes are "see the
+          # commits" is a release nobody reads.
+          if not m:
+              sys.exit(f"CHANGELOG.md has no '## {v}' section")
+          print(m.group(1).strip())
+          PY
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md

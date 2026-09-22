@@ -3,12 +3,25 @@
 **Audit the Claude Code configuration of a project.** One skill, one Python script, no
 dependencies, no network.
 
-Every skill description you write is injected into the model's context **on every single turn**,
-whether the skill is used or not. So is `CLAUDE.md`. So is every sub-agent description. A
-configuration that grows for six months without anyone measuring it ends up spending thousands of
-characters per turn on instructions nothing reads.
+Deadweight is configuration you carry that does nothing. It does nothing in three ways, and only
+the first is about tokens.
 
-That is the deadweight. This plugin measures it.
+**It costs and returns nothing.** Every skill description is injected into the model's context on
+every single turn, used or not. So is `CLAUDE.md`. So is every sub-agent description. A
+configuration that grows for six months without anyone measuring it spends thousands of characters
+per turn on instructions nothing reads.
+
+**It points at nothing.** A rule whose `paths:` glob matches no file never loads. A hook whose
+script was deleted still sits in your settings. A reference links to a file that is not there, and
+where a human shrugs, a model goes looking — bounded cost for one, unbounded for the other. Two
+descriptions close enough to steal each other's triggers are a defect neither file can show you.
+
+**It cannot be shown wrong.** A skill that names no checkable path can only be trusted, never
+refuted. A suite of evals nothing can execute is not a suite. A count with no floor is a number
+people learn to scroll past.
+
+Of the 36 check groups here, 11 are about what the configuration costs. The other 25 are about
+whether it does anything at all.
 
 ## What it checks
 
@@ -151,6 +164,34 @@ What it holds is the schema and the detector; the content lives in the consuming
 
 Templates for the first two are in `skills/config-auditor/templates/`. All three are optional:
 absent means "this project has recorded nothing", which is a valid state, not a missing file.
+
+### A project may hold its own number — for a doctrine threshold only
+
+```json
+{ "thresholds": {
+    "CLAUDE_MD_MAX_BYTES": {
+      "value": 13312,
+      "reason": "Ops repository: CLAUDE.md is hard rules end to end, every procedure already lives in its own skill.",
+      "date": "2026-09-22" } } }
+```
+
+Thresholds come in three families, and treating them alike would be the mistake.
+
+| Family | Examples | Overridable |
+| --- | --- | --- |
+| **Mechanism** — imposed by the harness | the 1,024-char spec cap on `description`, the 1,536 listing cutoff, the compaction slice, the context window | **No.** The override is refused as an error, naming why: moving the number changes what the audit says, not what the harness does |
+| **Doctrine** — uniform by choice | `CLAUDE_MD_MAX_BYTES`, the always-loaded budget, reference length, the overlap threshold, eval coverage | **Yes**, with a reason and a date |
+| **Derived** — computed from the project's own settings | the listing ceiling, from `skillListingBudgetFraction` | Already the project's |
+
+Every applied override prints itself on every run:
+
+```
+[31-overlay-threshold] `CLAUDE_MD_MAX_BYTES` 12288 -> 13312, on this project's
+authority (2026-09-22): Ops repository, CLAUDE.md is hard rules end to end.
+```
+
+An override nobody sees is a doctrine quietly rewritten. One that announces itself is a decision
+anyone can re-open — including the person who made it, six months later.
 
 An exemption without a `reason` is a decision nobody can review; without a `date`, one nobody can
 age out. A bare list of exempt paths is amnesia — six months on nobody dares remove an entry, so the

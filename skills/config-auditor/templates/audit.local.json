@@ -1,5 +1,6 @@
 {
-  "_comment": "Copy to <your-project>/.claude/audit.local.json. Every exemption needs a reason and a date: check 31 rejects it otherwise. This file is the project's, never the plugin's.",
+  "_comment": "Copy to <your-project>/.claude/audit.local.json. This file is the project's, never the plugin's: shipped as a plugin, the auditor lives in a version-stamped cache that is replaced on every update, so anything written next to it is lost.",
+
   "exemptions": [
     {
       "check": "11-english-only",
@@ -7,5 +8,13 @@
       "reason": "FR/EN glossary, bilingual by nature",
       "date": "2026-09-22"
     }
-  ]
+  ],
+
+  "thresholds": {
+    "CLAUDE_MD_MAX_BYTES": {
+      "value": 13312,
+      "reason": "Ops repository: CLAUDE.md is hard rules end to end, every procedure already lives in its own skill. Nothing left to move out.",
+      "date": "2026-09-22"
+    }
+  }
 }

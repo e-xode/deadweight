@@ -1,3 +1,9 @@
 __pycache__/
 *.pyc
 .DS_Store
+
+# Eval run artefacts. `claude plugin eval` writes the full model transcript here,
+# including the ABSOLUTE PATHS of the machine that ran it. Committed once by
+# accident on 2026-09-22: 13 occurrences of a home directory reached a public
+# repository through a tag. A run's output is a measurement, not a deliverable.
+evals/results/

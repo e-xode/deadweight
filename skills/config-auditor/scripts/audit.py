@@ -121,6 +121,34 @@ EVALS_MIN_COUNT = 3
 #    is a per-repository dial (measured 2026-09-20 across one fleet of 19: 0.025 in
 #    eight repositories, 0.05 in one, 0.06 in another). Hard-coding one ceiling across
 #    repositories that set different fractions would uniformise the wrong thing.
+# --- Which thresholds a project may move, and which it may not -------------
+# C57 names three families of threshold, and treating them alike would be the
+# mistake. MECHANISM is imposed by the harness: a project that raises the 1,024
+# spec cap has not adjusted a threshold, it has decided to ignore a limit its
+# upload will hit anyway. DOCTRINE is uniform by choice, so a repository with a
+# good reason may hold its own number - an ops repository whose CLAUDE.md is all
+# hard rules is the case that forced this. DERIVED already comes from the
+# project's own settings and needs no override.
+#
+# Refusing loudly is the point. A plugin that silently obeyed any override would
+# turn its own doctrine into a suggestion, and the audit into a mirror.
+OVERRIDABLE_THRESHOLDS = frozenset({
+    "CLAUDE_MD_MAX_BYTES", "CLAUDE_MD_MAX_LINES", "SKILL_MD_ERROR_BYTES",
+    "REFERENCE_WARN_LINES", "REFERENCE_TOC_LINES", "DESCRIPTION_MIN_CHARS",
+    "AGENT_DESCRIPTION_MAX_CHARS", "ALWAYS_LOADED_WARN_CHARS",
+    "ALWAYS_LOADED_ERROR_CHARS", "SKILL_DESC_AGGREGATE_WARN_CHARS",
+    "PLUGIN_COST_WARN_CHARS", "OVERLAP_THRESHOLD", "EVALS_COVERAGE_WARN",
+    "EVALS_MIN_COUNT",
+})
+MECHANISM_THRESHOLDS = {
+    "DESCRIPTION_MAX_CHARS": "the Agent Skills spec cap on `description` alone; over it the upload fails",
+    "DESCRIPTION_LISTING_MAX_CHARS": "where the harness truncates the listing; moving the number moves nothing",
+    "SKILL_MD_COMPACTION_WARN_BYTES": "the slice re-attached after compaction; it is the harness's, not yours",
+    "SKILL_NAME_MAX_CHARS": "a spec limit on the name field",
+    "CONTEXT_WINDOW_TOKENS": "the window the model actually has",
+    "CHARS_PER_TOKEN": "kept optimistic on purpose so every derived figure is a floor",
+}
+
 LISTING_FRACTION_DEFAULT = 0.01       # harness default: 1% of the context window
 CONTEXT_WINDOW_TOKENS = 1_000_000     # the window this fleet actually runs on
 # Measured 2026-09-22 with `claude plugin details`, the harness's own projection.
@@ -169,7 +197,7 @@ CHECKS = (
     "skill anchors resolve to real files (falsifiability)",
     "listing budget derived from skillListingBudgetFraction",
     "plugin cost imposed on each consuming project",
-    "project overlay: every exemption carries a reason, a date and a live path",
+    "project overlay: exemptions and doctrine-threshold overrides, each with a reason and a date",
     "skill name shape + reserved words (spec)",
     "confusable descriptions (TF-IDF cosine between listed skills)",
     "ratchet: counts against the recorded floor, same instrument only",
@@ -282,6 +310,75 @@ def load_local_config(root: Path) -> dict:
         return data if isinstance(data, dict) else {}
     except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         return {"__error__": str(path)}
+
+
+def apply_thresholds(local: dict, report: Report) -> None:
+    """Let a project hold its own number for a DOCTRINE threshold, and say so.
+
+    Schema, in `<project>/.claude/audit.local.json`:
+
+        {"thresholds": {"CLAUDE_MD_MAX_BYTES":
+            {"value": 13312, "reason": "ops repository, all hard rules", "date": "2026-09-22"}}}
+
+    `reason` and `date` are required for exactly the same cause as on an
+    exemption: a bare number is amnesia. Six months on nobody knows why the
+    ceiling is 13 KB, so nobody dares lower it, and the dial only ever turns one
+    way.
+
+    Every applied override is reported as INFO on every run. An override nobody
+    sees is a doctrine quietly rewritten; one that prints itself is a decision
+    anyone can re-open.
+    """
+    # Une cle inconnue dans l'overlay etait ignoree en silence : un projet qui
+    # ecrivait `thresholds` sur une version anterieure ne recevait aucun signal et
+    # cherchait pourquoi rien ne bougeait. Un fichier de configuration qui accepte
+    # tout et n'applique qu'une partie est pire qu'un fichier qui refuse.
+    connues = {"exemptions", "thresholds", "_comment"}
+    for k in sorted(set(local) - connues):
+        report.add("31-overlay-unknown", "WARN",
+                   f"`{k}` is not a key this audit reads, so it does nothing. Known keys: "
+                   f"{', '.join(sorted(connues - {'_comment'}))}.", "")
+    over = local.get("thresholds")
+    if not isinstance(over, dict):
+        return
+    for nom in sorted(over):
+        spec = over[nom]
+        if nom in MECHANISM_THRESHOLDS:
+            report.add("31-overlay-threshold", "ERROR",
+                       f"`{nom}` cannot be overridden: {MECHANISM_THRESHOLDS[nom]}. "
+                       "Moving this number changes what the audit says, not what the harness "
+                       "does.", "")
+            continue
+        if nom not in OVERRIDABLE_THRESHOLDS:
+            report.add("31-overlay-threshold", "ERROR",
+                       f"`{nom}` is not a threshold this audit recognises. Known overridable "
+                       f"thresholds: {', '.join(sorted(OVERRIDABLE_THRESHOLDS))}.", "")
+            continue
+        if not isinstance(spec, dict) or "value" not in spec:
+            report.add("31-overlay-threshold", "ERROR",
+                       f"`{nom}` must be an object with `value`, `reason` and `date`.", "")
+            continue
+        manque = [k for k in ("reason", "date") if not str(spec.get(k, "")).strip()]
+        if manque:
+            report.add("31-overlay-threshold", "ERROR",
+                       f"`{nom}` overrides a doctrine threshold without {' and '.join(manque)}. "
+                       "A number with no reason is a number nobody dares change back.", "")
+            continue
+        if not ISO_DATE_RE.match(str(spec["date"])):
+            report.add("31-overlay-threshold", "ERROR",
+                       f"`{nom}`: `date` must be YYYY-MM-DD.", "")
+            continue
+        ancien = globals().get(nom)
+        try:
+            valeur = type(ancien)(spec["value"])
+        except (TypeError, ValueError):
+            report.add("31-overlay-threshold", "ERROR",
+                       f"`{nom}`: `value` is not a {type(ancien).__name__}.", "")
+            continue
+        globals()[nom] = valeur
+        report.add("31-overlay-threshold", "INFO",
+                   f"`{nom}` {ancien} -> {valeur}, on this project's authority "
+                   f"({spec['date']}): {spec['reason']}", "")
 
 
 def exemption_paths(local: dict, check: str) -> set[str]:
@@ -2261,9 +2358,17 @@ def check_project_overlay(root: Path, report: Report, local: dict) -> None:
 
     raw = local.get("exemptions")
     if raw is None:
+        # An overlay that carries only `thresholds` is legitimate since 0.4.0: a
+        # project may hold its own doctrine number without granting any exemption.
+        # Demanding both keys would make the file a form to fill rather than a place
+        # to record what this project decided.
+        if local.get("thresholds"):
+            return
         report.add("31-overlay-schema", "ERROR",
-                   "audit.local.json has no `exemptions` key. Schema: "
-                   '{"exemptions": [{"check", "path", "reason", "date"}]}.', str(path))
+                   "audit.local.json has neither `exemptions` nor `thresholds`, so it "
+                   'does nothing. Schema: {"exemptions": [{"check", "path", "reason", '
+                   '"date"}], "thresholds": {"<NAME>": {"value", "reason", "date"}}}.',
+                   str(path))
         return
     if not isinstance(raw, list):
         report.add("31-overlay-schema", "ERROR",
@@ -2435,6 +2540,9 @@ def main(argv: list[str]) -> int:
     _local = load_local_config(root)
     ENGLISH_ONLY_EXEMPT = exemption_paths(_local, "11-english-only")
     report = Report()
+    # Avant tout controle : un seuil deplace doit l'etre pour TOUS les controles
+    # qui le lisent, pas seulement pour ceux qui tournent apres.
+    apply_thresholds(_local, report)
     report.add(
         "00-layout",
         "INFO",

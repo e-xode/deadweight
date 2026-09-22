@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.0 — 2026-09-22
+
+**This release changes `audit.py`, so a floor set with an earlier version stops comparing.
+Re-set it with `--set-floor` after reading the two counts side by side.**
+
+- **A project may hold its own number for a doctrine threshold**, declared in
+  `.claude/audit.local.json` under `thresholds`, each with a `reason` and a `date` — the same
+  discipline exemptions already carry, for the same cause: a bare number is amnesia, and a dial
+  nobody dares turn back only ever turns one way.
+- **Mechanism thresholds are refused, loudly.** The 1,024-char spec cap, the 1,536 listing cutoff,
+  the compaction slice and the context window are not the project's to move: overriding them
+  changes what the audit says, not what the harness does. The error names which one and why.
+- **Unknown overlay keys are reported.** They were ignored in silence, so a project writing
+  `thresholds` against an older release got no signal and wondered why nothing moved. A
+  configuration file that accepts everything and applies part of it is worse than one that refuses.
+
+The case that forced this: an ops repository whose `CLAUDE.md` is 12,858 bytes against a 12,288
+ceiling, and whose largest section states that every procedure already lives in its own skill.
+There was nothing left to move out — the ceiling would have been paid by deleting a rule. Check 57
+of the doctrine says it plainly: uniformise the rule, not the number.
+
 ## 0.3.0 — 2026-09-22
 
 **This release changes `audit.py`, so every floor set with an earlier version stops comparing.
