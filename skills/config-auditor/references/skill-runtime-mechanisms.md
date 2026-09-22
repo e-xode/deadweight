@@ -275,7 +275,7 @@ Mitigations, all on the project side because a bundled skill cannot be withheld 
 - Arrows that mean "delegate to an agent" carry the `agent` qualifier (`→ design agent`,
   `→ translate agent`), so a pointer never resolves to a bundled skill by accident.
 - A project description that competes with a bundled skill names it in its anti-trigger clause
-  (a vendor-named project skill → `claude-api`; `review` → `code-review`).
+  (a vendor-named project skill renamed to `api-vendor`; a bare `review` renamed to `shop-review`).
 - The collision is documented, not fought: the bundled listing changes with every CLI release, so
   re-read it at each audit and update this table.
 

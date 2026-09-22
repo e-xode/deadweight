@@ -11,15 +11,21 @@ description: "Audit and govern a Claude Code configuration - a project's (CLAUDE
 
 | In scope                                                     | Out of scope                                                            |
 | ------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| Rules for writing/editing `CLAUDE.md`                        | Validating modified application code (→ `hooks` agent)                  |
-| Anatomy of a project skill (frontmatter, references, budget) | The workflow of drafting and evaluating a new skill (→ `skill-creator`) |
-| Anatomy of a project sub-agent                               | Git hooks and commit format (→ `git-workflow`)                          |
+| Rules for writing/editing `CLAUDE.md`                        | Validating modified application code (your own validation agent)                  |
+| Anatomy of a project skill (frontmatter, references, budget) | The workflow of drafting and evaluating a new skill (Anthropic's `skill-creator`, where installed) |
+| Anatomy of a project sub-agent                               | Git hooks and commit format (your own git skill, if any)                          |
 | Anatomy of path-scoped rules (`.claude/rules/`)              | Vue/the design system lifecycle hooks (framework concepts)                        |
-| Validation-path doctrine (agent-driven; observation hooks allowed)       | Skill description optimisation tooling (→ `skill-creator`)              |
+| Validation-path doctrine (agent-driven; observation hooks allowed)       | Skill description optimisation tooling (`skill-creator`, where installed)              |
 | Audit checklist + automated `scripts/audit.py`               | Application architecture (→ `shop-architecture`)                         |
 | Anthropic doctrine: progressive disclosure, agent design     |                                                                         |
 
 ## Division of responsibilities — `config-auditor` ↔ `skill-creator`
+
+**`skill-creator` may not be installed where you are reading this, and absent is a valid state.**
+This plugin needs nothing from it and declares no dependency on it: the table below is a routing
+hint for projects that have both, not a requirement. A plugin that routes to a skill it does not
+ship hands the reader a dangling reference — a human shrugs at one, a model goes looking, and the
+cost of looking is unbounded.
 
 `skill-creator` is Anthropic's upstream skill (Apache-2.0). The two are complementary, not
 competing: `skill-creator` builds one skill, `config-auditor` judges the configuration a skill

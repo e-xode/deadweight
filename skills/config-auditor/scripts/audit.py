@@ -163,6 +163,7 @@ CHECKS = (
     "confusable descriptions (TF-IDF cosine between listed skills)",
     "ratchet: counts against the recorded floor, same instrument only",
     "hooks: known events, resolvable commands, timeouts, and what their stdout costs",
+    "plugin routing to skills it does not ship",
 )
 FRENCH_HEURISTIC_WORDS = {
     "avec", "pour", "dans", "cette", "celui", "celle", "ceux", "celles",
@@ -886,6 +887,63 @@ def check_see_skill_targets(root: Path, report: Report, skills: dict[str, dict])
                     f"Cross-reference '➜ See skill: {name}' points to a non-existent skill.",
                     str(path),
                 )
+
+
+def check_foreign_skill_mentions(root: Path, report: Report, skills: dict[str, dict]) -> None:
+    """A plugin must not route to skills it does not ship.
+
+    A reference to a skill the reader does not have is a dangling reference, and a
+    dangling reference costs a model more than a human: a human shrugs, a model goes
+    looking - Glob, Grep, wrong files read. Bounded cost for one, unbounded for the
+    other. In a PROJECT that risk is local and check 18 already covers the formal
+    `➜ See skill:` form. In a PLUGIN the same sentence ships to every consumer, and
+    in most of them the target does not exist.
+
+    Two shapes are legitimate and are not flagged: the declared fictional example
+    domain (a plugin's references need a worked example), and an angle-bracket
+    placeholder. What is flagged is a bare backticked skill name that the plugin
+    does not ship - it reads as a routing instruction and is not one.
+
+    The fix is never to delete the sentence: it is to say that absent is a valid
+    state, or to move the name into the example domain.
+    """
+    if LAYOUT != "plugin":
+        return
+    # ROUTING CONTEXTS ONLY. A first version matched any backticked kebab-case
+    # token and returned 21 findings, of which some fifteen were frontmatter keys
+    # (`disable-model-invocation`, `allowed-tools`), eval vocabulary
+    # (`anti-trigger`, `near-miss`) and built-in commands. A detector that is
+    # wrong seven times out of ten is one people learn to skip, which is worse
+    # than not having it. What makes a name a routing instruction is the arrow in
+    # front of it, not its shape.
+    example_prefixes = ("shop-", "ui-", "api-", "data-")
+    # Le tiret n'est pas obligatoire dans un nom de skill : une premiere version
+    # l'exigeait et ratait `hooks`, `review`, `translate`, `release`. La fleche
+    # suffit a qualifier le contexte ; la forme du nom n'a pas a le faire.
+    routing = re.compile(r"(?:➜\s*See skill:\s*|→\s*`)([a-z0-9]+(?:-[a-z0-9]+)*)")
+    seen: dict[str, list[str]] = {}
+    base = root / SKILLS_DIR
+    if not base.is_dir():
+        return
+    for path in sorted(base.rglob("*.md")):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for m in routing.finditer(text):
+            name = m.group(1)
+            if name in skills or name.startswith(example_prefixes):
+                continue
+            seen.setdefault(name, []).append(str(path.relative_to(root)))
+    for name, where in sorted(seen.items(), key=lambda kv: -len(kv[1])):
+        report.add(
+            "36-foreign-skill",
+            "WARN",
+            f"`{name}` reads as a skill name but this plugin does not ship it "
+            f"({len(where)} mention(s), e.g. {where[0]}). In a consuming project it may "
+            "not exist: say that absent is a valid state, or move it to the example domain.",
+            str(root / SKILLS_DIR),
+        )
 
 
 def check_cross_refs(
@@ -2418,6 +2476,7 @@ def main(argv: list[str]) -> int:
     check_reference_sizes(root, report)
     run(check_always_loaded_budget, root, report, skills, agents)
     check_see_skill_targets(root, report, skills)
+    check_foreign_skill_mentions(root, report, skills)
     check_frontmatter_quoting(root, report)
     check_all_relative_links(root, report)
     run(check_rule_globs, root, report)

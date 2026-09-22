@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.0 — 2026-09-22
+
+- **Check 36 — a plugin must not route to skills it does not ship.** Six routing arrows pointed at
+  `skill-creator`, `git-workflow`, `hooks`, `translate`, `claude-api` and `code-review`. In a
+  consuming project most of those do not exist, and a dangling reference costs a model more than a
+  human: a human shrugs, a model goes looking, and the cost of looking is unbounded. Rewritten to
+  the example domain or to "where installed", and the check keeps them from coming back.
+- The check reads **routing contexts only** (`➜ See skill:` and `→ \`name\``). A first version
+  matched any backticked kebab-case token and returned 21 findings, three quarters of which were
+  frontmatter keys and eval vocabulary. A detector wrong seven times in ten is one people skip.
+- `skill-creator` is now named as optional in the division-of-responsibilities section, with the
+  reason. **No `dependencies` entry**: this plugin needs nothing from it, a dependency would double
+  the always-on cost every consumer cannot refuse, and enabling or disabling the two would become
+  coupled.
+
 ## 0.1.5 — 2026-09-22
 
 - **The hook no longer writes the history series at all.** `history.jsonl` is dated to the day and

@@ -201,7 +201,7 @@ contract, not the agents — so the contract moved here.
 
 Create a new agent when:
 
-- A class of tasks has a **clear domain boundary** (e.g., i18n JSON → `translate` agent: locale files, fleet parallelism is natural).
+- A class of tasks has a **clear domain boundary** (e.g., i18n JSON handled by a `data-i18n` agent: locale files, fleet parallelism is natural).
 - Tasks need a **different tool set or model** (`hooks` runs only `Bash` on `haiku`; `review` is read-only).
 - The orchestrator would otherwise **repeat the same long preamble** to delegate the work.
 
