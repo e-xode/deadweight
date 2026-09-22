@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.3 — 2026-09-22
+
+- **Corrects a false claim this plugin was making about itself.** Rule 17 listed three levers a
+  project can use to withhold a skill's description. Measured on 2026-09-22, with a project skill
+  as the negative control: **none of the three reaches a plugin skill**, with or without the
+  `<plugin>:` prefix on the `skillOverrides` key. A consuming project's only lever is disabling the
+  whole plugin. Check 30 now says so in its own message: a plugin's listing cost is a tax its
+  consumers cannot negotiate, which is an argument for writing the description short.
+
 ## 0.1.2 — 2026-09-22
 
 - **`jq` is gone.** `bin/deadweight` and the status line template were shell scripts piping through

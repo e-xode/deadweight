@@ -2020,7 +2020,7 @@ def check_plugin_cost(
         f"Plugin `{plugin_name}` adds {total} chars to the always-loaded context of "
         f"EACH consuming project ({len(listed)} skill description(s) {skill_chars} + "
         f"{len(agents)} agent description(s) {agent_chars}), plus {namespacing} chars of "
-        f"`{plugin_name}:` namespacing in the skill listing.{detail}"
+        f"`{plugin_name}:` namespacing in the skill listing. This cost is NOT negotiable downstream: `skillOverrides` does not reach a plugin skill (measured 2026-09-22), so a consuming project can only disable the whole plugin.{detail}"
     )
     if total > PLUGIN_COST_WARN_CHARS:
         report.add(
