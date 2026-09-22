@@ -1,7 +1,7 @@
 {
   "name": "deadweight",
   "displayName": "Deadweight",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Audit the Claude Code configuration of a project or of a plugin: CLAUDE.md, skills, sub-agents, rules, settings, and the context budget a configuration spends on every turn. Finds the configuration that costs context every turn and does nothing.",
   "author": {
     "name": "Christophe Bragard",

@@ -31,23 +31,66 @@ It reports `OK` / `INFO` / `WARN` / `ERROR` and exits 1 on any error.
 
 ## Install
 
-```bash
-/plugin install deadweight@<marketplace>
-```
-
-Then, in any project:
-
-```
-/deadweight:config-auditor
-```
-
-or run the checks directly:
+The marketplace and the plugin are both called `deadweight`, hence `deadweight@deadweight`.
 
 ```bash
-python3 <plugin>/skills/config-auditor/scripts/audit.py --root . [--json]
+claude plugin marketplace add e-xode/deadweight
+claude plugin install deadweight@deadweight
 ```
 
-Python 3.9+, standard library only.
+That is the whole installation. Add `--scope project` to both commands to declare it in the
+project's `.claude/settings.json` instead of your user settings, so a clone gets it too.
+
+**Requirements: `python3` (3.9+, standard library only).** Nothing else — no `jq`, no Node, no pip
+install. If `python3` runs, the plugin runs.
+
+### What works immediately, with no further setup
+
+| | |
+| --- | --- |
+| `SessionStart` hook | audits the project when a session opens, and **prints nothing** — see [Two channels](#two-channels-two-prices) |
+| skill `deadweight:config-auditor` | Claude loads it when the task is about configuration |
+| command `deadweight` | on the Bash tool's `PATH`: ask Claude for the audit detail and it runs this |
+
+Check it: open a session in any project and ask Claude to run `deadweight`.
+
+### Status line — one command
+
+```bash
+deadweight --setup-statusline
+```
+
+It writes `.claude/statusline.py` and sets `statusLine` in the project's `.claude/settings.json`.
+It refuses to overwrite a `statusLine` you already have, and tells you where the segment is so you
+can splice it into yours. The line appears on the next session:
+
+```
+audit 0E 27W · 4m ago · deadweight
+```
+
+A plugin cannot ship a `statusLine` itself — a plugin's own `settings.json` only honours `agent`
+and `subagentStatusLine` — so this one command is the shortest honest path.
+
+Ask Claude to run it, or call it from your own shell after defining it once:
+
+```bash
+# ~/.bashrc or ~/.zshrc
+deadweight() {
+  local p
+  p=$(claude plugin list --json | python3 -c 'import json,sys
+rows=[r for r in json.load(sys.stdin) if r["id"].startswith("deadweight@")]
+print(sorted(rows, key=lambda r: r["version"])[-1]["installPath"])')
+  python3 "$p/bin/deadweight" "$@"
+}
+```
+
+### Running the audit directly
+
+```bash
+deadweight --fresh            # audit this project now, human-readable
+deadweight --fresh --json     # same, as JSON (adds layout and audit_sha)
+deadweight --where            # the plugin's root, if you want the script path
+```
 
 ## Per-project exceptions
 
@@ -140,18 +183,16 @@ worth keeping — `audit.py --record` appending to `.claude/audit/history.jsonl`
 opt-in: the hook writes it only where `.claude/audit/` already exists, which is how a project says
 it wants to keep the record and commit it.
 
-Numbers a human glances at belong in the status line. Copy the template and point the setting at it:
+Numbers a human glances at belong in the status line, and installing it is one command:
 
 ```bash
-cp <plugin root>/skills/config-auditor/templates/statusline.sh .claude/statusline.sh
-chmod +x .claude/statusline.sh
-```
-```json
-{ "statusLine": { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/statusline.sh" } }
+deadweight --setup-statusline
 ```
 
-It prints `audit 1E 3W · <sha> · now · deadweight` — red on errors, yellow on warnings, green at
-zero — and nothing at all where no audit has ever run.
+It prints `audit 0E 27W · 4m ago · deadweight` — red on errors, yellow on warnings, green at zero,
+dimmed once the number is a day old — and nothing at all where no audit has ever run. The template
+it installs is `skills/config-auditor/templates/statusline.py`, readable and yours to edit.
+
 
 ### Seeing the detail behind the count
 
@@ -169,8 +210,7 @@ deadweight --json     # the raw report
 ```
 
 Ask Claude for the detail and it runs this; the status line names the command whenever there is
-something to see. To run it from your own shell, alias it once — the path is inside the installed
-plugin, which `claude plugin list` prints.
+something to see. To run it from your own shell, define the function in [Install](#install) once.
 
 Two properties of that template are load-bearing. It **does not run the audit**: the status line
 re-runs on every assistant message, and an in-flight script is cancelled when the next update
@@ -180,7 +220,7 @@ start and nothing the session changes afterwards is reflected. A count shown wit
 as current, and a stale green light is worse than no light.
 
 Opting out is per project: `claude plugin disable deadweight --scope project` writes
-`{"enabledPlugins": {"deadweight@<marketplace>": false}}` into `.claude/settings.json`, and the hook
+`{"enabledPlugins": {"deadweight@deadweight": false}}` into `.claude/settings.json`, and the hook
 stops firing there. The granularity is the whole plugin, not the hook alone — a project cannot keep
 the skill and refuse the hook.
 

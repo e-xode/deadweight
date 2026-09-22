@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.2 — 2026-09-22
+
+- **`jq` is gone.** `bin/deadweight` and the status line template were shell scripts piping through
+  `jq`, a dependency the README did not declare and which fails silently where it is missing. Both
+  are Python now — the same requirement `audit.py` already had, and the only one.
+- **`deadweight --setup-statusline`** writes `.claude/statusline.py` and wires the setting. A plugin
+  cannot ship a `statusLine` of its own, so the alternative was a README telling the reader to copy
+  a file from a `<plugin root>` it could not name.
+- README install section rewritten with the real commands and no placeholders. `claude plugin
+  marketplace add e-xode/deadweight` then `claude plugin install deadweight@deadweight`, and a shell
+  function for calling `deadweight` outside Claude.
+
 ## 0.1.1 — 2026-09-22
 
 - Cache key for the status line switched from `cksum` to `md5`: the shell and a Python status line

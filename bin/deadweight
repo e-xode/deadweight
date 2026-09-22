@@ -1,59 +1,134 @@
-#!/usr/bin/env bash
-# Show the detail behind the status line.
-#
-# THE GAP THIS FILLS. A status line that says "3W" and offers no way to see which
-# three warnings is a number without a referent: it can only be believed or
-# ignored, and a number that can only be believed is not a measurement. The audit
-# already ran at session start and its findings are already in the cache, so the
-# detail costs nothing to show - only a second run would.
-#
-# This directory is on the Bash tool's PATH while the plugin is enabled, so Claude
-# can run `deadweight` by name. To run it yourself, alias it once:
-#   alias deadweight='"$(ls -d ~/.claude/plugins/*/deadweight*/bin/deadweight | head -1)"'
-#
-#   deadweight               the cached findings for this directory
-#   deadweight --fresh       re-run the audit now instead of reading the cache
-#   deadweight --errors      errors only
-#   deadweight --json        the raw report
-set -uo pipefail
+#!/usr/bin/env python3
+"""Show the detail behind the status line, and set that status line up.
 
-ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AUDIT="$HERE/../skills/config-auditor/scripts/audit.py"
-FRESH=0; ONLY_ERR=0; AS_JSON=0
-for a in "$@"; do
-  case "$a" in
-    --fresh)  FRESH=1 ;;
-    --errors) ONLY_ERR=1 ;;
-    --json)   AS_JSON=1 ;;
-    -h|--help) sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) ROOT="$a" ;;
-  esac
-done
+THE GAP THIS FILLS. A status line that says "3W" and offers no way to see which
+three warnings is a number without a referent: it can only be believed or
+ignored, and a number that can only be believed is not a measurement. The audit
+already ran at session start and its findings are already cached, so showing the
+detail costs nothing - only a second run would.
 
-if [ "$FRESH" = 1 ]; then
-  [ -f "$AUDIT" ] || { echo "audit.py introuvable a $AUDIT" >&2; exit 2; }
-  if [ "$AS_JSON" = 1 ]; then exec python3 "$AUDIT" --root "$ROOT" --json; fi
-  exec python3 "$AUDIT" --root "$ROOT"
-fi
+Python only, standard library only - the same dependency the audit already has.
+An earlier version piped through `jq`, which was a dependency the README did not
+declare and which fails silently where it is missing.
 
-CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/claude-audit"
-SRC="$CACHE/$(basename "$ROOT")-$(printf '%s' "$ROOT" | md5sum | cut -c1-8).json"
-if [ ! -s "$SRC" ]; then
-  echo "Aucune mesure en cache pour $ROOT."
-  echo "Le hook SessionStart ecrit ce fichier a l'ouverture d'une session; « deadweight --fresh » mesure maintenant."
-  exit 1
-fi
-[ "$AS_JSON" = 1 ] && exec cat "$SRC"
+    deadweight                   cached findings for this project, errors first
+    deadweight --errors          errors only
+    deadweight --fresh           re-run the audit now instead of reading the cache
+    deadweight --json            the raw cached report
+    deadweight --setup-statusline  install the status line into this project
+    deadweight --where           print this plugin's root (to alias the command)
+"""
+from __future__ import annotations
 
-jq -r --argjson onlyerr "$ONLY_ERR" '
-  "\(.project)  \(.errors)E \(.warnings)W   audit \(.audit_sha)   mesure \(.measured_at)",
-  "",
-  ( .findings
-    | map(select($onlyerr == 0 or .severity == "ERROR"))
-    | if length == 0 then ["  (rien a signaler)"]
-      else sort_by(if .severity == "ERROR" then 0 else 1 end)
-           | map("  [\(.severity)] \(.check)\n      \(.message)\n      \(.location)")
-      end
-    | .[] )
-' <"$SRC"
+import hashlib
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+PLUGIN_ROOT = HERE.parent
+AUDIT = PLUGIN_ROOT / "skills" / "config-auditor" / "scripts" / "audit.py"
+TEMPLATE = PLUGIN_ROOT / "skills" / "config-auditor" / "templates" / "statusline.py"
+
+RED, YEL, GRN, DIM, OFF = "\033[31m", "\033[33m", "\033[32m", "\033[2m", "\033[0m"
+
+
+def cache_path(root: Path) -> Path:
+    base = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "claude-audit"
+    return base / f"{root.name}-{hashlib.md5(str(root).encode()).hexdigest()[:8]}.json"
+
+
+def setup_statusline(root: Path) -> int:
+    """Write the status line and wire it, instead of asking the reader to do it.
+
+    A plugin cannot ship a `statusLine` setting: a plugin's own settings.json
+    only honours `agent` and `subagentStatusLine`. So the wiring has to happen in
+    the consuming project - which is a manual step unless something does it, and
+    a manual step described with a `<placeholder>` path is where a plugin loses
+    its user.
+    """
+    dest = root / ".claude" / "statusline.py"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
+    dest.chmod(0o755)
+
+    settings = root / ".claude" / "settings.json"
+    data = {}
+    if settings.is_file():
+        try:
+            data = json.loads(settings.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            print(f"{settings} is not valid JSON; not touching it.", file=sys.stderr)
+            return 2
+    wanted = {"type": "command", "command": 'python3 "$CLAUDE_PROJECT_DIR"/.claude/statusline.py'}
+    existing = data.get("statusLine")
+    if existing and existing != wanted:
+        print(f"This project already has a statusLine:\n  {json.dumps(existing)}\n"
+              f"Left untouched. The audit segment is in {dest}.", file=sys.stderr)
+        return 1
+    data["statusLine"] = wanted
+    settings.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"Status line installed:\n  {dest}\n  statusLine set in {settings}\n"
+          f"It shows up on the next session.")
+    return 0
+
+
+def show(root: Path, only_errors: bool, as_json: bool) -> int:
+    src = cache_path(root)
+    if not src.is_file() or src.stat().st_size == 0:
+        print(f"No cached measurement for {root}.\n"
+              f"The SessionStart hook writes it when a session opens here; "
+              f"`deadweight --fresh` measures now.")
+        return 1
+    if as_json:
+        print(src.read_text(encoding="utf-8"), end="")
+        return 0
+    try:
+        d = json.loads(src.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        print(f"Cached report at {src} is unreadable.", file=sys.stderr)
+        return 2
+    e, w = d.get("errors", 0), d.get("warnings", 0)
+    col = RED if e else (YEL if w else GRN)
+    print(f"{col}{d.get('project')}  {e}E {w}W{OFF}{DIM}   audit {d.get('audit_sha')}"
+          f"   measured {d.get('measured_at')}{OFF}\n")
+    found = [f for f in (d.get("findings") or [])
+             if not only_errors or f.get("severity") == "ERROR"]
+    if not found:
+        print("  (nothing to report)")
+        return 0
+    for f in sorted(found, key=lambda x: 0 if x.get("severity") == "ERROR" else 1):
+        c = RED if f.get("severity") == "ERROR" else YEL
+        print(f"  {c}[{f.get('severity')}]{OFF} {f.get('check')}")
+        print(f"      {f.get('message')}")
+        print(f"      {DIM}{f.get('location')}{OFF}")
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    root = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path.cwd())
+    fresh = errors = as_json = setup = False
+    for a in argv:
+        if a == "--fresh":                   fresh = True
+        elif a == "--errors":                errors = True
+        elif a == "--json":                  as_json = True
+        elif a == "--setup-statusline":      setup = True
+        elif a == "--where":                 print(PLUGIN_ROOT); return 0
+        elif a in ("-h", "--help"):          print(__doc__); return 0
+        elif not a.startswith("-"):          root = Path(a).expanduser()
+        else:
+            print(f"unknown option: {a}", file=sys.stderr); return 2
+    root = root.resolve()
+
+    if setup:
+        return setup_statusline(root)
+    if fresh:
+        cmd = [sys.executable, str(AUDIT), "--root", str(root)] + (["--json"] if as_json else [])
+        return subprocess.call(cmd)
+    return show(root, errors, as_json)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
