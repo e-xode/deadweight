@@ -180,8 +180,18 @@ The hook writes its measurement to `${XDG_CACHE_HOME:-~/.cache}/claude-audit/`, 
 repository. A hook that runs at every session start and writes inside the project leaves one more
 untracked file in every repository, forever; a measurement is not configuration. The series that is
 worth keeping — `audit.py --record` appending to `.claude/audit/history.jsonl` — is therefore
-opt-in: the hook writes it only where `.claude/audit/` already exists, which is how a project says
-it wants to keep the record and commit it.
+opt-in, and **the opt-in signal is the file, not its directory**:
+
+```bash
+mkdir -p .claude/audit && touch .claude/audit/history.jsonl   # start keeping the series
+```
+
+An earlier version keyed on `.claude/audit/` existing — which `--set-floor` creates. Every project
+that set a floor was opted in without asking for it. A guard whose condition is produced by a
+routine operation is not a guard.
+
+Commit `.claude/audit/floor.json`: a ratchet nobody else can see is a private opinion. The history
+file is a growing log — `.gitignore` it unless you mean to keep the series in the repository.
 
 Numbers a human glances at belong in the status line, and installing it is one command:
 

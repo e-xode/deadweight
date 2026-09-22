@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.4 — 2026-09-22
+
+- **The opt-in for the in-repository history was not an opt-in.** The hook wrote
+  `.claude/audit/history.jsonl` wherever `.claude/audit/` existed — a directory that `--set-floor`
+  creates. Every project that set a floor was opted in without asking. The signal is now the
+  history file itself (`touch .claude/audit/history.jsonl`). A guard whose condition is produced by
+  a routine operation is not a guard.
+- README: commit `floor.json`, and `.gitignore` the history unless you mean to keep the series.
+
 ## 0.1.3 — 2026-09-22
 
 - **Corrects a false claim this plugin was making about itself.** Rule 17 listed three levers a
