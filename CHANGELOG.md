@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.5 — 2026-09-22
+
+- **The hook no longer writes the history series at all.** `history.jsonl` is dated to the day and
+  never deduplicated; a session-start hook driving it turns twenty sessions into twenty
+  near-identical lines. `--record` is a deliberate act, for CI or by hand. Two earlier attempts —
+  writing it unconditionally, then gating on a directory `--set-floor` creates — were fixes to the
+  condition when the write itself was the mistake.
+
 ## 0.1.4 — 2026-09-22
 
 - **The opt-in for the in-repository history was not an opt-in.** The hook wrote

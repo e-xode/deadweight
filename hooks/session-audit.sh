@@ -13,21 +13,25 @@
 #
 # WHY THE CACHE LIVES OUTSIDE THE REPOSITORY. A hook that runs at every session
 # start and writes inside the project leaves one more untracked file in every
-# repository, forever. A measurement is not configuration. The series that IS
-# worth keeping - `audit.py --record` appending to .claude/audit/history.jsonl -
-# is therefore opt-in.
+# repository, forever. A measurement is not configuration.
 #
-# The opt-in signal is the HISTORY FILE, not its directory. An earlier version
-# keyed on `.claude/audit/` existing, which `--set-floor` creates: every project
-# that set a floor was opted in without asking for it, and a guard whose
-# condition is produced by a routine operation is not a guard. To opt in:
-#     mkdir -p .claude/audit && touch .claude/audit/history.jsonl
+# AND WHY THIS HOOK DOES NOT WRITE THE HISTORY SERIES. `audit.py --record`
+# appends one line per run to .claude/audit/history.jsonl, dated to the DAY and
+# never deduplicated. Driven by a session-start hook, twenty sessions in a day
+# produce twenty near-identical lines and the series stops being readable. A
+# series is worth keeping when it is written rarely - in CI, or by hand. So
+# `--record` stays a deliberate act and this hook never performs it.
 #
+# Two earlier attempts are worth remembering: writing it unconditionally (noise
+# in every repository), then gating on `.claude/audit/` existing - a directory
+# `--set-floor` creates, so every project that set a floor was opted in without
+# asking. A guard whose condition is produced by a routine operation is not a
+# guard. The fix was not a better condition; it was removing the write.
+
 # Matchers: `startup` and `resume` only. `clear` and `compact` reset the
 # conversation, not the configuration on disk.
 #
-# Writes:   ${XDG_CACHE_HOME:-~/.cache}/claude-audit/<project>.json   (always)
-#           ${CLAUDE_PROJECT_DIR}/.claude/audit/history.jsonl  (only if that file exists)
+# Writes:   ${XDG_CACHE_HOME:-~/.cache}/claude-audit/<project>.json, and nothing else
 # Read by:  templates/statusline.sh
 # Opt out:  `claude plugin disable <this plugin> --scope project` - the
 #           granularity is the whole plugin, not this hook.
@@ -36,9 +40,6 @@ set -uo pipefail
 ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
 AUDIT="${CLAUDE_PLUGIN_ROOT:-}/skills/config-auditor/scripts/audit.py"
 [ -f "$AUDIT" ] || exit 0
-
-# Opt-in series, inside the project, only where the directory already exists.
-[ -f "$ROOT/.claude/audit/history.jsonl" ] && timeout 25 python3 "$AUDIT" --root "$ROOT" --record >/dev/null 2>&1
 
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/claude-audit"
 mkdir -p "$CACHE" 2>/dev/null || exit 0

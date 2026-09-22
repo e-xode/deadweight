@@ -178,20 +178,16 @@ So there are two channels, and they are not two ways of showing the same thing:
 
 The hook writes its measurement to `${XDG_CACHE_HOME:-~/.cache}/claude-audit/`, **outside** the
 repository. A hook that runs at every session start and writes inside the project leaves one more
-untracked file in every repository, forever; a measurement is not configuration. The series that is
-worth keeping — `audit.py --record` appending to `.claude/audit/history.jsonl` — is therefore
-opt-in, and **the opt-in signal is the file, not its directory**:
+untracked file in every repository, forever; a measurement is not configuration.
 
-```bash
-mkdir -p .claude/audit && touch .claude/audit/history.jsonl   # start keeping the series
-```
+**The hook never writes the history series.** `audit.py --record` appends one line per run to
+`.claude/audit/history.jsonl` — date, instrument sha, counts, and the distinct check ids behind
+them. It is dated to the day and never deduplicated, so a session-start hook driving it turns
+twenty sessions into twenty near-identical lines. A series is worth keeping when it is written
+rarely: in CI, or by hand. `--record` therefore stays a deliberate act.
 
-An earlier version keyed on `.claude/audit/` existing — which `--set-floor` creates. Every project
-that set a floor was opted in without asking for it. A guard whose condition is produced by a
-routine operation is not a guard.
-
-Commit `.claude/audit/floor.json`: a ratchet nobody else can see is a private opinion. The history
-file is a growing log — `.gitignore` it unless you mean to keep the series in the repository.
+Commit `.claude/audit/floor.json` — a ratchet nobody else can see is a private opinion. The floor
+says where you are; the series says how you got there.
 
 Numbers a human glances at belong in the status line, and installing it is one command:
 
