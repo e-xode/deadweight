@@ -37,7 +37,6 @@ Usage:
     python3 ${CLAUDE_SKILL_DIR}/scripts/audit.py
     python3 ${CLAUDE_SKILL_DIR}/scripts/audit.py --json
     python3 ${CLAUDE_SKILL_DIR}/scripts/audit.py --root /path/to/repo
-    python3 ${CLAUDE_SKILL_DIR}/scripts/audit.py --record
 
 No external dependencies (Python stdlib only). No --fix flag: corrections are
 always proposed to the user, never applied automatically.
@@ -124,7 +123,19 @@ EVALS_MIN_COUNT = 3
 #    repositories that set different fractions would uniformise the wrong thing.
 LISTING_FRACTION_DEFAULT = 0.01       # harness default: 1% of the context window
 CONTEXT_WINDOW_TOKENS = 1_000_000     # the window this fleet actually runs on
-CHARS_PER_TOKEN = 4                   # rough, and stated as rough
+# Measured 2026-09-22 with `claude plugin details`, the harness's own projection.
+# Four throwaway plugins, one skill each, only the description length varying:
+# tokens = 18.2 + chars / 3.38, r2 = 0.99992 - a slope AND a fixed cost of about 18
+# tokens per listed skill. Then two controls at IDENTICAL length (627 chars): ordinary
+# prose 174 tokens (4.02 chars/token), this plugin's own description 238 (2.85). A
+# factor of 1.4 at the same length: the ratio is a property of the TEXT, not of the
+# language - a description tokenises badly precisely because it is written tight.
+#
+# So 4 is not replaced by another number; there is no single right one. 4 is the most
+# optimistic ratio observed, so any token count computed from it is a FLOOR, stated as
+# "at least". Characters stay the measured quantity: the budget doctrine is written in
+# characters, not in tokens.
+CHARS_PER_TOKEN = 4                   # optimistic on purpose: token figures are floors
 # ---------------------------------------------------------------------------
 
 CHECKS = (
@@ -1658,7 +1669,18 @@ def check_evals(root: Path, report: Report) -> None:
     if not skills_dir.is_dir():
         return
     dirs = [d for d in sorted(skills_dir.iterdir()) if d.is_dir()]
-    withed = [d for d in dirs if (d / "evals" / "evals.json").is_file()]
+    # Two layouts count as a suite. The house one, `<skill>/evals/evals.json`, and the
+    # one `claude plugin eval` actually runs: case directories under the container's
+    # `evals/`, each holding `case.yaml` or `prompt.md`. Until 2026-09-22 this check
+    # knew only the first, so it reported 0% coverage on a plugin whose suite had just
+    # been made executable - it punished the migration it had itself provoked.
+    officiel = root / "evals"
+    cas_officiels = ([p for p in sorted(officiel.iterdir())
+                      if p.is_dir() and ((p / "case.yaml").is_file() or (p / "prompt.md").is_file())]
+                     if officiel.is_dir() else [])
+    withed = [d for d in dirs
+              if (d / "evals" / "evals.json").is_file()
+              or (LAYOUT == "plugin" and len(cas_officiels) >= EVALS_MIN_COUNT)]
     if dirs:
         pct = len(withed) / len(dirs)
         missing = [d.name for d in dirs if d not in withed]
@@ -2030,7 +2052,7 @@ def check_listing_budget_derived(root: Path, report: Report, skills: dict) -> No
         "29-listing-budget-derived",
         severity,
         f"Listed skill descriptions: {listed} chars against a derived ceiling of {ceiling} "
-        f"({fraction} x {CONTEXT_WINDOW_TOKENS} tokens x {CHARS_PER_TOKEN} chars/token, from "
+        f"({fraction} x {CONTEXT_WINDOW_TOKENS} tokens x {CHARS_PER_TOKEN} chars/token, an optimistic ratio measured at 2.85 on this plugin's own description, so this ceiling is generous and a token figure under it is a floor; from "
         f"{source}) - {pct:.0f}% used. Past the ceiling the listing silently keeps names and "
         f"drops descriptions, least-invoked first. The chars/token ratio is rough: treat this "
         f"as an order of magnitude, and {ALWAYS_LOADED_WARN_CHARS} as the house ratchet.",
@@ -2299,40 +2321,6 @@ def audit_sha() -> str:
         return "unknown"
 
 
-def record_run(root: Path, report: Report, layout: str) -> Path | None:
-    """Append one line per run to `.claude/audit/history.jsonl`.
-
-    Written by the SCRIPT, never by a model: a journal entrusted to a model is
-    forgotten, and when it is not forgotten it is embellished. The script records
-    what it measured; the judgement - treated, deliberately not treated - is a
-    separate act, and belongs in the overlay's `reason` or in the project's own
-    notes.
-
-    Each line carries the sha of this script, because the series is unreadable
-    without it: a drop in errors at a different sha is not the same fact as a drop
-    at the same sha. One is work, the other may be a change of instrument.
-    """
-    sha = audit_sha()
-    counts = report.counts()
-    line = {
-        "date": _date.today().isoformat(),
-        "layout": layout,
-        "audit_sha": sha,
-        "errors": counts.get("ERROR", 0),
-        "warnings": counts.get("WARN", 0),
-        "error_ids": sorted({f.check for f in report.findings if f.severity == "ERROR"}),
-        "warning_ids": sorted({f.check for f in report.findings if f.severity == "WARN"}),
-    }
-    out = root / STATE_DIR / "audit" / "history.jsonl"
-    try:
-        out.parent.mkdir(parents=True, exist_ok=True)
-        with out.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(line, ensure_ascii=False) + "\n")
-    except OSError:
-        return None
-    return out
-
-
 def floor_path(root: Path) -> Path:
     return root / STATE_DIR / "audit" / "floor.json"
 
@@ -2340,12 +2328,19 @@ def floor_path(root: Path) -> Path:
 def set_floor(root: Path, report: Report, layout: str) -> Path | None:
     """Freeze the current counts as the floor this configuration may not fall below."""
     counts = report.counts()
+    # The floor carries the check ids, not just the counts. They were the only thing
+    # the run-history file held that this one did not - and a committed floor beats a
+    # jsonl series on every other axis: `git log -p` on this file is the same
+    # trajectory, timestamped to the second, with an author and a reason. The measure
+    # belongs to the script, the judgement to the commit message.
     data = {
         "date": _date.today().isoformat(),
         "layout": layout,
         "audit_sha": audit_sha(),
         "errors": counts.get("ERROR", 0),
         "warnings": counts.get("WARN", 0),
+        "error_ids": sorted({f.check for f in report.findings if f.severity == "ERROR"}),
+        "warning_ids": sorted({f.check for f in report.findings if f.severity == "WARN"}),
     }
     out = floor_path(root)
     try:
@@ -2386,9 +2381,11 @@ def check_floor(root: Path, report: Report) -> int:
     if data.get("audit_sha") != audit_sha():
         report.add("34-floor", "WARN",
                    f"Floor was set with audit.py `{data.get('audit_sha')}`, this run is "
-                   f"`{audit_sha()}`. Counts across two instruments are not comparable: "
-                   f"re-set the floor deliberately (now {err} error(s), {warn} warning(s); "
-                   f"floor {f_err}/{f_warn}).", str(path))
+                   f"`{audit_sha()}`. Counts across two instruments are not comparable, "
+                   f"so nothing is compared: now {err} error(s), {warn} warning(s), the "
+                   f"floor said {f_err}/{f_warn}. Read them side by side, then re-set "
+                   f"deliberately: `--set-floor`. A plugin release only reaches here when "
+                   f"it changed the auditor itself - most releases do not.", str(path))
         return 0
     if err > f_err or warn > f_warn:
         report.add("34-floor", "ERROR",
@@ -2427,11 +2424,6 @@ def main(argv: list[str]) -> int:
         "--check-floor",
         action="store_true",
         help="Fail when the counts rose above the recorded floor (for CI)",
-    )
-    parser.add_argument(
-        "--record",
-        action="store_true",
-        help="Append this run to .claude/audit/history.jsonl (date, audit sha, counts, ids)",
     )
     args = parser.parse_args(argv)
 
@@ -2512,11 +2504,6 @@ def main(argv: list[str]) -> int:
         written = set_floor(root, report, layout)
         print(f"\nFloor set in {written}" if written
               else "\nCould not write the floor (unwritable path).", file=sys.stderr)
-
-    if args.record:
-        written = record_run(root, report, layout)
-        print(f"\nRun appended to {written}" if written
-              else "\nCould not write the run history (unwritable path).", file=sys.stderr)
 
     return 1 if (report.has_errors() or floor_rc) else 0
 

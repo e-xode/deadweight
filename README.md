@@ -180,14 +180,18 @@ The hook writes its measurement to `${XDG_CACHE_HOME:-~/.cache}/claude-audit/`, 
 repository. A hook that runs at every session start and writes inside the project leaves one more
 untracked file in every repository, forever; a measurement is not configuration.
 
-**The hook never writes the history series.** `audit.py --record` appends one line per run to
-`.claude/audit/history.jsonl` — date, instrument sha, counts, and the distinct check ids behind
-them. It is dated to the day and never deduplicated, so a session-start hook driving it turns
-twenty sessions into twenty near-identical lines. A series is worth keeping when it is written
-rarely: in CI, or by hand. `--record` therefore stays a deliberate act.
+**There is no run-history file.** An earlier version appended one line per run to
+`.claude/audit/history.jsonl`. It has been removed: `git log -p .claude/audit/floor.json` is the
+same trajectory, timestamped to the second, with an author and a commit message saying **why** the
+floor moved. The floor now carries the check ids behind its counts — the only thing the series held
+that it did not. The measure belongs to the script, the judgement to the commit message.
 
-Commit `.claude/audit/floor.json` — a ratchet nobody else can see is a private opinion. The floor
-says where you are; the series says how you got there.
+Commit `.claude/audit/floor.json` — a ratchet nobody else can see is a private opinion.
+
+**A release only invalidates your floor when it changes the auditor.** The floor records the sha of
+`audit.py`, not the plugin version: of the first seven releases of this plugin, two touched
+`audit.py` and five did not. When one does, check 34 refuses to compare, prints both counts side by
+side, and asks you to re-set deliberately.
 
 Numbers a human glances at belong in the status line, and installing it is one command:
 

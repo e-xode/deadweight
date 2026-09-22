@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.3.0 — 2026-09-22
+
+**This release changes `audit.py`, so every floor set with an earlier version stops comparing.
+Re-set it with `--set-floor` after reading the two counts side by side.**
+
+- **The run-history file is gone.** `--record` and `.claude/audit/history.jsonl` are removed.
+  `git log -p .claude/audit/floor.json` is the same trajectory with a timestamp, an author and a
+  reason. The floor now carries `error_ids` and `warning_ids`, the only thing the series held that
+  it did not.
+- **Token figures are floors, and say so.** Measured with `claude plugin details`: four plugins
+  varying only description length give `tokens = 18.2 + chars / 3.38` (r² = 0.99992) — a slope and
+  a fixed ~18 tokens per listed skill. Two controls at identical length (627 chars) give 174 tokens
+  for ordinary prose and 238 for this plugin's own description: **a factor of 1.4 at the same
+  length**. The ratio belongs to the text, not to the language. `CHARS_PER_TOKEN = 4` is kept
+  because it is the most optimistic ratio observed, which makes every derived figure a lower bound.
+- **Check 26 recognises the official eval layout.** It knew only `<skill>/evals/evals.json` and
+  reported 0% coverage on a suite that `claude plugin eval` runs — it punished the migration it had
+  provoked.
+- Check 34 prints both counts and names the command instead of only refusing.
+
 ## 0.2.0 — 2026-09-22
 
 - **Check 36 — a plugin must not route to skills it does not ship.** Six routing arrows pointed at

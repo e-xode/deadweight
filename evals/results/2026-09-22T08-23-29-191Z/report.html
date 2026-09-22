@@ -1,0 +1,1301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Eval report — deadweight v0.2.0</title>
+</head>
+<body>
+<style>
+:root{--plane:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink-2:#52514e;--ink-3:#6b6a64;--hairline:rgba(11,11,11,.10);--grid:#e1e0d9;--inset:rgba(11,11,11,.04);--accent:#2a78d6;--base-fill:#6b6a64;--delta-good:#006300;--good:#067d06;--warning:#8a6100;--critical:#d03b3b;
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme:dark){:root{--plane:#0d0d0d;--surface:#1a1a19;--ink:#ffffff;--ink-2:#c3c2b7;--ink-3:#898781;--hairline:rgba(255,255,255,.10);--grid:#2c2c2a;--inset:rgba(255,255,255,.05);--accent:#3987e5;--base-fill:#898781;--delta-good:#0ca30c;--good:#0ca30c;--warning:#fab219;--critical:#e06c6c;color-scheme:dark}}
+:root[data-theme="dark"]{--plane:#0d0d0d;--surface:#1a1a19;--ink:#ffffff;--ink-2:#c3c2b7;--ink-3:#898781;--hairline:rgba(255,255,255,.10);--grid:#2c2c2a;--inset:rgba(255,255,255,.05);--accent:#3987e5;--base-fill:#898781;--delta-good:#0ca30c;--good:#0ca30c;--warning:#fab219;--critical:#e06c6c;color-scheme:dark}
+:root[data-theme="light"]{--plane:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink-2:#52514e;--ink-3:#6b6a64;--hairline:rgba(11,11,11,.10);--grid:#e1e0d9;--inset:rgba(11,11,11,.04);--accent:#2a78d6;--base-fill:#6b6a64;--delta-good:#006300;--good:#067d06;--warning:#8a6100;--critical:#d03b3b;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink);
+  font:14px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
+  -webkit-text-size-adjust:100%}
+.wrap{max-width:880px;margin:0 auto;padding:40px 24px 64px;display:flex;flex-direction:column;gap:20px}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+header h1{margin:2px 0 0;font-size:24px;font-weight:600;line-height:1.25;text-wrap:balance}
+.meta{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;color:var(--ink-2);font-size:13px}
+.meta .num{font-variant-numeric:tabular-nums lining-nums}
+.banner{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;
+  border:1px solid var(--hairline);background:var(--surface);font-size:13px}
+.banner .chip-warn{color:var(--warning);font-weight:600}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--hairline);border-radius:10px;padding:14px 16px;
+  display:flex;flex-direction:column;gap:4px}
+.tile .label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.tile .value{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums lining-nums;line-height:1.1}
+.tile.hero .value{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:48px}
+.tile .sub{font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.tile .value.delta-pos{color:var(--delta-good)}
+.tile .value.delta-neg{color:var(--critical)}
+.toolbar{display:flex;gap:8px;justify-content:flex-end}
+.toolbar button{font:12px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink-2);
+  background:var(--surface);border:1px solid var(--hairline);border-radius:6px;padding:4px 10px;cursor:pointer}
+.toolbar button:hover{color:var(--ink)}
+.toolbar button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.case{background:var(--surface);border:1px solid var(--hairline);border-radius:10px;padding:18px 20px;
+  display:flex;flex-direction:column;gap:10px}
+.case-regressed{border-left:3px solid var(--critical)}
+.verdict{margin:6px 0 0;font-size:15px}
+.verdict .delta{font-size:15px}
+.flag{font-size:11px;font-weight:600;color:var(--warning);white-space:nowrap}
+.star{color:var(--warning);font-size:.45em;vertical-align:super;line-height:0;cursor:help}
+.legend summary{cursor:pointer;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2)}
+.legend-list{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--ink-2)}
+.case-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.case-head h2{margin:0;font-size:16px;font-weight:600}
+.case-head .spacer{flex:1}
+.case-score{font-size:15px;font-weight:600}
+.mono{font:12px "SF Mono",ui-monospace,Menlo,Consolas,monospace}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.muted{color:var(--ink-3);font-size:12px}
+.meter{display:inline-block;position:relative;width:120px;height:6px;border-radius:4px;background:var(--grid);
+  vertical-align:middle}
+.meter>span{display:block;height:100%;border-radius:4px;max-width:100%}
+.meter .tick{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink-3);border-radius:1px}
+.m-accent>span{background:var(--accent)}
+.m-base>span{background:var(--base-fill)}
+.delta{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+.delta-pos{color:var(--delta-good)}
+.delta-neg{color:var(--critical)}
+.delta-zero{color:var(--ink-3)}
+details.section{border-top:1px solid var(--grid);padding-top:10px}
+details.section>summary{cursor:pointer;font-size:12px;font-weight:600;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--ink-2);list-style-position:outside;margin-left:2px}
+details.section>summary:hover{color:var(--ink)}
+details.section[open]>summary{margin-bottom:8px}
+.md{display:flex;flex-direction:column;gap:8px;background:var(--inset);border-radius:8px;
+  padding:12px 14px;overflow-wrap:break-word}
+.md>:first-child{margin-top:0}
+.md h1,.md h2,.md h3,.md h4,.md h5,.md h6{margin:4px 0 0;font-size:1em;font-weight:600;line-height:1.3}
+.md p,.md ul,.md ol,.md blockquote,.md table,.md pre,.md hr{margin:0}
+.md ul,.md ol{display:flex;flex-direction:column;gap:4px;padding-left:20px}
+.md blockquote{border-left:2px solid var(--hairline);padding-left:10px;color:var(--ink-2)}
+.md :not(pre)>code{background:var(--inset);padding:1px 4px;border-radius:4px;
+  font:.92em "SF Mono",ui-monospace,Menlo,Consolas,monospace}
+.md pre{background:var(--inset);border:1px solid var(--hairline);padding:10px 12px;border-radius:6px;
+  overflow-x:auto;font:12px/1.5 "SF Mono",ui-monospace,Menlo,Consolas,monospace}
+.md pre code{background:none;padding:0;font:inherit}
+.md table{width:100%;border-collapse:collapse}
+.md th,.md td{padding:5px 8px;text-align:left;vertical-align:top;border-bottom:1px solid var(--grid)}
+.md th{font-weight:600;color:var(--ink-2)}
+.md a{color:var(--accent);text-decoration:none}
+.md a:hover{text-decoration:underline}
+.grader-def{display:flex;flex-direction:column;gap:6px;padding:8px 0}
+.grader-def+.grader-def{border-top:1px solid var(--grid)}
+.grader-def-head{display:flex;align-items:baseline;gap:8px}
+.grader-name{font:13px "SF Mono",ui-monospace,Menlo,Consolas,monospace;font-weight:600}
+.badge{font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2);
+  border:1px solid var(--hairline);border-radius:999px;padding:1px 8px}
+.config{display:flex;flex-direction:column;gap:2px;background:var(--inset);border-radius:8px;padding:10px 14px}
+.config code{font:12px "SF Mono",ui-monospace,Menlo,Consolas,monospace;overflow-wrap:anywhere}
+.arm{display:flex;flex-direction:column;gap:8px;padding:6px 0}
+.arm+.arm{border-top:1px dashed var(--grid);margin-top:4px;padding-top:12px}
+.arm-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.arm-label{font-size:13px;font-weight:600}
+.run{border:1px solid var(--grid);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.run-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.run-title{font-size:12px;font-weight:600;color:var(--ink-2)}
+.run-error .explanation{color:var(--ink-2)}
+.note{font-size:12px;color:var(--ink-2)}
+.graders{display:flex;flex-direction:column;gap:4px}
+details.grader{border-radius:6px}
+details.grader>summary{cursor:pointer;display:flex;align-items:baseline;gap:8px;padding:3px 4px;
+  border-radius:6px;list-style:none}
+details.grader>summary::-webkit-details-marker{display:none}
+details.grader>summary::before{content:'▸';font-size:10px;color:var(--ink-3);flex:none;
+  transition:transform .12s ease}
+details.grader[open]>summary::before{transform:rotate(90deg)}
+details.grader>summary:hover{background:var(--inset)}
+details.grader>summary:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.grader-body{padding:6px 8px 8px 24px;display:flex;flex-direction:column;gap:6px}
+.chip{font-size:11px;font-weight:600;border-radius:999px;padding:1px 8px;white-space:nowrap}
+.chip-pass{color:var(--good);border:1px solid currentColor}
+.chip-fail{color:var(--critical);border:1px solid currentColor}
+.chip.chip-warn{color:var(--warning);border:1px solid currentColor}
+.explanation{margin:0;font-size:13px;color:var(--ink-2);white-space:pre-wrap;overflow-wrap:break-word}
+.kv{display:flex;gap:8px;font-size:12px;color:var(--ink-3)}
+.votes{font-variant-numeric:tabular-nums;letter-spacing:.1em}
+pre.evidence{margin:0;background:var(--inset);border:1px solid var(--hairline);border-radius:6px;
+  padding:8px 10px;overflow-x:auto;max-height:320px;
+  font:12px/1.5 "SF Mono",ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;overflow-wrap:break-word}
+footer{color:var(--ink-3);font-size:12px;text-align:center;padding-top:8px}
+@media (prefers-reduced-motion:no-preference){
+  details.grader>summary,.toolbar button{transition:background .12s ease,color .12s ease}
+}
+@media (prefers-reduced-motion:reduce){
+  details.grader>summary::before{transition:none}
+}
+@media print{
+  :root,:root[data-theme="dark"],:root[data-theme="light"]{--plane:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink-2:#52514e;--ink-3:#6b6a64;--hairline:rgba(11,11,11,.10);--grid:#e1e0d9;--inset:rgba(11,11,11,.04);--accent:#2a78d6;--base-fill:#6b6a64;--delta-good:#006300;--good:#067d06;--warning:#8a6100;--critical:#d03b3b;color-scheme:light}
+  body{background:#fff}
+  .toolbar{display:none}
+  .case,.run,.grader-def{break-inside:avoid}
+  pre.evidence{max-height:none}
+}
+</style>
+<div class="wrap">
+<header>
+<div class="eyebrow">Plugin eval report</div>
+<h1>deadweight v0.2.0</h1>
+<p class="verdict">Plugin effect: <span class="delta delta-pos">↑ +6.7 pts</span> vs baseline — improved 1 · flat 4 · regressed 0 of 5 cases.</p>
+<div class="meta">
+<span class="mono">.</span>
+<span>Claude Code v2.1.278</span>
+<span class="num">2026-09-22 08:23 UTC</span>
+<span class="num">15m 21s</span>
+<span class="num">$5.56</span>
+<span class="num">31 runs</span>
+
+
+
+<span>judge default</span>
+<span class="num">threshold 100%</span>
+
+</div>
+</header>
+<div class="banner"><span class="chip-warn">⚠ Partial results</span><span>The run was interrupted before every case finished.</span></div><div class="banner"><span class="chip-warn">⚠ Averages include non-judgments</span><span>6 runs errored — their scores count toward the averages shown without a complete judgment.</span></div>
+<section class="tiles">
+<div class="tile hero"><span class="label">Suite score · with plugin</span><span class="value">27.8%<span class="star" title="Includes runs that errored or hit the cost ceiling — see “How to read this report”">*</span></span><span class="sub">mean of per-case scores · * includes 6 runs without a complete judgment</span></div>
+<div class="tile"><span class="label">Ablation Δ</span><span class="value num delta-pos">↑ +6.7</span><span class="sub">score points vs baseline, 5 of 6 cases</span></div>
+<div class="tile"><span class="label">Baseline score</span><span class="value num">26.7%</span><span class="sub">without the plugin</span></div>
+<div class="tile"><span class="label">Cases</span><span class="value num">6</span><span class="sub">1 of 6 ≥ 100% threshold</span></div>
+<div class="tile"><span class="label">Perfect runs</span><span class="value num">27.8%</span><span class="sub">runs where every grader passed</span></div>
+</section>
+<details class="section legend">
+<summary>How to read this report</summary>
+<ul class="legend-list">
+<li>A run's score is the weighted fraction of its graders that passed; a "perfect" run passed every grader.</li>
+<li>A case's score is the mean of its runs; a case passes when its score is at or above the 100% threshold (the tick on each case bar).</li>
+<li>The suite score is the mean of the per-case scores.</li>
+<li>Judge votes are independent samples of the LLM judge; the majority decides pass or fail.</li>
+<li>"With plugin" and "Baseline" runs are identical except for the plugin being loaded; Δ is the with-plugin score minus the baseline score. Cases that show no baseline ran a single arm (nothing to strip, or a replay case) — their scores are absolute.</li>
+<li>Scores marked with * include runs that errored or hit the cost ceiling (LLM graders force-failed); those runs count toward the means without a complete judgment.</li>
+</ul>
+</details>
+<div class="toolbar"><button type="button" data-act="expand">Expand all</button><button type="button" data-act="collapse">Collapse all</button></div>
+<article class="case" id="case-1">
+<div class="case-head">
+<h2>anti-trigger-application-code</h2>
+<span class="muted mono">evals/anti-trigger-application-code</span>
+<span class="spacer"></span>
+
+<span class="delta delta-zero">· 0.0 pts</span>
+<span class="muted">with plugin</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:33.3%"></span><i class="tick" style="left:100.0%"></i></span>
+<span class="num case-score">33.3%</span>
+</div>
+
+<details class="section" open>
+<summary>Results</summary>
+<section class="arm">
+<div class="arm-head">
+<span class="arm-label">With plugin</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:33.3%"></span></span>
+<span class="num">33.3%</span>
+<span class="muted num">33.3% of runs perfect</span>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 1</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">5 turns · $0.11 · 08:23:29 UTC</span>
+</div>
+
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✗ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">There&apos;s nothing to refactor here yet — the repo is empty.
+
+What I checked:
+- `/tmp/claude-eval-IiinyI/home/cwd` (the working directory): no files at all, not even hidden ones.
+- The repo root `/tmp/claude-eval-IiinyI/home`: only `.git/` metadata, a `.gitconfig`, and a cache file. No commits either.
+
+So there&apos;s no checkout controller — or any source code — on disk. A few possibilities:
+
+- The code lives in a different checkout/path on this machine — give me the path and I&apos;ll start there.
+- The repo needs to be cloned or a branch fetched first.
+- You&apos;re in a different worktree than you expected (`.git/commondir` suggests this is a linked worktree).
+
+Point me at the file or directory and I&apos;ll do the conversion — including the parts people usually miss on promise-chain→async/await: preserving `.catch()` semantics as `try/catch` with the same error responses, keeping parallel `Promise.all` branches parallel rather than serializing them with sequential `await`s, and making sure every path still returns/responds exactly once.</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 2</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:100.0%"></span></span>
+<span class="num">100%</span>
+<span class="muted num">5 turns · $0.10 · 08:23:50 UTC</span>
+</div>
+
+<div class="graders"><details class="grader">
+<summary><span class="chip chip-pass">✓ pass</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: PASS PASS PASS</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✓ ✓ ✓</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">There&apos;s no checkout controller here — the repository has no source files at all. `/tmp/claude-eval-MDpscQ/home/cwd` is empty, and the repo root (`/tmp/claude-eval-MDpscQ/home`) contains only `.git` metadata and a stray `.gitconfig`, with no commits yet.
+
+So I can&apos;t do the refactor as asked. A few possibilities:
+
+- You&apos;re in a different checkout than you expected — if you tell me the real path, I&apos;ll work there.
+- The code lives in another repo on this machine — give me a path or name and I&apos;ll locate it.
+- The file genuinely doesn&apos;t exist yet, in which case I can write a checkout controller from scratch in async/await style if you describe the flow (cart validation, payment, order creation, etc.) and the framework you&apos;re using.
+
+Which of those is it?</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 3</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">5 turns · $0.10 · 08:24:06 UTC</span>
+</div>
+
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✗ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">The working directory is empty — there&apos;s no checkout controller (or any source code) here.
+
+`/tmp/claude-eval-aYYqSj/home/cwd` contains no files, and the repo at `/tmp/claude-eval-aYYqSj/home` has only a `.git` directory with no commits. So there&apos;s nothing to refactor.
+
+A couple of possibilities:
+- The project lives somewhere else on this machine — give me the path and I&apos;ll start there.
+- The repo hasn&apos;t been cloned/checked out into this directory yet.
+
+Which is it?</pre>
+</div>
+</details></div>
+</div>
+</section><section class="arm">
+<div class="arm-head">
+<span class="arm-label">Baseline (no plugin)</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:33.3%"></span></span>
+<span class="num">33.3%</span>
+<span class="muted num">33.3% of runs perfect</span>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 1</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:100.0%"></span></span>
+<span class="num">100%</span>
+<span class="muted num">6 turns · $0.11 · 08:24:20 UTC</span>
+</div>
+
+<div class="graders"><details class="grader">
+<summary><span class="chip chip-pass">✓ pass</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: PASS PASS PASS</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✓ ✓ ✓</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">There&apos;s no checkout controller here to refactor — the repository is empty.
+
+What I checked:
+- `/tmp/claude-eval-88w0qo/home/cwd` (working directory): no files at all
+- The repo root `/tmp/claude-eval-88w0qo/home`: only `.git/` internals and a stray `.gitconfig`, no commits yet
+
+So there&apos;s no source code of any kind, let alone a checkout controller with promise chains.
+
+A few likely explanations:
+- You meant a different directory or machine — tell me the path and I&apos;ll pick it up from there.
+- The code isn&apos;t checked out yet — if there&apos;s a remote to clone or a branch to fetch, point me at it.
+- You want the controller written from scratch — say the word and I&apos;ll draft one in async/await, but I&apos;d need to know the framework (Express, NestJS, Fastify…) and what the checkout flow involves.
+
+Which is it?</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 2</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">6 turns · $0.11 · 08:24:37 UTC</span>
+</div>
+
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✗ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">There&apos;s no checkout controller here — in fact there&apos;s no source code at all.
+
+What I found:
+- Working directory `/tmp/claude-eval-bwrVhf/home/cwd` is empty.
+- The repo root `/tmp/claude-eval-bwrVhf/home` contains only `.git/` and an untracked `.gitconfig`, with no commits yet.
+- A case-insensitive search for &quot;checkout&quot; across the tree turned up nothing.
+
+So I can&apos;t start the refactor until I know where the code lives. Could you point me at it?
+
+- Is the project at a different path on this machine (if so, what path)?
+- Or does it still need to be cloned/checked out here?
+
+Once I can see the file, the refactor itself is straightforward: convert the `.then()/.catch()` chains to `await` with `try/catch`, preserve the existing error-handling and response semantics, and keep any deliberate parallelism as `Promise.all` rather than serializing independent awaits.</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 3</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">5 turns · $0.10 · 08:24:54 UTC</span>
+</div>
+
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: PASS FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✓ ✗ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">There&apos;s no checkout controller here to refactor — the repo is empty. `/tmp/claude-eval-kqPID9/home/cwd` has no files, and the repository root (`/tmp/claude-eval-kqPID9/home`) contains only `.git` and a `.gitconfig`, with no commits in history.
+
+A couple of possibilities:
+- The code lives in a different directory or on a different branch/clone than the one I&apos;m working in.
+- The working tree hasn&apos;t been checked out or the project hasn&apos;t been copied in yet.
+
+Point me at the right path (or tell me where to clone from) and I&apos;ll do the async/await conversion. If you&apos;d rather, paste the controller and I&apos;ll refactor it directly.</pre>
+</div>
+</details></div>
+</div>
+</section>
+</details>
+<details class="section" open>
+<summary>Prompt</summary>
+<div class="md"><p>Refactor our checkout controller to use async/await instead of promise chains.</p>
+</div>
+</details>
+<details class="section" open>
+<summary>Graders — what "good" means for this case</summary>
+<div class="grader-def">
+<div class="grader-def-head"><span class="grader-name">criteria</span><span class="badge">llm</span></div>
+<div class="md"><p>The run must NOT load the <code>config-auditor</code> skill. This is the whole point of the case: a description that fires here is over-triggering, and the failure is invisible from the skill's own file.</p>
+<p>A successful response:</p>
+<ul>
+<li>does not trigger: this is application code, outside .claude/ and the plugin manifest</li>
+<li>should not load config-auditor for a code change that touches no configuration</li>
+</ul>
+</div>
+</div>
+</details>
+</article>
+<article class="case" id="case-2">
+<div class="case-head">
+<h2>anti-trigger-diff-review</h2>
+<span class="muted mono">evals/anti-trigger-diff-review</span>
+<span class="spacer"></span>
+
+<span class="delta delta-zero">· 0.0 pts</span>
+<span class="muted">with plugin</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:100.0%"></span><i class="tick" style="left:100.0%"></i></span>
+<span class="num case-score">100%</span>
+</div>
+
+<details class="section" open>
+<summary>Results</summary>
+<section class="arm">
+<div class="arm-head">
+<span class="arm-label">With plugin</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:100.0%"></span></span>
+<span class="num">100%</span>
+<span class="muted num">100% of runs perfect</span>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 1</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:100.0%"></span></span>
+<span class="num">100%</span>
+<span class="muted num">4 turns · $0.11 · 08:25:09 UTC</span>
+</div>
+
+<div class="graders"><details class="grader">
+<summary><span class="chip chip-pass">✓ pass</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: PASS PASS PASS</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✓ ✓ ✓</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">I don&apos;t have a diff to review — nothing came through with your message, and there&apos;s nothing to read from the repo either:
+
+- `/tmp/claude-eval-mt4ixf/home/cwd` is empty
+- The git repo has no commits and no tracked files (only an untracked `.gitconfig` one level up)
+
+Can you send the diff? Any of these work:
+
+- Paste the diff text directly into the chat
+- Save it to a file in the working directory and tell me the path
+- Give me a PR number or branch name — though note I have no Bash tool in this session, so I can&apos;t run `gh pr diff` or `git diff` myself; I&apos;d need the content in a file or in the message
+
+Once I have it, I&apos;ll run a proper correctness review over it.</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 2</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:100.0%"></span></span>
+<span class="num">100%</span>
+<span class="muted num">3 turns · $0.11 · 08:25:29 UTC</span>
+</div>
+
+<div class="graders"><details class="grader">
+<summary><span class="chip chip-pass">✓ pass</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: PASS PASS PASS</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✓ ✓ ✓</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">There&apos;s no diff available to review. Concretely:
+
+- `/tmp/claude-eval-NIrODC/home/cwd` is empty — no files at all.
+- The repo has no commits on `main`, and the only thing git sees is an untracked `../.gitconfig`.
+- No diff text came through in your message, and I have no Bash tool in this session, so I can&apos;t fetch a PR via `gh` or run `git diff` myself.
+
+Could you send the diff directly (paste the patch text), or tell me where it lives — a file path I can read, or a branch/PR in a checked-out repo? Once I have it, I&apos;ll run it through `/code-review` and report on the logic.</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 3</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:100.0%"></span></span>
+<span class="num">100%</span>
+<span class="muted num">3 turns · $0.31 · 08:25:48 UTC</span>
+</div>
+
+<div class="graders"><details class="grader">
+<summary><span class="chip chip-pass">✓ pass</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: PASS PASS PASS</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✓ ✓ ✓</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">I couldn&apos;t review it — there&apos;s no diff here to review.
+
+The repo at `/tmp/claude-eval-25RR6G/home` has zero commits (HEAD is unborn, pointing at `refs/heads/main` with no `refs/` or `objects/`), no remote configured, and the working directory `cwd/` is empty. The only files in the tree are environment artifacts (`.gitconfig`, a stale `claude-audit` cache file). So there are no committed changes, no uncommitted changes, and no branch to diff against.
+
+To be clear: this is an empty result, not a clean bill of health. I read no code and therefore found no bugs — that&apos;s different from reading the code and concluding the logic is sound.
+
+Send me any one of these and I&apos;ll do the review:
+- an absolute path to the repo/worktree that actually has the changes
+- a PR number or branch name (in a repo with commits and a remote)
+- the unified diff pasted directly into the chat — that works fine on its own
+
+One note: Bash is disabled in this session, so I&apos;m working through file-reading tools. A pasted diff or an explicit path is the most reliable route.</pre>
+</div>
+</details></div>
+</div>
+</section><section class="arm">
+<div class="arm-head">
+<span class="arm-label">Baseline (no plugin)</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:100.0%"></span></span>
+<span class="num">100%</span>
+<span class="muted num">100% of runs perfect</span>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 1</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:100.0%"></span></span>
+<span class="num">100%</span>
+<span class="muted num">5 turns · $0.13 · 08:26:48 UTC</span>
+</div>
+
+<div class="graders"><details class="grader">
+<summary><span class="chip chip-pass">✓ pass</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: PASS PASS PASS</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✓ ✓ ✓</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">There&apos;s no diff here to review — I want to flag that rather than guess at what you meant.
+
+What I found:
+- Your message didn&apos;t include any diff text.
+- The working directory `/tmp/claude-eval-6Pleb2/home/cwd` is empty, and the repo at `/tmp/claude-eval-6Pleb2/home` has no commits and no tracked files (just `.git/` and an untracked `.gitconfig`). So there are no local changes to diff against.
+- I also don&apos;t have a Bash tool in this session, so I can&apos;t run `git diff` or `gh pr view` to fetch the PR myself.
+
+To get you a real review, send me any one of these:
+
+1. **Paste the diff** directly into the chat — that&apos;s the fastest path and needs nothing else.
+2. **Point me at files on disk** (a `.patch`/`.diff` file, or a checked-out repo path) and I&apos;ll read them.
+3. **Enable a Bash tool** for this session and give me the PR number or branch — then I can pull the diff and run `/code-review` against it properly.
+
+Once I have the actual changes, I&apos;ll go through the logic for correctness bugs — edge cases, error handling, off-by-ones, concurrency, and whether the change actually does what its description claims.</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 2</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:100.0%"></span></span>
+<span class="num">100%</span>
+<span class="muted num">5 turns · $0.11 · 08:27:12 UTC</span>
+</div>
+
+<div class="graders"><details class="grader">
+<summary><span class="chip chip-pass">✓ pass</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: PASS PASS PASS</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✓ ✓ ✓</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">I don&apos;t have a diff to review — nothing was attached to your message, and there&apos;s nothing on disk to derive one from:
+
+- The working directory `/tmp/claude-eval-6CF04H/home/cwd` is empty.
+- The repo has no commits and no tracked files (only an untracked `.gitconfig` one level up), so there&apos;s no branch to diff against `main`.
+
+Can you send it one of these ways?
+
+1. **Paste the diff** directly into chat.
+2. **Give me a PR number or URL** — if `gh` is authenticated for that repo, I can fetch it (note: I don&apos;t currently have a Bash tool loaded, so I&apos;d need that enabled).
+3. **Point me at a file** — e.g. save it as `/tmp/claude-eval-6CF04H/home/cwd/pr.diff` and I&apos;ll read it.
+
+Once I have it, I&apos;ll run the `/code-review` skill over it and report on correctness, plus any reuse/simplification issues. Let me know what effort level you want (low/medium for only high-confidence findings, high/max for broader coverage).</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 3</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:100.0%"></span></span>
+<span class="num">100%</span>
+<span class="muted num">3 turns · $0.54 · 08:27:35 UTC</span>
+</div>
+
+<div class="graders"><details class="grader">
+<summary><span class="chip chip-pass">✓ pass</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: PASS PASS PASS</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✓ ✓ ✓</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">I can&apos;t review it — there&apos;s no diff here to look at.
+
+**What I found:**
+- The working directory `/tmp/claude-eval-irtBo9/home/cwd` is empty.
+- The repo at `/tmp/claude-eval-irtBo9/home` contains only `.git/HEAD`, `.git/config`, `.git/commondir`, and an untracked `.gitconfig`. No `.git/objects`, no `.git/refs`, no index, no tracked source files. `HEAD` points at `refs/heads/main`, which doesn&apos;t exist — an unborn branch with zero commits.
+- This session also has no `Bash` tool, so I couldn&apos;t run `git diff` in any form regardless.
+
+To be clear: this is **not** &quot;the logic looks sound.&quot; I examined nothing, so I can&apos;t vouch for anything.
+
+**To get the review you wanted**, any one of these works:
+1. Give me the path to the actual project — my attempt to search the parent `/tmp/claude-eval-irtBo9` was blocked by the sandbox, so I couldn&apos;t hunt for it myself.
+2. Paste the diff directly into chat and I&apos;ll review it inline.
+3. Re-run in a session with Bash enabled so I can pull the diff from git.
+
+One heads-up for whichever you pick: the `ReportFindings` tool the review flow normally posts through isn&apos;t available either, so I&apos;d give you findings as `file:line — summary` lines in my reply rather than as inline PR comments. Let me know if that&apos;s fine.</pre>
+</div>
+</details></div>
+</div>
+</section>
+</details>
+<details class="section" open>
+<summary>Prompt</summary>
+<div class="md"><p>Review this pull request diff and tell me if the logic is sound.</p>
+</div>
+</details>
+<details class="section" open>
+<summary>Graders — what "good" means for this case</summary>
+<div class="grader-def">
+<div class="grader-def-head"><span class="grader-name">criteria</span><span class="badge">llm</span></div>
+<div class="md"><p>The run must NOT load the <code>config-auditor</code> skill. This is the whole point of the case: a description that fires here is over-triggering, and the failure is invisible from the skill's own file.</p>
+<p>A successful response:</p>
+<ul>
+<li>does not trigger: reviewing a diff is a code-review task, not a configuration audit</li>
+<li>should not load config-auditor unless the diff changes CLAUDE.md, skills, agents, rules or settings</li>
+</ul>
+</div>
+</div>
+</details>
+</article>
+<article class="case" id="case-3">
+<div class="case-head">
+<h2>budget-growth</h2>
+<span class="muted mono">evals/budget-growth</span>
+<span class="spacer"></span>
+<span class="flag">⚠ 3 runs errored</span>
+<span class="delta delta-zero">· 0.0 pts</span>
+<span class="muted">with plugin</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:0.0%"></span><i class="tick" style="left:100.0%"></i></span>
+<span class="num case-score">0%<span class="star" title="Includes runs that errored or hit the cost ceiling — see “How to read this report”">*</span></span>
+</div>
+
+<details class="section" open>
+<summary>Results</summary>
+<section class="arm">
+<div class="arm-head">
+<span class="arm-label">With plugin</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">0% of runs perfect</span>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 1</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">7 turns · $0.28 · 08:29:34 UTC</span>
+</div>
+<div class="run-error"><span class="chip chip-fail">✗ run error</span> <span class="explanation">exit 1: Reached maximum number of turns (6)</span></div>
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✗ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">I&apos;ll use the config auditor skill for this — it&apos;s built for exactly this question.</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 2</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">7 turns · $0.28 · 08:30:19 UTC</span>
+</div>
+<div class="run-error"><span class="chip chip-fail">✗ run error</span> <span class="explanation">exit 1: Reached maximum number of turns (6)</span></div>
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✗ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">No Bash and no `CLAUDE.md` in the working directory. Let me see what&apos;s actually there.</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 3</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">7 turns · $0.27 · 08:31:04 UTC</span>
+</div>
+<div class="run-error"><span class="chip chip-fail">✗ run error</span> <span class="explanation">exit 1: Reached maximum number of turns (6)</span></div>
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✗ ✗</span></div>
+</div>
+</details></div>
+</div>
+</section><section class="arm">
+<div class="arm-head">
+<span class="arm-label">Baseline (no plugin)</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">0% of runs perfect</span>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 1</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">7 turns · $0.13 · 08:31:44 UTC</span>
+</div>
+
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✗ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">I couldn&apos;t find anything to audit — the premise doesn&apos;t hold in this directory.
+
+What I checked:
+
+- `/tmp/claude-eval-AtkhB8/home/cwd` (the working directory) — **empty**, no files at all
+- `/tmp/claude-eval-AtkhB8/home` and below — only `.git/` and an untracked `.gitconfig`
+- No `CLAUDE.md` anywhere in the tree, and no `.claude/` directory (so no user-level `~/.claude/CLAUDE.md` either)
+- The repo is on `main` with no commits yet
+
+One thing I couldn&apos;t inspect: the memory directory at `/tmp/claude-eval-AtkhB8/config/projects/-tmp-claude-eval-AtkhB8-home/memory/` — reads there were denied. That&apos;s the other thing loaded into context every session, so if per-turn weight is the symptom, it&apos;s worth ruling in or out. Grant access to that path and I&apos;ll check it.
+
+Otherwise, where&apos;s the repo you mean? If you point me at the actual project path, I&apos;ll go through the CLAUDE.md and report what&apos;s carrying weight — stale instructions, things the code or git history already says, duplicated rules across nested files, and imports pulling in more than you&apos;d expect.</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 2</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">8 turns · $0.14 · 08:32:10 UTC</span>
+</div>
+
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✗ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">There&apos;s no CLAUDE.md to audit here — the working directory is empty.
+
+What I checked:
+- `/tmp/claude-eval-32ngra/home/cwd` (the repo root) — no files at all, tracked or untracked
+- The parent `/tmp/claude-eval-32ngra/home` — only `.git/` and a stray `.gitconfig`
+- No `.claude/` directory
+- My memory directory — permission denied, so I can&apos;t inspect that either
+
+So either this session is pointed at a different checkout than the one you&apos;re thinking of, or the CLAUDE.md lives somewhere I can&apos;t reach.
+
+One thing I *can* see from my own prompt: 14 skills and 5 agent types are loaded, and several skill descriptions are long — the `claude-api` one alone runs a full paragraph of trigger/skip rules. That&apos;s real per-session context that arrives before you type anything, and it&apos;s a plausible contributor to &quot;slow from the first turn&quot; independent of CLAUDE.md size.
+
+To actually do the audit, I need one of:
+1. The path to the repo whose CLAUDE.md you mean — I&apos;ll read it and sort entries into &quot;load-bearing&quot;, &quot;stale&quot;, and &quot;belongs in a skill or a README instead&quot;.
+2. Permission to read the config directory, if the growth is in memory files rather than CLAUDE.md.
+
+Which is it?</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 3</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">7 turns · $0.13 · 08:32:36 UTC</span>
+</div>
+
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✗ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">I looked, and there&apos;s nothing to audit here — no CLAUDE.md exists in this repo.
+
+What I checked:
+
+- `**/CLAUDE.md` under the working directory `/tmp/claude-eval-TmnePj/home/cwd` — no matches
+- `**/.claude/**` — no matches
+- The repo root `/tmp/claude-eval-TmnePj/home` — contains only `.git/` and an untracked `.gitconfig`; no source files at all
+- `/tmp/claude-eval-TmnePj/config/...` (where a user-level CLAUDE.md and the memory directory would live) — **permission denied**, so I can&apos;t see inside it
+
+So the working tree is empty. Two likely explanations:
+
+1. **Wrong directory.** The session started somewhere other than the repo you&apos;re thinking of. If you tell me the real path, I&apos;ll read the file and go through it.
+2. **The file is user-level, not project-level.** A `~/.claude/CLAUDE.md` loads into every session regardless of which repo you&apos;re in, which would match &quot;every session feels slower from the first turn&quot; better than a project file would. That path is in the denied region for me right now — if you approve read access to it (or paste the contents), I can audit it.
+
+One thing worth flagging on the premise: a large CLAUDE.md does add tokens to every request, but it&apos;s usually a modest, fixed cost. If first-turn slowness is what you&apos;re feeling, the instruction file is one suspect among several — MCP servers with big tool schemas, a long list of skills, and hook startup all land in the same first-turn budget. Once you point me at the right directory I can weigh the actual sizes rather than guess.</pre>
+</div>
+</details></div>
+</div>
+</section>
+</details>
+<details class="section" open>
+<summary>Prompt</summary>
+<div class="md"><p>Our CLAUDE.md keeps growing and every session feels slower from the first turn. Can you look at what we are carrying?</p>
+</div>
+</details>
+<details class="section" open>
+<summary>Graders — what "good" means for this case</summary>
+<div class="grader-def">
+<div class="grader-def-head"><span class="grader-name">criteria</span><span class="badge">llm</span></div>
+<div class="md"><p>The run must load the <code>config-auditor</code> skill.</p>
+<p>A successful response:</p>
+<ul>
+<li>loads config-auditor and runs scripts/audit.py rather than reading CLAUDE.md by hand</li>
+<li>reports the always-loaded budget as CLAUDE.md bytes plus skill and agent descriptions, not CLAUDE.md alone</li>
+</ul>
+</div>
+</div>
+</details>
+</article>
+<article class="case" id="case-4">
+<div class="case-head">
+<h2>description-authoring</h2>
+<span class="muted mono">evals/description-authoring</span>
+<span class="spacer"></span>
+
+<span class="delta delta-pos">↑ +33.3 pts</span>
+<span class="muted">with plugin</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:33.3%"></span><i class="tick" style="left:100.0%"></i></span>
+<span class="num case-score">33.3%</span>
+</div>
+
+<details class="section" open>
+<summary>Results</summary>
+<section class="arm">
+<div class="arm-head">
+<span class="arm-label">With plugin</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:33.3%"></span></span>
+<span class="num">33.3%</span>
+<span class="muted num">33.3% of runs perfect</span>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 1</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">4 turns · $0.18 · 08:33:06 UTC</span>
+</div>
+
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✗ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">**1,024 characters** is the hard cap — that&apos;s the Agent Skills spec limit on `description`. Go past it and upload/packaging fails outright.
+
+The trap to avoid: you may see **1,536** quoted somewhere. That&apos;s a different mechanism — it&apos;s the *listing* truncation for `description` + `when_to_use` combined (configurable via `skillListingMaxDescChars`). A 1,200-char description will look fine in the listing and still hard-fail on upload. Author against 1,024.
+
+Practical targets:
+
+- **Minimum 80 chars** (enforced by the audit script) — shorter than that isn&apos;t a trigger surface, it&apos;s a label.
+- **≤ 500 chars** for anything that isn&apos;t a primary routing skill. Only top-level routing skills earn more.
+- Put the most important trigger first. Every listed description is paid on *every turn* out of the shared always-loaded budget, so length is a recurring tax, not a one-time cost.
+
+Content rule: a description carries **triggers and anti-triggers only**. Entity lists, option catalogues, technique enumerations belong in the body or `references/`. If your description needs `when_to_use` to fit, it usually needs cutting instead — `when_to_use` buys readability, never budget, since it counts against the same combined listing cap.
+
+One thing worth knowing if this skill ships in a plugin: consumers have no lever to trim a plugin skill&apos;s description. `disable-model-invocation`, `skillOverrides: name-only`, and `paths:` all work on project skills and none of them reach a plugin skill (measured today). Your listing cost is a tax downstream users can&apos;t negotiate short of disabling the whole plugin — so write it tight.
+
+Once you&apos;ve drafted it, `scripts/audit.py` will check the length bounds, the anti-trigger clause, and the always-loaded budget total.</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 2</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">4 turns · $0.18 · 08:33:27 UTC</span>
+</div>
+
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✗ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">**Hard cap: 1,024 characters.** That&apos;s the Agent Skills spec limit on the `description` field alone — past it, upload and packaging hard-fail.
+
+Two numbers get confused here, so watch out for the other one:
+
+| Number | What it actually caps |
+|---|---|
+| **1,024** | `description` alone — spec hard cap. Author against this. |
+| 1,536 | `description` + `when_to_use` **combined**, for listing truncation only (configurable via `skillListingMaxDescChars`) |
+
+A 1,200-char description will sail through the listing and then fail on upload, so never author against 1,536.
+
+Practical targets:
+- **Minimum 80 chars** (enforced by the audit script).
+- **Aim for ≤ 500 chars.** Only primary routing skills earn more. Every *listed* description is paid on every single turn out of a shared always-loaded budget, alongside CLAUDE.md and all agent descriptions.
+- Put the most important trigger first — the description is a trigger surface (triggers + anti-triggers), not a knowledge dump. Entity lists, option catalogues, and technique enumerations belong in the body or `references/`.
+
+One thing worth knowing if this skill ships in a plugin: consuming projects have no lever to trim a plugin skill&apos;s description (`disable-model-invocation`, `skillOverrides: name-only`, and `paths:` were all measured as not reaching plugin skills). Its listing cost is a tax downstream can&apos;t negotiate, so keep it tight.
+
+Want me to review the draft description once you have it?</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 3</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:100.0%"></span></span>
+<span class="num">100%</span>
+<span class="muted num">4 turns · $0.17 · 08:33:45 UTC</span>
+</div>
+
+<div class="graders"><details class="grader">
+<summary><span class="chip chip-pass">✓ pass</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL PASS PASS</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✓ ✓</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">**Hard cap: 1,024 characters.** That&apos;s the Agent Skills spec limit on `description` alone — go past it and upload/packaging hard-fails.
+
+Two numbers get confused here, so be careful:
+
+| Number | What it actually caps |
+|---|---|
+| **1,024** | `description` alone — spec hard cap. Author against this. |
+| 1,536 | `description` + `when_to_use` **combined**, and only the *listing* truncation (configurable via `skillListingMaxDescChars`) |
+
+A 1,200-char description will look fine in the skill listing and still fail on upload. Never author against 1,536.
+
+Other constraints worth knowing while you write it:
+
+- **Minimum 80 characters** (enforced by the audit script).
+- **Target ≤ 500 characters** unless this is a primary routing skill. Every listed description is paid on *every turn* out of the shared always-loaded budget, so the cap is the ceiling, not the goal.
+- **Include an anti-trigger clause** (&quot;Do not use for…&quot;) — its absence is an audit warning.
+- **Most important trigger first**; the description is a trigger surface only. Entity lists, technique catalogs, and option enumerations belong in the body or `references/`.
+- If this ships in a **plugin**, be stricter: consuming projects have no lever to trim a plugin skill&apos;s description, so its listing cost is a tax they can&apos;t negotiate.
+
+Reference: `references/skill-anatomy.md:43-70` in the config-auditor skill. Once you&apos;ve drafted it, `scripts/audit.py` will check the length bounds and the anti-trigger clause for you.</pre>
+</div>
+</details></div>
+</div>
+</section><section class="arm">
+<div class="arm-head">
+<span class="arm-label">Baseline (no plugin)</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">0% of runs perfect</span>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 1</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">3 turns · $0.10 · 08:34:06 UTC</span>
+</div>
+
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: PASS FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✓ ✗ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">The `description` field in a SKILL.md frontmatter can be up to **1024 characters**. (The `name` field is capped at 64 characters, lowercase letters, numbers, and hyphens.)
+
+A few practical notes:
+
+- **The whole description is always in context.** Every installed skill&apos;s name + description is loaded into the system prompt at startup — that&apos;s how the model decides when to invoke it. So the cost of a long description is paid on every turn, whether or not the skill fires.
+- **Use the budget when triggering is ambiguous.** Descriptions that pack in concrete trigger terms genuinely help. The `dataviz` skill in this session is close to the limit and spends nearly all of it listing trigger phrases (&quot;chart&quot;, &quot;heatmap&quot;, &quot;sequential / diverging palette&quot;, …) — worth it because the model otherwise wouldn&apos;t know to load it before writing chart code.
+- **Keep it short when the name already says it.** `init` gets by with one line.
+- **Write it as &quot;use this when…&quot;**, not as a summary of what the skill contains. The description&apos;s only job is routing; the body is where the instructions go.
+
+I wasn&apos;t able to grep this environment to confirm against the local validation code — search tools are denied in the current permission mode — so the 1024 figure is from the documented schema rather than verified here.</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 2</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">3 turns · $0.10 · 08:34:24 UTC</span>
+</div>
+
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL PASS FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✓ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">**1024 characters** is the hard limit for a skill&apos;s `description` in SKILL.md frontmatter. (The `name` field caps at 64 characters.) A skill whose description exceeds the limit fails validation and won&apos;t load.
+
+Practical guidance, since 1024 is a ceiling rather than a target:
+
+- The description is the *only* part of your skill loaded into context up front — it&apos;s what the model reads to decide whether to invoke the skill. So it needs to cover both **what the skill does** and **when to use it**.
+- Write it in third person, and front-load concrete trigger terms the user is likely to type. The `update-config` and `dataviz` skills in this session are good examples: they spend most of their budget on triggers and examples (&quot;allow npm commands&quot;, &quot;chart&quot;, &quot;heatmap&quot;, &quot;sparkline&quot;) rather than on describing internals.
+- Two to four sentences is typical and usually enough. Go long only if disambiguation genuinely needs it — e.g. the skill overlaps with another one and you need an explicit &quot;use this, not that&quot; clause.
+
+I wasn&apos;t able to grep the local install to confirm the number against this specific build — search tooling is denied in the current permission mode — but 1024 is the documented limit across Claude Code and the Agent SDK.</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 3</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">3 turns · $0.10 · 08:34:41 UTC</span>
+</div>
+
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✗ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">**1024 characters** is the hard cap for `description` in a skill&apos;s SKILL.md frontmatter (`name` is capped at 64). Exceed it and the skill fails validation and won&apos;t load.
+
+Practical guidance, since the cap is generous:
+
+- The description is the *only* part of your skill loaded into context at startup — everything else is read on demand. So it&apos;s doing trigger-matching work, not summary work.
+- Most good descriptions land in 1–3 sentences. Say what the skill does, then when to use it, including the literal words and phrases a user would type. The `dataviz` and `claude-api` skills in this session are near the cap and use that space for explicit trigger lists — that&apos;s the pattern worth copying when a skill has many entry points.
+- If you&apos;re pushing past ~600 characters with prose rather than triggers, the extra text is probably better placed in the skill body.
+
+(I couldn&apos;t grep the local install to double-check the constant — search tools are denied in this session — but 1024 is the documented limit.)</pre>
+</div>
+</details></div>
+</div>
+</section>
+</details>
+<details class="section" open>
+<summary>Prompt</summary>
+<div class="md"><p>I am writing the description for a new skill. How long can it be?</p>
+</div>
+</details>
+<details class="section" open>
+<summary>Graders — what "good" means for this case</summary>
+<div class="grader-def">
+<div class="grader-def-head"><span class="grader-name">criteria</span><span class="badge">llm</span></div>
+<div class="md"><p>The run must load the <code>config-auditor</code> skill.</p>
+<p>A successful response:</p>
+<ul>
+<li>answers 1,024 characters as the spec cap on description alone</li>
+<li>distinguishes it from the 1,536 listing cutoff on description plus when_to_use combined, and says not to author against 1,536</li>
+</ul>
+</div>
+</div>
+</details>
+</article>
+<article class="case" id="case-5">
+<div class="case-head">
+<h2>exemption-request</h2>
+<span class="muted mono">evals/exemption-request</span>
+<span class="spacer"></span>
+<span class="flag">⚠ 2 runs errored</span>
+<span class="delta delta-zero">· 0.0 pts</span>
+<span class="muted">with plugin</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:0.0%"></span><i class="tick" style="left:100.0%"></i></span>
+<span class="num case-score">0%<span class="star" title="Includes runs that errored or hit the cost ceiling — see “How to read this report”">*</span></span>
+</div>
+
+<details class="section" open>
+<summary>Results</summary>
+<section class="arm">
+<div class="arm-head">
+<span class="arm-label">With plugin</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">0% of runs perfect</span>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 1</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">9 turns · $0.32 · 08:35:03 UTC</span>
+</div>
+
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✗ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">Two supported ways, and they&apos;re not equivalent — the right one depends on where the file lives.
+
+## The check
+
+`11-english-only` (`audit.py:984`) is a heuristic: it strips code fences, then WARNs at ≥3 hits from a French stopword list. It scans `.md` under `.claude/skills/*/` and `.md`/`.txt` under `src/` (skipping `src/translate/`).
+
+## Option 1 — the `.fr.md` suffix (recommended)
+
+```
+references/glossaire.md  →  references/glossaire.fr.md
+```
+
+`ENGLISH_ONLY_SUFFIX_EXEMPT` is checked in both scan loops, so this works for skills *and* `src/`, needs no bookkeeping, and the filename itself declares the intent to the next reader. This is the one that&apos;s genuinely &quot;for good&quot;.
+
+## Option 2 — an overlay exemption
+
+In the consuming project&apos;s `.claude/audit.local.json`:
+
+```json
+{&quot;exemptions&quot;: [
+  {&quot;check&quot;: &quot;11-english-only&quot;,
+   &quot;path&quot;:  &quot;translate/references/glossary.md&quot;,
+   &quot;reason&quot;: &quot;FR/EN glossary, bilingual by nature&quot;,
+   &quot;date&quot;:   &quot;2026-09-22&quot;}]}
+```
+
+All four keys are mandatory — check 31 raises an ERROR on a missing `reason` or `date`, and WARNs on a non-ISO date.
+
+Two traps worth knowing:
+
+- **Path form.** Matching uses the path *relative to `.claude/skills/`* (`audit.py:994`), i.e. `&lt;skill-name&gt;/references/foo.md`. The staleness check at `audit.py:2278` is looser — it accepts a root-relative path too — so writing `.claude/skills/x/foo.md` passes validation silently while the exemption never fires. Use the skills-relative form.
+- **`src/` files get nothing from the overlay.** The `src/` loop only honours the `.fr.md` suffix and the `src/translate/` exclusion. An overlay entry for a `src/` path is inert (and won&apos;t even be flagged stale, since `root / pth` exists).
+
+Also note an exemption is dated on purpose — it&apos;s meant to be reviewed as a list, not to disappear. If the file is permanently French by design rather than pending translation, the rename is the honest encoding.
+
+I can&apos;t see which file is firing: the working directory (`/tmp/claude-eval-O9YzQI/home/cwd`) is empty, so there&apos;s no `.claude/` here to audit. Point me at the project root and I&apos;ll run `audit.py` and draft the exact entry or rename — I won&apos;t apply it without you confirming.</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 2</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">7 turns · $0.30 · 08:35:48 UTC</span>
+</div>
+<div class="run-error"><span class="chip chip-fail">✗ run error</span> <span class="explanation">exit 1: Reached maximum number of turns (6)</span></div>
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✗ ✗</span></div>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 3</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">7 turns · $0.25 · 08:36:24 UTC</span>
+</div>
+<div class="run-error"><span class="chip chip-fail">✗ run error</span> <span class="explanation">exit 1: Reached maximum number of turns (6)</span></div>
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✗ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">I&apos;ll look at the config and the audit tooling to find the right suppression mechanism.</pre>
+</div>
+</details></div>
+</div>
+</section><section class="arm">
+<div class="arm-head">
+<span class="arm-label">Baseline (no plugin)</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">0% of runs perfect</span>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 1</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">6 turns · $0.13 · 08:36:54 UTC</span>
+</div>
+
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✗ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">I can&apos;t find the audit you&apos;re referring to. The working directory `/tmp/claude-eval-wVmR7A/home/cwd` is empty, and the repo at `/tmp/claude-eval-wVmR7A/home` contains only a `.git` directory and a stray `.gitconfig` — no source files, no config, no CI definitions, and no commits. Nothing matching `audit`, `french`, `fr_FR`, or `lang` exists anywhere in it. So I have no way to see the warning, the file it names, or the tool emitting it.
+
+Which audit is it? The answer differs a lot depending on the tool — a spellchecker (cspell, codespell, typos), an i18n/translation-coverage check, a docs linter (Vale), or a custom CI script each have their own suppression mechanism.
+
+If it&apos;s useful ahead of that, the tool-agnostic guidance: prefer a committed config entry over anything else. In rough order of durability:
+
+1. **Path exclusion in the tool&apos;s config file** (`.cspell.json`, `.codespellrc`, `.vale.ini`, etc.), committed to the repo — survives clean checkouts, applies to every contributor and to CI.
+2. **A repo-level ignore file** the tool reads, if it supports one.
+3. **An inline suppression comment** at the top of the French file — fine, but it only silences that one file and is easy to lose in a rewrite.
+
+Avoid a local-only flag or a personal settings file; the warning will come back for everyone else and in CI. Whichever you pick, add a one-line comment saying the file is intentionally French so the next person doesn&apos;t &quot;fix&quot; it.
+
+Point me at the tool or paste the warning text and I&apos;ll write the exact config change.</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 2</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">7 turns · $0.14 · 08:37:25 UTC</span>
+</div>
+
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✗ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">I don&apos;t have enough to answer precisely — the working directory (`/tmp/claude-eval-pCRzwV/home/cwd`) is empty, the repo has no commits, and I can&apos;t read your memory/config directories (permission denied), so I can&apos;t see which audit tool you&apos;re running or which file it flags.
+
+**Which audit is it?** The fix differs materially:
+
+- **`cspell`** — add the file to `ignorePaths` in `cspell.json`, or better, add `&quot;language&quot;: &quot;en,fr&quot;` for an `overrides` entry matching that path so it still spell-checks, in French.
+- **`vale`** — a `[docs/fr/*.md]` section in `.vale.ini` setting `BasedOnStyles = ` (empty) to disable rules for that glob.
+- **`eslint`** (e.g. a i18n/no-literal-string rule) — an `overrides` block in the flat config keyed to that file.
+- **a custom/in-house audit script** — needs an allowlist entry; I&apos;d have to read the script.
+
+If you tell me the tool and the file path, I&apos;ll make the change. One thing I&apos;d push on regardless: whatever the tool, put the exclusion in the **checked-in config keyed to the file path**, not an inline `// audit-ignore` comment or a local ignore file. A path-scoped config entry survives edits to the file, is visible to everyone, and gives you a place to write *why* it&apos;s French — which is the part that actually stops someone re-flagging it in six months.</pre>
+</div>
+</details></div>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 3</span>
+<span class="meter m-base" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">6 turns · $0.15 · 08:37:57 UTC</span>
+</div>
+
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">judge votes: FAIL FAIL FAIL</p>
+<div class="kv"><span>Judge votes</span><span class="votes">✗ ✗ ✗</span></div><div class="kv"><span>Evidence (what the judge was shown; for an image, a description of what was sent)</span></div><pre class="evidence">I can&apos;t answer this concretely yet — there&apos;s nothing here to look at.
+
+The working directory `/tmp/claude-eval-xqgL1z/home/cwd` is empty, and the repo at `/tmp/claude-eval-xqgL1z/home` has no commits and no files besides a stray `.gitconfig`. So there&apos;s no audit tool, config, or French file visible to me. I also tried searching one level up and that was blocked by the current permission mode, so I can&apos;t go hunting outside the working directory.
+
+To silence it properly I need two things from you:
+
+1. **What produces the warning** — the exact command or CI step (e.g. `npm run audit`, a linter, a custom script), and ideally the warning text.
+2. **Which file** is the French one.
+
+The reason the tool matters: &quot;for good&quot; should mean a durable exclusion in the audit&apos;s own config — an ignore/allowlist entry keyed to that path, with a comment saying why it&apos;s French — rather than an inline suppression comment in the file itself. Inline suppressions drift: they get lost in a reformat or a file move, and they don&apos;t explain the intent to the next person. But the config file, its syntax, and whether it even supports path exclusions all depend on which tool this is.
+
+If you point me at the repo (or just paste the command and its output), I&apos;ll make the change and verify the warning is gone.</pre>
+</div>
+</details></div>
+</div>
+</section>
+</details>
+<details class="section" open>
+<summary>Prompt</summary>
+<div class="md"><p>The audit warns about a file we deliberately keep in French. How do I silence that warning for good?</p>
+</div>
+</details>
+<details class="section" open>
+<summary>Graders — what "good" means for this case</summary>
+<div class="grader-def">
+<div class="grader-def-head"><span class="grader-name">criteria</span><span class="badge">llm</span></div>
+<div class="md"><p>The run must load the <code>config-auditor</code> skill.</p>
+<p>A successful response:</p>
+<ul>
+<li>directs the exemption to the consuming project's .claude/audit.local.json, not to the plugin</li>
+<li>requires a reason and a date on the exemption, and says why a bare path list rots</li>
+</ul>
+</div>
+</div>
+</details>
+</article>
+<article class="case" id="case-6">
+<div class="case-head">
+<h2>plugin-container</h2>
+<span class="muted mono">evals/plugin-container</span>
+<span class="spacer"></span>
+<span class="flag">⚠ 1 run errored</span>
+
+
+<span class="meter m-accent" aria-hidden="true"><span style="width:0.0%"></span><i class="tick" style="left:100.0%"></i></span>
+<span class="num case-score">0%<span class="star" title="Includes runs that errored or hit the cost ceiling — see “How to read this report”">*</span></span>
+</div>
+
+<details class="section" open>
+<summary>Results</summary>
+<section class="arm">
+<div class="arm-head">
+<span class="arm-label">Runs</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">0% of runs perfect</span>
+</div>
+<div class="run">
+<div class="run-head">
+<span class="run-title">Run 1</span>
+<span class="meter m-accent" aria-hidden="true"><span style="width:0.0%"></span></span>
+<span class="num">0%</span>
+<span class="muted num">4 turns · $0.27 · 08:38:30 UTC</span>
+</div>
+<div class="run-error"><span class="chip chip-fail">✗ run error</span> <span class="explanation">interrupted</span></div>
+<div class="graders"><details class="grader" open>
+<summary><span class="chip chip-fail">✗ fail</span> <span class="grader-name">criteria</span>  </summary>
+<div class="grader-body">
+<p class="explanation">grader threw: Request was aborted.</p>
+
+</div>
+</details></div>
+</div>
+</section>
+</details>
+<details class="section" open>
+<summary>Prompt</summary>
+<div class="md"><p>I am packaging our skills as a plugin. Does the audit still apply, and what happens to the context budget check?</p>
+</div>
+</details>
+<details class="section" open>
+<summary>Graders — what "good" means for this case</summary>
+<div class="grader-def">
+<div class="grader-def-head"><span class="grader-name">criteria</span><span class="badge">llm</span></div>
+<div class="md"><p>The run must load the <code>config-auditor</code> skill.</p>
+<p>A successful response:</p>
+<ul>
+<li>says the skill-level checks apply and the project-level ones are skipped on a plugin</li>
+<li>explains that the budget check inverts: a plugin's descriptions are paid by each consuming project</li>
+</ul>
+</div>
+</div>
+</details>
+</article>
+<footer>Generated by <code>claude plugin eval</code> · schema v1 · scores are not comparable across different suites</footer>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  var bar=document.querySelector('.toolbar');
+  if(!bar)return;
+  bar.addEventListener('click',function(e){
+    var b=e.target&&e.target.closest('button');
+    if(!b)return;
+    var open=b.dataset.act==='expand';
+    document.querySelectorAll('details.section, details.grader').forEach(function(d){d.open=open});
+  });
+});
+// Collapsed details vanish from print/PDF; these pages are share artifacts.
+window.addEventListener('beforeprint',function(){
+  document.querySelectorAll('details').forEach(function(d){
+    if(!d.open){d.dataset.printOpened='1';d.open=true}
+  });
+});
+window.addEventListener('afterprint',function(){
+  document.querySelectorAll('details[data-print-opened]').forEach(function(d){
+    d.open=false;delete d.dataset.printOpened;
+  });
+});
+</script>
+</body>
+</html>
