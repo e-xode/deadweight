@@ -8,204 +8,291 @@
 
 # Skill anatomy
 
-Contents: [Folder layout](#folder-layout) · [Frontmatter](#frontmatter) · [`SKILL.md` body](#skillmd-body) · [`references/` rules](#references-rules) · [Scripts placement](#scripts-placement) · [When to split a skill](#when-to-split-a-skill) · [Retiring a skill](#retiring-a-skill) · [Anti-triggers, in practice](#anti-triggers-in-practice) · [Trigger-verb tiering](#trigger-verb-tiering)
+Verified against the docs on 2026-09-23 (Claude Code 2.1.280).
+
+Contents: [How to read this file](#how-to-read-this-file) · [Where a skill must live](#where-a-skill-must-live) · [Folder layout](#folder-layout) · [Frontmatter](#frontmatter) · [`description` rules](#description-rules) · [`SKILL.md` body](#skillmd-body) · [`references/` rules](#references-rules) · [Scripts](#scripts) · [Evals](#evals) · [When to split a skill](#when-to-split-a-skill) · [Retiring a skill](#retiring-a-skill) · [Anti-triggers, in practice](#anti-triggers-in-practice) · [Tone of a description](#tone-of-a-description)
+
+## How to read this file
+
+Every rule carries one of three labels. **Doc**: an Anthropic page says it, and the link is given.
+**Measured**: not documented; observed on a stated Claude Code version with a stated protocol.
+**House convention**: this plugin's choice, with its reason — a consuming project may exempt it
+through its `.claude/audit.local.json`. The runtime details (all twenty frontmatter fields,
+visibility levers, lifecycle) live in [skill-runtime-mechanisms.md](./skill-runtime-mechanisms.md).
+
+## Where a skill must live
+
+**Doc.** Claude Code finds skills **by location, not by content**: `~/.claude/skills/<name>/SKILL.md`
+(personal), `.claude/skills/<name>/SKILL.md` (project, and nested copies below it), a directory
+passed with `--add-dir`, the managed-settings directory, and `<plugin>/skills/<name>/SKILL.md`
+([skills § Choose where skills load](https://code.claude.com/docs/en/skills)). A plugin manifest is
+optional: without one, components are auto-discovered in their default folders
+([plugins-reference](https://code.claude.com/docs/en/plugins-reference)).
+
+Consequences:
+
+- A `<name>/SKILL.md` folder at the **root** of a repository loads nowhere — not as a project skill,
+  not as a plugin skill. `40-skill-not-loaded` reports it.
+- **Measured** (2026-09-23, 2.1.280): a `skills/<name>/SKILL.md` tree loads under
+  `claude --plugin-dir <repo>` even with no `.claude-plugin/plugin.json`. Protocol: a repository
+  holding only `skills/shop-probe/SKILL.md`, started with `--plugin-dir`, then the probe looked up
+  in the session's skill list. The docs say only that the manifest is optional; that this layout is
+  enough on its own is the measured part.
+- **Doc.** Never name a skill folder `synced`, in any capitalization: Claude Code reserves
+  `~/.claude/skills/synced/` for skills downloaded from claude.ai and skips an authored skill of that
+  name ([skills § Choose where skills load](https://code.claude.com/docs/en/skills)).
 
 ## Folder layout
 
 ```
 .claude/skills/<skill-name>/
 ├── SKILL.md            (required)
-├── references/         (optional, recommended for any skill > ~200 lines)
+├── references/         (optional: detail loaded on demand)
 │   ├── <topic-1>.md
 │   └── <topic-2>.md
-├── scripts/            (optional, deterministic tooling)
-└── assets/             (optional, files used in output)
+├── scripts/            (optional: executable tooling)
+└── assets/             (optional: files used in output)
 ```
 
-- **`<skill-name>` is kebab-case** and matches the frontmatter `name` exactly. Enforced by `scripts/audit.py`.
-- **Domain prefix is mandatory** when the skill is scoped to one area of the project — in the worked example below, `shop-*`, `ui-*`, `api-*`, `data-*`. Cross-cutting skills (`translate`, `review`, `skill-creator`, `git-workflow`, this one) take no prefix.
+- **Doc.** `SKILL.md` is required; the other folders are recommendations
+  ([agentskills.io specification](https://agentskills.io/specification)). `02-skill-md-exists`.
+- **House convention: domain prefix.** A skill scoped to one area carries it as a prefix — `shop-*`,
+  `ui-*`, `api-*`, `data-*` in the worked example. Cross-cutting skills (`translate`, `release`) take
+  none. Reason: a prefix makes the owner of a file surface visible at a glance, in the listing, the
+  `/` menu and every `➜ See skill:` pointer.
 
 ## Frontmatter
 
 ```yaml
 ---
-name: skill-name
+name: shop-checkout
 description: '<single string, no line breaks>'
 ---
 ```
 
-Only `name` and `description` are required.
+**What is required depends on the target** — say which one you author for:
 
-### Truncation budget (official Anthropic)
+| Target | Required | Source |
+| --- | --- | --- |
+| Claude Code | nothing: every field is optional. `name` defaults to the folder name; a missing `description` falls back to "the first non-empty line of the markdown content" | [skills § Frontmatter reference](https://code.claude.com/docs/en/skills) |
+| Agent Skills spec (claude.ai upload, Skills API, `package_skill.py`) | `name` **and** `description` | [agentskills.io specification](https://agentskills.io/specification) |
+
+`02-skill-frontmatter` demands both, because a skill that loads in Claude Code but fails on upload is
+a latent defect (house convention, aligned on the stricter target).
+
+**`name` rules** — **doc**: at most 64 characters, lowercase letters, digits and hyphens, no leading,
+trailing or doubled hyphen, must match the parent folder
+([specification](https://agentskills.io/specification)); no XML tags, and never the reserved words
+`anthropic` or `claude`, which claude.ai and the Skills API reject
+([platform best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)).
+Checks: `32-skill-name-shape`, `32-skill-name-reserved`, `03-skill-name-matches-folder`,
+`06-skill-duplicate-name`. For a personal or project skill the typed `/command` comes from the
+folder, not from `name` ([skills § How a skill gets its command name](https://code.claude.com/docs/en/skills)).
+
+**Silent failures** — **doc**: a frontmatter block is read only when the opening `---` is the file's
+first line; if the YAML does not parse, the skill still loads "with no fields set", so `/name` works
+but Claude cannot match its description ([skills § Skill not triggering](https://code.claude.com/docs/en/skills)).
+`claude plugin validate .claude/skills` lists the `SKILL.md` files whose frontmatter does not parse
+(2.1.233+). **Measured, not documented** (2026-09-23, 2.1.280): an unknown key is ignored without
+error — a probe `SKILL.md` carrying `trigger-words:` passed `claude plugin validate` with no warning.
+`02-skill-unknown-field` is the only thing that will tell you; `02-skill-frontmatter` catches the
+unparseable block.
+
+### Two caps, two documents
 
 | Number | What it caps | Source |
 | --- | --- | --- |
-| **1,024** | `description` **alone** — hard cap of the Agent Skills spec. Past it, upload and packaging fail. | [platform.claude.com — agent-skills/best-practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices) |
-| **1,536** | `description` **+** `when_to_use` **combined** — truncation in the skill listing, nothing else. | [code.claude.com — skills](https://code.claude.com/docs/en/skills) |
+| **1,024** | `description` **alone** — spec cap; past it, upload and packaging fail. | [platform best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices) |
+| **1,536** | `description` **+** `when_to_use` combined — truncation in the Claude Code listing, nothing else; configurable with `skillListingMaxDescChars`. | [skills § Frontmatter reference](https://code.claude.com/docs/en/skills) |
 
-Two mechanisms, two documents, two pages. **Author against 1,024.** A 1,200-character description
-passes the listing and still hard-fails on upload. Table added 2026-09-20: two readers had confused
-the two figures that day, one of them the author of this doctrine.
+**Author against 1,024**: a 1,200-character description passes the listing and still hard-fails on
+upload. `04-skill-description-length`. `when_to_use` is appended to `description` in the listing and
+counts toward the same 1,536 cap: it buys readability, never budget.
 
-The Agent Skills spec caps `description` at **1,024 characters** — that is the number to author against. The **1,536-character** figure is a different cap: the _listing_ truncation of `description` + `when_to_use` combined, itself configurable through `skillListingMaxDescChars`. A 1,200-char description passes the listing and still hard-fails on upload or packaging. Put the most important trigger information first.
+`paths:` does not disambiguate two skills whose descriptions both match: it keeps a skill out of the
+starting listing until a matching file is touched. Full account in
+[skill-runtime-mechanisms.md § Path-scoped skills](./skill-runtime-mechanisms.md#path-scoped-skills).
 
-`when_to_use` is a second, separately-named trigger field, appended to `description` in the listing and counted against the **same** 1,536-char cap. It buys readability — "what it is" split from "when to fire" — never budget. Not used here; a description that needs the split is usually a description that needs cutting.
+## `description` rules
 
-`paths:` scopes _automatic_ activation to a glob list, the same syntax as `.claude/rules/`. It looks like the structural answer to two skills whose descriptions both plausibly match — a boundary that is mechanical instead of semantic. Measured, it does **not** deliver that: a `paths:`-scoped skill is withheld from the listing entirely — name and description — is not invocable by name, and never auto-loads, in headless and interactive sessions alike. It is a **withholding lever, not a disambiguation one, and never a routing lever**. Do not reach for it to separate two skills. Measured both ways and ruled against on 2026-09-09; see [skill-runtime-mechanisms.md](./skill-runtime-mechanisms.md) § Path-scoped skills.
+The description is the trigger surface: Claude decides whether to load a skill from it alone.
 
-Twenty frontmatter fields exist in total; four of them change what a description costs. Full table, and the six-field spec subset that survives upload or packaging: [skill-runtime-mechanisms.md](./skill-runtime-mechanisms.md).
+1. **Doc — what and when, third person.** "Should describe what the Skill does and when to use it";
+   "Always write in third person", because the text is injected into the system prompt
+   ([platform best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)).
+2. **Doc — discriminating.** Name the domain, file types, key concepts and the words a user would
+   actually type ([skills § Skill not triggering](https://code.claude.com/docs/en/skills)).
+3. **Doc — a little pushy.** skill-creator notes that Claude tends to under-trigger skills and asks
+   for descriptions "a little bit pushy" ([anthropics/skills — skill-creator](https://github.com/anthropics/skills)).
+   Insistent is defensible; shouted is not — see [Tone](#tone-of-a-description).
+4. **Doc — no XML, no angle brackets.** The spec forbids XML tags in `description`; skill-creator's
+   `quick_validate.py` rejects any `<` or `>`. Claude Code loads it anyway, which is why
+   `04-skill-description-brackets` warns rather than errors.
+5. **House convention — anti-triggered.** End with a `Don't use for:` clause naming the right
+   alternative. Reason: a near-miss request is where two skills collide, and the clause is the only
+   text that separates them. `04-skill-description-antitrigger` (WARN); `33-description-overlap`
+   flags pairs of descriptions that compete.
+6. **House convention — 80 to ~500 characters.** Under 80 carries no discriminating term
+   (`04-skill-description-length` also enforces the floor); over ~500 is usually knowledge that
+   belongs in the body. Every listed description is paid on every turn: `17-always-loaded-budget`
+   caps `CLAUDE.md` + listed skill descriptions + agent descriptions at 43,000 chars WARN / 47,000
+   ERROR — a house ratchet, not an Anthropic figure.
 
-### `description` rules
+**Doc — what triggering can and cannot do.** "Claude only consults skills for tasks it can't easily
+handle on its own" (skill-creator): a one-step request ("read this file") may not load a skill
+however good its description is. Test triggering with substantive requests.
 
-The description is the **primary triggering mechanism**. Three constraints:
-
-1. **Discriminating.** State the _exact_ domain, key file paths, key types, and key concepts. Listing 5–10 trigger keywords beats a vague sentence.
-2. **Pushy.** Claude under-triggers skills by default. Use phrasings like "Trigger this skill **whenever** the user mentions X, even if they don't say 'skill'" or "Always load X together with Y".
-3. **Anti-triggered.** Always include a `Don't use for: ...` clause that points to the correct alternative skill. This both improves precision and aids discovery.
-
-Minimum length enforced: 80 characters. Anti-trigger clause enforced as a warning by `scripts/audit.py`.
-
-### Description budget
-
-The description is the trigger surface, nothing more: triggers + anti-triggers. Enumerated knowledge (entity lists, technique catalogs, option enumerations) belongs in the body or `references/`. Target ≤ 500 chars; only primary routing skills earn more.
-
-Every **listed** description is paid every turn from the shared always-loaded budget (CLAUDE.md bytes + listed skill descriptions + all agent descriptions ≤ 43,000 chars WARN / 47,000 ERROR), audited by `scripts/audit.py`, which prints the effective total as INFO and reports separately how much is withheld.
-
-Before trimming a description a third time, ask whether it should be listed at all. A skill reached only through an explicit pointer — an agent body, a CLAUDE.md row — pays for a trigger surface nobody uses. Withhold it (`disable-model-invocation`, or `skillOverrides: name-only`) and the whole cost disappears. Trim what genuinely competes for semantic selection; withhold what does not.
+Before trimming a description a third time, ask whether it should be listed at all. A skill reached
+only through an explicit pointer pays for a trigger surface nobody uses: withhold it
+(`disable-model-invocation`, or a `skillOverrides` entry) — see
+[skill-runtime-mechanisms.md § Listing visibility](./skill-runtime-mechanisms.md#listing-visibility-and-the-budget).
 
 ### Description example (good)
 
 ```
-description: "Enforce design-system-first SCSS architecture for this project. Use this
-before touching any .scss file, design-system theme override, mixin, Sass token, page
-stylesheet, or shared style helper. Push back on bespoke SCSS when the design system
-components, props, utilities, defaults, or theme tokens already solve the problem.
-Don't use for: plain CSS outside the design system (→ ui-css), UX/a11y quality
-audits (→ ui-a11y), or component prop/slot decisions (→ ui-components)."
+description: "Enforces design-system-first SCSS in the shop front end. Use before touching any
+.scss file, theme override, mixin, Sass token or page stylesheet; pushes back on bespoke SCSS when
+a design-system component, prop, utility or token already solves the problem. Don't use for: plain
+CSS outside the design system (→ ui-css), accessibility audits (→ ui-a11y), or component prop
+decisions (→ ui-components)."
 ```
 
 ### Description example (bad)
 
 ```
-description: "Helps with SCSS in the project."
+description: "Helps with SCSS."
 ```
 
-Why it fails: no triggers, no anti-triggers, no file paths, no discrimination from any other skill.
+Why it fails: no trigger terms, no file surface, no anti-trigger, nothing that separates it from
+`ui-css`.
 
 ## `SKILL.md` body
 
-### Target shape
-
-- **≤ ~500 lines, and ideally ≤ 20 KB.** 500 lines is Anthropic's figure. 20 KB is the _effective_ ceiling: after the first auto-compaction only the first 5,000 tokens of an invoked skill are re-attached, truncation keeps the start, and anything past the cut silently stops applying. The 50 KB figure `scripts/audit.py` enforces is a hard error, not the target — a 30 KB `SKILL.md` passes the script and is still half-dropped mid-session.
-- **Method + index.** What to do, and where to look for details. Not the encyclopedia itself.
-- **Imperative voice.** Same as `CLAUDE.md`.
-- **Tables for enumerations** (responsibilities, routing, decision matrices).
-- **No code comments** outside fenced blocks.
-
-### Recommended sections (project convention)
-
-1. **Lead paragraph** — what the skill owns in one or two sentences.
-2. **In/out scope table** — what belongs here, what is delegated elsewhere.
-3. **Division of responsibilities** (only for twin skills, e.g. `config-auditor` ↔ `skill-creator`).
-4. **Core rules** — the minimum set to remember without reading references.
-5. **Workflows** — one numbered list per common task, with `➜ See skill: ...` handoffs.
-6. **Routing table** — "if you need X, read references/Y".
+- **Doc — under 500 lines** ([platform best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)).
+- **Doc-derived — ideally under ~20 KB.** After auto-compaction Claude Code re-attaches only the
+  first 5,000 tokens of each invoked skill ([skills § Skill content lifecycle](https://code.claude.com/docs/en/skills));
+  past that point the text silently stops applying. `21-skill-md-compaction` warns;
+  `05-skill-md-size` errors at 50 KB (house ceiling).
+- **Doc — method plus index.** `SKILL.md` "serves as an overview that points Claude to detailed
+  materials as needed" (platform best practices). Critical rules stay in the body: a reference may
+  never be opened on a cheap task.
+- **House convention — sections.** Lead paragraph (what the skill owns); in/out scope table; a
+  division-of-responsibilities table for twin skills; core rules; one numbered workflow per task
+  with `➜ See skill: <name>` handoffs; a routing table to `references/`. Reason: the same shape in
+  every skill makes a missing section visible. `15-skill-index` reconciles the `CLAUDE.md` skills
+  index; `28-skill-anchors` checks that paths the body names still exist.
 
 ## `references/` rules
 
-- **One topic per file.** If a reference grows past ~300 lines, split it.
-- **Table of contents** at the top of any reference > 100 lines.
+- **Doc — one level deep.** Every reference is linked directly from `SKILL.md`, so Claude reads
+  whole files instead of following chains (platform best practices). `25-orphan-reference` flags a
+  reference `SKILL.md` never names.
+- **Doc — table of contents past 100 lines** (platform best practices). skill-creator repeats it
+  for files over 300 lines: "include a table of contents" — it does not say split.
+- **House convention — split past ~300 lines, one topic per file.** Reason: a reference is read
+  whole when opened, so one bloated file makes every consult pay for every topic in it; two
+  focused files let Claude open only the one it needs. `16-reference-size` warns at 100 lines
+  without a `Contents:` block, and at 300 lines even with one.
 - **No frontmatter** in references — they are not skills.
-- **Heading hierarchy** starts at `#` (top-level), same as `SKILL.md`.
-- References are loaded **on demand** — they may be skipped on cheap tasks. Never put a critical rule only in a reference; mention it briefly in `SKILL.md` with a pointer.
 
-## Scripts placement
+## Scripts
 
-Skills may bundle executable tooling under `scripts/`:
+**Doc** ([platform best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices),
+[agentskills.io — Using scripts](https://agentskills.io/skill-creation/using-scripts)):
 
-### Rules
+- **Solve, don't punt.** A script handles its error conditions itself instead of failing and
+  leaving Claude to improvise.
+- **No voodoo constants.** Every timeout, retry count or threshold is justified in a comment or the
+  docs: "If you don't know the right value, how will Claude determine it?"
+- **Forward slashes** in every path, even on Windows.
+- **Say whether the script is executed or read.** "Run `scripts/check_stock.py`" (its output
+  enters context, its source does not) versus "See `scripts/check_stock.py` for the algorithm".
+- **Non-interactive**, with a `--help` that documents flags and exit codes: an agent cannot answer
+  a TTY prompt.
 
-- **Scripts belong to one skill.** The owner is the skill whose body or references document the script's method. Never share a script across skills via a global pool. One sanctioned shared toolbox exists: `shop-art-direction/scripts/` hosts the visual verification tooling (`measure.mjs`, `screenshots.mjs`, `anim-probe.mjs`, `lib/session.mjs`) because that skill owns the charter the tools grade against; `ui-css`, `ui-performance`, `visual-qa`, `shop-known-issues` and `shop-preview-video` consume them by path and never copy them.
-- **No `.claude/scripts/` pool.** Top-level `.claude/scripts/` is an anti-pattern. Anthropic's official skill anatomy lists `scripts/` as a **bundled resource of a skill**, not a project-wide directory. `audit.py` check #13 enforces this as an ERROR.
-- **Documented in the owning `SKILL.md` or a reference.** A script that no skill calls or describes is orphan code.
-- **Stdlib first.** Prefer Python/Bash with no external dependencies.
-- **Executable + shebang.** `chmod +x` and a `#!/usr/bin/env python3` / `#!/usr/bin/env bash` line.
-- **Exit code 0 on success, 1 on failure.**
-- **No `--fix` mode by default.** Audit/validation scripts propose corrections; the user applies them.
+**Doc — review `allowed-tools`.** Workspace trust does not gate a project skill's `allowed-tools`:
+it applies even in a `-p` run in a never-trusted folder, so read that field in any committed skill
+before running Claude Code there ([skills § Pre-approve tools](https://code.claude.com/docs/en/skills)).
+
+**House conventions**, each with its reason:
+
+- **A script belongs to one skill** — the one whose body documents its method — so it travels and
+  retires with that skill. No top-level `.claude/scripts/` pool: `13-no-global-scripts`.
+- **Sharing is by path, never by copy.** Example: `shop-catalog` owns
+  `scripts/validate_sku.py`; `shop-import` calls `.claude/skills/shop-catalog/scripts/validate_sku.py`
+  and documents that dependency in its own body. In a plugin, reference shared files through
+  `${CLAUDE_PLUGIN_ROOT}`, which the docs name for exactly this
+  ([skills § Available string substitutions](https://code.claude.com/docs/en/skills)).
+- **Stdlib first, shebang, executable bit, exit 0 on success.** A dependency is a failure on the
+  next machine.
+- **No `--fix` by default** in audit scripts: they propose, the user applies.
+
+## Evals
+
+**Doc** ([platform best practices § Build evaluations first](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices),
+[agentskills.io — Evaluating skills](https://agentskills.io/skill-creation/evaluating-skills)):
+run representative tasks **without** the skill first and write down what fails; build **at least
+three** scenarios from those failures; measure the baseline without the skill; write the minimum
+instructions that pass; iterate against the baseline. An assertion that passes in both
+configurations proves nothing and should go. Checks: `26-evals-count`, `26-evals-coverage`,
+`26-evals-schema`, `26-evals-anti-trigger`, `26-evals-id-type`.
 
 ## When to split a skill
 
-Split when:
-
-- The skill touches **two distinct domains** (e.g., REST API and Socket events → split into `api-express` and `api-socket`).
-- The body exceeds **500 lines** and the topics inside are independently triggerable.
-- Two parts have **different triggering profiles**.
-
-Do NOT split when:
-
-- The two parts are always loaded together (split is cosmetic and costs context).
-- The "split" is just chapters of the same procedure (use `references/` instead).
+Split when the skill covers **two domains** (REST and socket events → `api-express` and
+`api-socket`), when the body passes 500 lines and its parts trigger independently, or when two parts
+have different triggering profiles. Do **not** split when the parts always load together (the
+split costs context for nothing) or are chapters of one procedure (use `references/`). House
+convention; the 500-line figure is Anthropic's.
 
 ## Retiring a skill
 
-Everything above is about birth: when to write a skill, when to split one. Nothing said when to
-remove one. Measured 2026-09-20 across the 16 personal repositories
-(`git log --diff-filter=A|D --name-only -- '.claude/skills/*/SKILL.md'`): **352 `SKILL.md` created,
-8 deleted, 348 live.** A configuration with no retirement procedure does not degrade — it
-accumulates. A budget that only ever goes up is not a budget.
+**Doc — the signal that matters most.** "If the agent already handles the entire task well without
+the skill, the skill may not be adding value"
+([agentskills.io — Best practices](https://agentskills.io/skill-creation/best-practices)). A skill
+whose baseline run passes its own evals is a retirement candidate, whatever else is true; re-run
+the baselines after every major model release.
 
-### The four signals
-
-A skill is a candidate for retirement when **all four** are true. Each is measurable today, from
-this repository, with no new tooling.
+**House convention — three corroborating signals**, each measurable with no new tooling:
 
 | Signal | How it is measured |
 | --- | --- |
-| Nobody names it | no `➜ See skill: <name>` anywhere in the tree, and absent from the `CLAUDE.md` skills index |
-| It has no eval | no `evals/evals.json`, or fewer than 3 cases |
-| Its anchors are dead | the paths its body names no longer exist (checked by `audit.py`, check 28) |
+| Nobody names it | no `➜ See skill: <name>` pointer anywhere, absent from the `CLAUDE.md` skills index |
+| Its anchors are dead | paths its body names no longer exist (`28-skill-anchors`) |
 | It has not moved | no commit on its folder for 3 months (`git log -1 --format=%ar -- .claude/skills/<name>`) |
 
-Three signals out of four is not a candidate. A skill nobody names by pointer, whose eval passes and
-whose anchors are live, is a skill reached by its description — which is how a skill is meant to be
-reached.
+A skill nobody names but whose evals show a gain over the baseline is reached by its description —
+which is how a skill is meant to be reached. Keep it.
 
-### The procedure — two steps, never one
-
-1. **Withhold it.** Set its `skillOverrides` entry to `"off"` in `.claude/settings.json`. It leaves
-   the listing *and* the `/` menu without being deleted: the description stops costing context on
-   every turn, and any pointer still aimed at it starts failing visibly instead of silently.
-2. **Wait two weeks.** If nobody asked for it back, delete the folder and remove every
-   `➜ See skill:` pointer and index line that named it. `audit.py` catches what is left: check
-   `18-see-skill-target` errors on a dangling pointer, `24-settings-skill-overrides` on a
-   `skillOverrides` entry naming a folder that no longer exists, and `15-skill-index` warns on an
-   index line for a skill that is no longer withheld.
-
-Step 1 is reversible; step 2 is not. Doing both in one move turns a measurement into a bet.
-
-> **This section states the procedure; it authorises no deletion.** Added 2026-09-20 with none
-> pending anywhere in the fleet.
+**The procedure — two steps, never one.** (1) Set its `skillOverrides` entry to `"off"` in
+`.claude/settings.json`: it leaves the listing and the `/` menu without being deleted, and any
+pointer still aimed at it starts failing visibly. (2) After two weeks with no request for it,
+delete the folder and every pointer to it; `18-see-skill-target`, `24-settings-skill-overrides`
+and `15-skill-index` catch what is left. Step 1 is reversible; step 2 is not. Doing both at once
+turns a measurement into a bet.
 
 ## Anti-triggers, in practice
 
-The anti-trigger clause should be the **last sentence** of the description, prefixed with `Don't use for:`. Each anti-trigger must point to the correct alternative (skill, agent, or "this is a framework concept").
+The clause is the **last sentence** of the description, prefixed `Don't use for:`, and every entry
+points somewhere — a skill, an agent, or "framework concept":
 
 ```
-Don't use for: post-task code validation (→ hooks agent), git commit format (→ git-workflow), or Vue lifecycle hooks (framework concept).
+Don't use for: stock reconciliation (→ data-inventory), payment provider webhooks (→ api-payments
+agent), or Vue lifecycle hooks (framework concept).
 ```
 
-## Trigger-verb tiering
+## Tone of a description
 
-Descriptions across the tree open with whatever verb their author reached for, so the listing gives
-Claude no signal about which skills are _mandatory_ before touching a file and which are advice.
-Three tiers, to apply **on the next touch of a description** — never as a bulk rewrite, which would
-churn every skill for no measured gain:
+**Doc.** Recent models are "more responsive to the system prompt": prompts written to fight
+under-triggering now over-trigger, and the fix is to "dial back any aggressive language" — where you
+might have written "CRITICAL: You MUST use this tool when…", "you can use more normal prompting
+like 'Use this tool when…'"
+([platform — prompting best practices](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)).
+skill-creator says the same of skill bodies: "If you find yourself writing ALWAYS or NEVER in all
+caps … that's a yellow flag" — explain the reason instead.
 
-| Tier      | Opening verb | Applies to                                                                                                  |
-| --------- | ------------ | ----------------------------------------------------------------------------------------------------------- |
-| Mandatory | `MUST use`   | Skills owning a file surface no agent may edit without them: the file-owning `shop-*` and `api-*` skills.   |
-| Domain    | `Use for`    | Skills that carry a domain's knowledge but gate nothing: `ui-*`, `data-*`.                                  |
-| Advisory  | `Trigger on` | Skills answering a question rather than guarding a file: `shop-lore`, `content-*`.                          |
-
-The tier is a claim about consequence, not importance. If breaking a skill's rule produces a defect
-in committed code, it is mandatory; if it produces a weaker answer, it is not.
+In practice: open with what the skill does, then "Use when…" / "Use before touching…". A
+description that is a little insistent about its scope (item 3 above) remains defensible; capitals,
+`MUST use` and `CRITICAL` are not a way to raise priority. If breaking a skill's rule produces a
+defect in committed code, say **why** in one clause ("…because the checkout total is computed
+server-side") — the reason carries the weight the capitals used to fake.

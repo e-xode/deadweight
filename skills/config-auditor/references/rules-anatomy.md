@@ -8,133 +8,170 @@
 
 # Rules anatomy (`.claude/rules/`)
 
-Contents: [What rules are](#what-rules-are) · [Loading behaviour (official Anthropic)](#loading-behaviour-official-anthropic) · [Glob budget and silent-failure modes](#glob-budget-and-silent-failure-modes) · [File format](#file-format) · [When to use rules vs skills vs CLAUDE.md](#when-to-use-rules-vs-skills-vs-claudemd) · [Conventions worth adopting](#conventions-worth-adopting) · [Keeping the set legible](#keeping-the-set-legible) · [Proving a rule actually loaded](#proving-a-rule-actually-loaded) · [Anti-patterns (rules-specific)](#anti-patterns-rules-specific)
+Verified against the docs on 2026-09-23 (Claude Code 2.1.280).
 
-Verified 2026-09-03 against Claude Code 2.1.259.
+Registers: **Doc** (an Anthropic page, linked), **Measured** (observed on a running Claude Code,
+version given), **House convention** (this plugin's choice, with its reason — a project may
+disagree). Unless stated otherwise, "Doc" means
+[memory § Organize rules with `.claude/rules/`](https://code.claude.com/docs/en/memory).
 
-Partially re-verified 2026-09-20, at the source, on these points only: the 1,024-character cap on `description` (agent-skills/best-practices), the 1,536-character listing truncation of `description` + `when_to_use` (skills), the hook event catalogue and the semantics of `SessionStart` (hooks), and the behaviour of `disable-model-invocation` (skills). **Everything else on this page still carries the 2026-09-03 date** — it was not re-checked.
+Contents: [What a rule is](#what-a-rule-is) · [When a rule loads](#when-a-rule-loads) · [Compaction](#compaction) · [File format](#file-format) · [Globs and their silent failures](#globs-and-their-silent-failures) · [Discovery, user rules, symlinks](#discovery-user-rules-symlinks) · [Conflicts](#conflicts) · [Rules, skills or CLAUDE.md](#rules-skills-or-claudemd) · [House conventions](#house-conventions) · [Proving a rule loaded](#proving-a-rule-loaded) · [Checks](#checks)
 
+## What a rule is
 
-## What rules are
+A Markdown file under `.claude/rules/`, one topic per file. **Doc**: it is context, like
+`CLAUDE.md`, not enforced configuration. Two kinds:
 
-Rules are lightweight, path-scoped instruction files that load **automatically** when Claude works on files matching their glob pattern. They live in `.claude/rules/` and complement skills and `CLAUDE.md`.
+- **Without `paths:`** — loaded at launch "with the same priority as `.claude/CLAUDE.md`". This
+  is a documented, legitimate way to split a large `CLAUDE.md` into modules; it costs exactly
+  what the same lines would cost in `CLAUDE.md`.
+- **With `paths:`** — loaded only when a matching file is read.
 
-## Loading behaviour (official Anthropic)
+## When a rule loads
 
-- Rules **without** `paths:` frontmatter load unconditionally (same priority as `.claude/CLAUDE.md`).
-- Rules **with** `paths:` frontmatter load ONLY when Claude reads or edits files matching the glob.
-- Multiple rules can load simultaneously if several globs match the active file.
-- Rules are merged into the system prompt alongside `CLAUDE.md` content — they do not override it.
-- **User-level rules exist too**: `~/.claude/rules/` loads **before** project rules. A machine-local rule can therefore shape behaviour in this repo without appearing anywhere in it — check there first when a behaviour has no explanation in the tree.
-- **Discovery is recursive.** Subdirectories under `.claude/rules/` are found, and symlinked directories and files work (cycles are handled). The flat layout below is a project choice, not a platform constraint.
+- **Doc**: "Path-scoped rules trigger when Claude reads files matching the pattern, not on every
+  tool use."
+- **Reported upstream, not measured here** (`anthropics/claude-code#93248`, open): writing or
+  **creating** a matching file does not load the rule. A rule meant to guard how new
+  `src/api/<name>.ts` files are written would then never fire for a file created without a
+  matching file having been read first. *Inference, not verified:* an edit usually loads it,
+  since the Edit tool requires a prior Read of the file.
+- So a path-scoped rule is **not** a "100 % hit, set and forget" guardrail. It reaches Claude
+  when a matching file is read, and only until the next compaction.
+- **Doc** ([context-window](https://code.claude.com/docs/en/context-window)): the rule lands in
+  message history as a one-line "Loaded" notice for the user; the content goes to the model.
+- **Doc** ([skills](https://code.claude.com/docs/en/skills), frontmatter reference): skills accept
+  `paths:` too, same format. **Measured** (2.1.280): a skill with `paths:` is withheld from the
+  initial listing and becomes available once a matching file is read — the skill-side
+  equivalent, with a description and on-demand body.
 
-## Glob budget and silent-failure modes
+## Compaction
 
-A rule's whole `paths:` list shares a budget of **1,000 expanded patterns / 4 MiB**. Brace expansion counts against it, so `src/**/*.{vue,js,mjs,scss,css,json}` is six patterns, not one.
+**Doc** ([context-window § What survives compaction](https://code.claude.com/docs/en/context-window)):
 
-Two failures are silent — the rule keeps loading, its glob simply never matches anything:
-
-- **Over-budget patterns are used unexpanded**, so a pattern that only makes sense expanded matches nothing.
-- **An unescaped `[`** makes that pattern match nothing. The rest of the rule still works, which is what makes it hard to spot.
-
-Neither produces an error at runtime — which is why `audit.py` carries the static substitute: one check validates that a `paths:` glob is present and well-formed, and another **expands every glob, brace branches included, and reports one that matches no real file** as a silently inert guardrail. That is as far as static analysis reaches; proving a rule _loaded_ is the next section.
+- Rules without `paths:` are re-injected from disk after compaction.
+- Rules with `paths:` "load into message history when their trigger file is read, so compaction
+  summarizes them away". They return only when Claude next reads a matching file.
+- "If a rule must persist across compaction, drop the `paths:` frontmatter or move it to the
+  project-root CLAUDE.md."
 
 ## File format
 
-```yaml
+```markdown
 ---
 paths:
-  - 'src/**/*.vue'
+  - "src/api/**/*.ts"
+  - "tests/api/**/*.test.ts"
 ---
-# Title (optional but recommended)
 
-Instruction text in markdown. Short, imperative, guardrail-style.
+# API handlers
+
+- Validate every request body with the shared schema in `src/api/schema/`.
+- Return errors in the `{ code, message }` shape.
 ```
 
-### Frontmatter fields
+**Doc** (rule frontmatter reference):
 
-| Field   | Required             | Description                                                         |
-| ------- | -------------------- | ------------------------------------------------------------------- |
-| `paths` | No (but recommended) | YAML list of glob patterns. Without it, rule loads unconditionally. |
+- `paths` is **the only field a rule reads**. Any other field is ignored without an error —
+  `globs:` (Cursor's name for it), `description:`, `alwaysApply:` do nothing.
+- `paths` accepts a YAML list **or** a comma-separated string.
+- If the YAML between the markers does not parse, the frontmatter is ignored and **the rule loads
+  as if it had no `paths`** — it becomes global, silently. `claude --debug` shows the parse error.
+- The frontmatter is stripped before the rule enters context.
 
-No other frontmatter fields are used. Rules are intentionally minimal.
+## Globs and their silent failures
 
-## When to use rules vs skills vs CLAUDE.md
+**Doc** (path-specific rules):
 
-| Criterion        | `.claude/rules/`                                         | `.claude/skills/`                         | `CLAUDE.md`                          |
-| ---------------- | -------------------------------------------------------- | ----------------------------------------- | ------------------------------------ |
-| **Content type** | Guardrails, constraints, hard DON'Ts                     | Knowledge, procedures, how-to             | Global hard rules                    |
-| **Loading**      | Deterministic by file path (100% hit)                    | Semantic/description matching (may miss)  | Every turn                           |
-| **Size**         | Short (< 2 KB recommended)                               | Rich (up to 50 KB + references)           | Minimal (< 12 KB)                    |
-| **Structure**    | Flat markdown, no references                             | SKILL.md + references/ + scripts/         | Sections with tables                 |
-| **Maintenance**  | Near-zero (set and forget)                               | Active (needs audit, evals)               | Careful (token budget)               |
-| **Use when…**    | You need a constraint to fire reliably on specific files | You need to teach Claude domain knowledge | You need a rule on every single turn |
+- A rule's whole `paths` list shares one budget of **1,000 expanded patterns and 4 MiB**. Brace
+  groups multiply: `{ui,api}/**/*.{ts,tsx}` is four patterns; patterns without braces do not
+  count. A pattern that would exceed the budget is used unexpanded, and its literal braces match
+  nothing.
+- `[` opens a bracket expression. Only a `[` that **cannot** form one — `photos [2024/**` — makes
+  the pattern invalid; it then matches nothing while the rule's other patterns keep working.
+  `data/[ab]*.csv` is a valid class, not an error. Escape a literal bracket: `\[`.
+- Matching also works through a symlinked path to the project (2.1.198).
 
-### Decision flowchart
+None of these failures produces a runtime error, which is why `22-rule-glob-match` expands every
+glob, brace branches included, and reports one matching no file in the repository.
 
-1. Is this needed on **every turn**, regardless of file context? → `CLAUDE.md`
-2. Is this tied to a **specific file path or pattern**? → Rule
-3. Does it require **more than ~20 lines** to explain? → Skill
-4. Is it a **constraint** ("don't do X") rather than knowledge ("here's how to do X")? → Rule
-5. Does Claude need **examples, references, or procedures**? → Skill
+**House convention** (`22-rule-glob-match`, INFO): a glob rooted in a directory the repository's
+git ignores (`dist/**`, `data-exports/**`) can only be checked on machines that hold those
+untracked files. The auditor reports it as INFO and does not count it, so the same commit gives
+the same result everywhere. For every git-dependent judgement the auditor uses **the
+repository's own ignore rules only**, never the user's global `core.excludesFile`.
 
-### Complementary use (rule + skill)
+## Discovery, user rules, symlinks
 
-A rule and a skill can cover the same domain at different levels:
+**Doc**:
 
-- **Rule** = lightweight guardrail that always fires (e.g., "never import server modules from client code")
-- **Skill** = deep knowledge loaded on demand (e.g., full SSR architecture and browser API patterns)
+- Discovery is **recursive**: `.claude/rules/ui/`, `.claude/rules/api/` are found. A flat layout
+  is a choice, not a constraint.
+- **User rules** in `~/.claude/rules/` apply to every project and load **before** project rules.
+  A machine-local rule can shape behaviour without appearing anywhere in the repository — look
+  there when a behaviour has no explanation in the tree.
+- Symlinks work; cycles are handled. A symlink whose target lies **outside the working
+  directory** is treated like an external import: nothing loads until external imports are
+  approved for the project, and after that **only the rules without `paths:`** load.
+- `claudeMdExcludes` applies to rules files and directories (patterns against absolute paths).
 
-The rule prevents mistakes. The skill teaches the right approach.
+## Conflicts
 
-## Conventions worth adopting
+**Doc**: "if two rules contradict each other, Claude may pick one arbitrarily." The same holds
+between a user rule and a project rule — neither overrides the other. Review `CLAUDE.md`, nested
+`CLAUDE.md` files and `.claude/rules/` together, periodically, for contradictions.
 
-### Naming
+## Rules, skills or CLAUDE.md
 
-- `kebab-case.md` (e.g., `testing-conventions.md`, `locale-delegation.md`)
-- Descriptive — the filename should indicate what the rule guards
+| Criterion | Rule with `paths:` | Rule without `paths:` | Skill | `CLAUDE.md` |
+| --- | --- | --- | --- | --- |
+| Loads | When a matching file is **read** | At launch | When invoked or judged relevant | At launch |
+| After compaction | Gone until next matching read | Re-injected | Body re-injected, capped at 5,000 tokens | Re-injected (project root) |
+| Carries | A short constraint tied to files | A project-wide constraint, modularised | Procedure, knowledge, scripts | Project-wide facts and constraints |
 
-### Content style
+Sources: [memory](https://code.claude.com/docs/en/memory),
+[context-window](https://code.claude.com/docs/en/context-window). The **Doc** note on the memory
+page: "For task-specific instructions that don't need to be in context all the time, use skills."
 
-- **Imperative voice** — "Do X", "Never Y", "Always Z"
-- **No code comments** in prose (same rule as skills and CLAUDE.md)
-- **English only** (same rule as all persisted artefacts)
-- **Concise** — aim for < 2 KB. If growing beyond that, consider a skill instead.
+A rule and a skill can share a domain: the rule states the constraint
+("never import `api-*` modules from `ui-*` code"), the skill `shop-ssr` teaches the approach.
+Keep the rule short enough that duplicating the skill is impossible.
 
-### Placement
+## House conventions
 
-All rules live in `.claude/rules/`, **flat — no subdirectories. This is a project choice, not a platform limit**: discovery is recursive and symlinks work. A few dozen files stay legible flat, and a flat directory makes the inventory table below verifiable at a glance. Revisit only if the count roughly doubles.
+Each is this plugin's choice. A project can decline it; the auditor says which checks are doctrine.
 
-## Keeping the set legible
+- **Size ≤ 2 KB** (`14-rule-size`, WARN). Reason: a rule loads whole on every matching read with
+  no description to decide by; past ~2 KB it is usually a skill's body wearing a rule's clothes.
+- **A frontmatter block carries `paths:`** (`14-rule-no-paths`, WARN). Reason: a rule with
+  frontmatter but no `paths:` is almost always a scoping attempt that failed (wrong field name,
+  empty value); a rule meant to be global needs no frontmatter at all.
+- **No `//` comment lines outside code fences** (`14-rule-code-comments`, WARN). Reason: same as
+  `12-no-code-comments` for `CLAUDE.md`.
+- **Language** (`14-rule-english-only`, WARN, heuristic). Reason: a rule is read by a model and by
+  every contributor; the check detects one language only and a project writing in another
+  language should exempt it in its overlay. It is not a platform requirement.
+- **Naming**: `kebab-case.md`, named for what it guards (`api-error-shape.md`).
+- **Where the inventory lives**: the globs in each file's `paths:` are the source of truth. A table
+  of rules, if a project wants one, belongs in that project's own files, never in a shared plugin.
 
-Globs live in each file's `paths:` frontmatter — the authoritative source. A project that keeps a
-table of its rules keeps it in its own `CLAUDE.md` or `.claude/audit/decisions.md`, never in this
-skill: an inventory is project state, and state shipped inside a plugin is wrong in every project
-but the one it was copied from.
+## Proving a rule loaded
 
-## Proving a rule actually loaded
+The auditor proves a rule is well-formed and that its globs reach real files. It cannot prove the
+harness loaded it. **Doc**: `/context` lists the loaded memory files; `claude --debug` shows
+frontmatter parse errors; the
+[`InstructionsLoaded` hook](https://code.claude.com/docs/en/hooks#instructionsloaded) logs which
+`CLAUDE.md` and rules files loaded, when, and why — observability only, it enforces nothing.
 
-`audit.py` proves a rule is _well-formed_. It cannot prove the harness ever loaded it — that is the
-one question static analysis structurally cannot answer, and with eighteen path-scoped rules it is
-worth asking.
+## Checks
 
-The upstream answer is the **`InstructionsLoaded` hook** (2.1.69): it fires whenever a `CLAUDE.md`
-or `.claude/rules/*.md` loads, with the reason as its matcher (`session_start`, `path_glob_match`,
-`nested_traversal`, `include`, `compact`). It enforces nothing — pure observability, which is why it
-is the one hook worth naming.
+| Id | Level | What it asserts | Register |
+| --- | --- | --- | --- |
+| `14-rule-unknown-field` | WARN | No frontmatter field other than `paths` | Doc |
+| `22-rule-glob-match` | WARN / INFO | Each glob matches a file in the repository (INFO, not counted, when rooted in a git-ignored path) | Doc + House convention |
+| `14-rule-size` | WARN | ≤ 2 KB | House convention |
+| `14-rule-no-paths` | WARN | Frontmatter present ⇒ `paths:` present | House convention |
+| `14-rule-code-comments` | WARN | No `//` lines outside fences | House convention |
+| `14-rule-english-only` | WARN | No French-language content (heuristic) | House convention |
 
-**Reviewed 2026-09-03 and declined; re-examined 2026-09-20 and still declined.**
-_Amended 2026-09-20: the premise below — "the project runs zero native hooks" — stopped being true
-that day, when a `SessionStart` audit hook was wired here and in 14 other fleet repositories.
-`InstructionsLoaded` stays declined on its own merits: it is a second, runtime-only path to a
-question `audit.py` already answers statically, and the current line is "observation hooks are
-allowed", not "every observation hook is worth its wiring". The sentence is kept as the record of
-the decision this amendment replaces._ **Reviewed 2026-09-03 and declined.** The project runs zero
-native hooks (core rule 10), and an observability-only hook is not enough to reopen that. The substitutes stand: `audit.py` for
-structure and glob reach, and `--debug` for a one-off runtime look when a rule seems not to fire.
-
-## Anti-patterns (rules-specific)
-
-- **F1.** Rule that duplicates a skill's body (bloats context on every matching file)
-- **F2.** Rule without `paths:` that could be a line in `CLAUDE.md` (unconditional rule = same cost)
-- **F3.** Rule > 2 KB (should probably be a skill with proper structure)
+Anti-patterns for rules: [antipatterns.md § F](./antipatterns.md#f-rules-clauderules).

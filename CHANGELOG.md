@@ -1,5 +1,97 @@
 # Changelog
 
+## 0.10.0 — 2026-09-23
+
+**This release changes `audit.py`, so a floor set with an earlier version stops comparing.**
+Expect the warning count to drop: on the fleet this auditor comes from, 65 warnings across 12
+repositories were the auditor's own, and one repository went from 19 to 1 — the one real defect.
+
+### The doctrine, re-read against the documentation
+
+Every reference was compared with the raw documentation pages of Claude Code 2.1.280 and rewritten.
+They had been verified against 2.1.259, and several things they stated were no longer true: a
+`paths:` skill does load when a matching file is read (measured, and what the docs say); a bundled
+skill can be hidden; a subagent may spawn subagents; `bypassPermissions` declared by a subagent is
+not honoured. Content describing one particular project's setup is gone. Four references are new:
+hooks, settings and permissions, MCP, plugins.
+
+### New checks — what the harness ignores without a word
+
+- **Settings** (`24-settings-scope`): 76 of the 231 settings keys do nothing in a project's shared
+  `settings.json`; the Scope column of the settings reference is now read. Also credential or
+  routing variables in the shared `env` (`24-settings-env`), a committed or un-ignored
+  `settings.local.json` (`24-settings-local`), status line and output style.
+- **Permissions** (`42-*`): a rule both allowed and denied, an allow rule naming no tool (it raises
+  no warning), an unanchored glob, an `mcp__…(…)` rule, `:*` mid-pattern.
+- **MCP** (`43-*`): a literal credential in `.mcp.json`, a credential variable that reads as empty,
+  a `url` without `type`, server approvals committed in the shared file.
+- **Hooks** (`35-*`): `if` on a non-tool event, combined `if`, a bare `mcp__<server>` matcher,
+  unknown handler types and missing fields, the real per-event timeout.
+- **Plugins** (`44-*`): component directories inside `.claude-plugin/`, paths without `./` or
+  escaping the plugin, fields that replace a default directory, version drift.
+- **Agents, skills, CLAUDE.md**: unknown frontmatter fields, `permissionMode`, `Agent(<type>)` in a
+  subagent (ignored), `CLAUDE.md` over 200 lines, `@` imports that do not resolve, `AGENTS.md` not
+  imported, `CLAUDE.local.md` committed, commands shadowed by a skill, `globs:` in a rule.
+
+### Vocabulary aligned with the docs
+
+The lists of tools (21 → 46), models (`fable`), agent fields (18), skill fields (20) and settings keys
+(231) now match the documentation. `Task` is accepted as the alias it is. The maintainers check the
+lists against the live pages before every release: a list that enumerates what is valid drifts
+toward false with every harness release.
+
+### House conventions no longer pass for Anthropic's
+
+Several checks enforced choices this plugin makes, with the tone of documented rules. They were
+checked on 2026-09-23 against the raw documentation, Anthropic's public repositories and guides,
+archived versions of the pages and specialised sites — see `evals/CONVENTIONS.md`. Three families:
+
+- **Supported by a measurement** — a negative clause between two skills that compete (check 33).
+  A WARN where the measurement applies, and nowhere else.
+- **Contradicted by Anthropic** — the check now tests Anthropic's rule, and the house preference is
+  an INFO: a reference over 100 lines needs a table of contents (the old "split it past 300 lines"
+  warned people who followed the documentation); CLAUDE.md is measured in lines, not bytes.
+- **No source, no measurement** — the `## Agents directory` table, a rule under 2 KB, English only,
+  a global budget, description lengths. INFO, each finding naming what Anthropic documents instead.
+  A project that wants them as warnings sets `"profile": "house"` in `.claude/audit.local.json`.
+
+On 20 public repositories never seen before: warnings 196 → 86, the same 10 errors, no verified
+defect lost.
+
+### Severity follows one rule
+
+**ERROR** when the defect is certain — the harness rejects or ignores the thing, or its target does
+not exist. **WARN** for a probable defect or a convention of this plugin. **INFO** for what cannot be
+verified from the repository. Several house conventions were ERRORs and are now WARNs (`01-claude-md-size`,
+`09-*`, `13-no-global-scripts`, `17-always-loaded-budget`); a missing `CLAUDE.md` is INFO — it is optional.
+
+Measured on 20 public repositories drawn after all tuning, never seen before: **10 errors, all
+real** (0.9.0 reported 36 on the same repositories), and 50 of the 55 warnings that are not house
+conventions checked true by hand.
+
+### What it stops saying wrongly
+
+- **`28-skill-anchors` checked half a path.** The pattern opened on a word boundary, and `/` is
+  not a word character, so `.claude/skills/<skill>/scripts/measure.mjs` was read as
+  `scripts/measure.mjs`, looked up from the root, and reported dead. The whole path is read now.
+  The bug was there from the first release that shipped the check.
+- **`33-description-overlap` now sees its own remedy.** When each of two close descriptions
+  excludes the other in its anti-trigger clause, the pair is reported as INFO — separated by
+  declaration, not measured. When only one side excludes the other, the WARN names the missing
+  direction. A name mentioned outside an exclusion clause still counts for nothing.
+
+### The same commit gives the same count on every machine
+
+A floor that moves with the machine is not a floor. Measured on one repository: 0 findings on the
+machine that built it, 1 on a fresh clone of the same commit.
+
+- **Anchors and rule globs git ignores are not counted.** `dist/`, `node_modules/`, or any path
+  under an ignored directory exists only where the project was built or its assets downloaded. It
+  is asked of `git check-ignore`, which answers from the rules and works on absent paths, and it
+  is reported as an INFO listing what could not be verified. Absolute paths and paths outside the
+  repository are treated the same way.
+
+
 ## 0.9.0 — 2026-09-23
 
 **This release changes `audit.py`, so a floor set with an earlier version stops comparing.**

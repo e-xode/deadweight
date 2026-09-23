@@ -6,192 +6,258 @@
      Where only the structure matters, the examples use <angle-bracket> placeholders
      instead, which cannot rot into dead references. -->
 
-# Anti-patterns (observed in this project or seen elsewhere)
+# Anti-patterns
 
-Each anti-pattern includes a **symptom**, a **why it is bad**, and a **correction**.
+Verified against the docs on 2026-09-23 (Claude Code 2.1.280).
 
-Contents: [A. `CLAUDE.md`](#a-claudemd) · [B. Skills](#b-skills) · [C. Sub-agents](#c-sub-agents) · [D. Native hooks](#d-native-hooks) · [E. Workflow / process](#e-workflow--process) · [F. Rules (`.claude/rules/`)](#f-rules-clauderules) · [G. Settings](#g-settings)
+Each entry gives a **symptom**, **why it is bad**, and a **fix**, and is tagged with its
+register: **Universal** (follows from a documented mechanism, source linked) or **House
+convention** (this plugin's choice, with its reason — a project may decline it). The check id is
+named when `audit.py` detects the pattern.
+
+Contents: [A. `CLAUDE.md`](#a-claudemd) · [B. Skills](#b-skills) · [C. Sub-agents](#c-sub-agents) · [D. Hooks and agent teams](#d-hooks-and-agent-teams) · [E. Layout](#e-layout) · [F. Rules (`.claude/rules/`)](#f-rules-clauderules) · [G. Settings](#g-settings)
 
 ## A. `CLAUDE.md`
 
-### A1. Pasting a skill's intro into `CLAUDE.md`
+### A1. Pasting a skill's intro into `CLAUDE.md` — Universal
 
-- **Symptom.** A new `## SSR` section appears in `CLAUDE.md` with two paragraphs explaining when to use `onMounted`.
-- **Why bad.** Costs tokens on every turn for content the agent only needs occasionally. Duplicates the `shop-ssr` skill.
-- **Fix.** Delete the section. The harness already lists the skill's description every turn; the agent will load the body on demand.
+- **Symptom.** A `## SSR` section appears in `CLAUDE.md` with two paragraphs on when to use `onMounted`.
+- **Why bad.** Paid every session for content needed occasionally; duplicates the `shop-ssr`
+  skill. [memory](https://code.claude.com/docs/en/memory): a multi-step procedure or something that
+  "only matters for one part of the codebase" belongs in a skill or a path-scoped rule.
+- **Fix.** Delete the section. The skill's description is already listed; its body loads on demand.
 
-### A2. Decorative emojis or "Tips" sections
+### A2. Tips, FAQ, and emphasis everywhere — Universal
 
-- **Symptom.** "💡 Tip: prefer computed over watch".
-- **Why bad.** Tips are best practices, not hard rules. Hard rules only in `CLAUDE.md`.
-- **Fix.** Move the tip into the relevant skill (e.g., `ui-composition`).
+- **Symptom.** "💡 Tip: prefer computed over watch", and half the lines start with "IMPORTANT".
+- **Why bad.** [best-practices](https://code.claude.com/docs/en/best-practices): "If you emphasize
+  many lines, none of them stands out"; and "If Claude already does something correctly without
+  the instruction, delete it or convert it to a hook."
+- **Fix.** Apply the per-line test — "Would removing this cause Claude to make mistakes?" Move tips
+  into the relevant skill (`ui-composition`); keep emphasis on the one line Claude keeps skipping.
 
-### A3. Skills index that copies the harness listing
+### A3. Skills index that copies the harness listing — House convention (`15-skill-index`)
 
-- **Symptom.** The `CLAUDE.md` Skills index carries a row per skill — family groupings, one-liners, or full trigger descriptions.
-- **Why bad.** The harness lists every skill's name and description each turn already, so the index pays for that surface twice and rots on the next rename. Since 2026-09-03 the index has exactly one job.
-- **Fix.** Keep only the skills deliberately **withheld** from the listing (`disable-model-invocation`, or `skillOverrides` ≠ `on`) — one of those, unnamed, is unreachable. Delete every other row; `audit.py`'s `15-skill-index` check flags the strays ("the index carries withheld skills only").
+- **Symptom.** The `CLAUDE.md` skills index carries a row per skill.
+- **Why bad.** The harness lists every visible skill's name and description each turn
+  ([context-window](https://code.claude.com/docs/en/context-window)); the index pays for that twice
+  and rots on the next rename.
+- **Fix.** Keep only the skills withheld from the listing (`disable-model-invocation`,
+  `skillOverrides`, `paths:`), which nothing else points at. This is the plugin's convention for
+  what an index is for, not a documented rule.
+
+### A4. `CLAUDE.local.md` committed — Universal (`01-claude-local`)
+
+- **Symptom.** `CLAUDE.local.md` is tracked by git.
+- **Why bad.** [memory](https://code.claude.com/docs/en/memory): it holds "personal
+  project-specific preferences; add to `.gitignore`". Committed, one person's sandbox URLs become
+  everyone's instructions.
+- **Fix.** `git rm --cached CLAUDE.local.md` and ignore it in the repository's `.gitignore`.
+
+### A5. `AGENTS.md` beside a `CLAUDE.md` that does not import it — Universal (`01-agents-md-unread`)
+
+- **Symptom.** A repository shares an `AGENTS.md` with other coding agents and also has a `CLAUDE.md`.
+- **Why bad.** [memory](https://code.claude.com/docs/en/memory): by default Claude reads
+  `AGENTS.md` only when no `CLAUDE.md` or `CLAUDE.local.md` exists at or above the working
+  directory. Everything in it is invisible to Claude.
+- **Fix.** Put `@AGENTS.md` at the top of the `CLAUDE.md`, or delete the `CLAUDE.md`.
 
 ## B. Skills
 
-### B1. Vague description
+### B1. Vague description — Universal
 
 - **Symptom.** `"Helps with UI components."`
-- **Why bad.** Will never trigger reliably and will not discriminate from `ui-composition` or
-  `ui-components`.
-- **Fix.** State framework version, file paths, in-house systems, trigger keywords, anti-triggers.
+- **Why bad.** [skills](https://code.claude.com/docs/en/skills): the description says "what the
+  skill does and when to use it"; Claude decides from it. This one says neither, and cannot be told
+  apart from `ui-composition` or `ui-components`.
+- **Fix.** State the domain, file paths, in-house names and the words a user would type.
 
-### B2. Missing anti-trigger clause
+### B2. No "Do not use" clause — House convention
 
-- **Symptom.** Description lists triggers but no `Don't use for: …`.
-- **Why bad.** Skill triggers on adjacent topics, conflicts with neighbouring skills.
-- **Fix.** Append a `Don't use for:` clause naming the alternative skill / agent.
+- **Symptom.** A description lists triggers but never names what it is not for.
+- **Why bad.** The documented requirement is *what + when*. With neighbouring skills, a skill
+  also fires on adjacent requests.
+- **Fix.** The plugin recommends appending `Do not use for: … (→ <other-skill>)`. It is a useful
+  discriminator, not a documented field or rule.
 
-### B3. Rule lives only in a reference
+### B3. Rule lives only in a reference — Universal
 
-- **Symptom.** A hard rule (e.g., "never use window at top level") is mentioned only in `references/ssr-pitfalls.md`.
-- **Why bad.** References are loaded on demand. If they are skipped, the rule is invisible.
-- **Fix.** Surface the rule briefly in `SKILL.md` with a pointer.
+- **Symptom.** "never use `window` at top level" appears only in `references/ssr-pitfalls.md`.
+- **Why bad.** References load on demand; if skipped, the rule is invisible.
+- **Fix.** State the rule briefly in `SKILL.md`, with a pointer to the detail.
 
-### B4. `SKILL.md` is the encyclopedia
+### B4. `SKILL.md` is the encyclopedia — Universal
 
-- **Symptom.** `SKILL.md` is 1200 lines, contains 30 examples, no `references/`.
-- **Why bad.** Always-loaded body explodes context.
-- **Fix.** Move examples to `references/`. Keep `SKILL.md` as method + index. Aim for ≤ 500 lines.
+- **Symptom.** 1,200 lines, 30 examples, no `references/`.
+- **Why bad.** The whole body enters context on invocation.
+- **Fix.** Keep `SKILL.md` as method plus index (≤ 500 lines, [skills](https://code.claude.com/docs/en/skills));
+  move examples to `references/`.
 
-### B5. Trimming a description that should not be listed at all
+### B5. Trimming a description that should not be listed at all — House convention
 
-**Symptom.** The same handful of descriptions get shaved every few months and the aggregate creeps back. The trims are real but the structure is not addressed.
-**Fix.** Ask whether the skill is ever selected _semantically_. One reached only through an explicit pointer — an agent body, a CLAUDE.md row — pays every turn for a trigger surface nobody uses. Withhold it (`disable-model-invocation`, or `skillOverrides: name-only`) and the cost is gone permanently. Trim what competes for selection; withhold what does not.
+- **Symptom.** The same descriptions are shaved every few months and the total creeps back.
+- **Fix.** If a skill is only ever reached by an explicit pointer (an agent body, a `CLAUDE.md`
+  line), withhold it (`disable-model-invocation`, `skillOverrides`, or `paths:`) instead of
+  trimming. Trim what competes for selection; withhold what does not.
 
-### B6. Twin skills without a "Division of responsibilities" table
+### B6. Twin skills without a division of responsibilities — House convention (`27-twin-division-*`)
 
 - **Symptom.** Two skills cover related topics; neither says which owns what.
-- **Why bad.** Agent picks one and ignores the other.
-- **Fix.** Add a `Division of responsibilities` table on both sides. Each table carries a row owned by the twin, and the concern text of the row naming the pair reads identically in both files; the rest of each table is family-wide and may differ. `audit.py` check 27 asserts exactly that — presence, the twin's row, and the shared row's text — nothing more, because 45 mutually anti-triggering pairs share family tables that cannot all be row-identical.
+- **Why bad.** The agent picks one and ignores the other.
+- **Fix.** A `Division of responsibilities` table on both sides, each with a row naming the twin,
+  that row's text identical in both files.
 
-### B7. `SKILL.md` over the compaction slice (~20 KB)
+### B7. `SKILL.md` past the compaction slice — Universal
 
-- **Symptom.** A `SKILL.md` sits comfortably under `audit.py`'s 50 KB error and under 500 lines, and behaviour still degrades once a long session compacts.
-- **Why bad.** Compaction re-attaches only the **first 5,000 tokens** (≈ 20 KB) of each invoked skill, keeping the start. Everything past that stops applying, silently, mid-task — and the reader has no signal, because the file on disk is intact. The 50 KB threshold is 2.5× the real ceiling.
-- **Fix.** Treat ~20 KB as the working ceiling. Front-load the rules and the routing table; move catalogues, examples and enumerations into `references/`, which load on demand and are never subject to the re-attach cap. When a body genuinely cannot fit, split the skill by triggering profile.
+- **Symptom.** A `SKILL.md` well under the size errors, and behaviour still degrades once a long
+  session compacts.
+- **Why bad.** [context-window](https://code.claude.com/docs/en/context-window): after compaction
+  each invoked skill's body is re-injected "capped at 5,000 tokens per skill", keeping the start.
+- **Fix.** Front-load rules and routing; treat ~20 KB as the working ceiling; move catalogues to
+  `references/`.
 
-### B8. One anchor block duplicated across a skill family
+### B8. One anchor block duplicated across a skill family — Universal
 
-- **Symptom.** Every `ui-*` skill opens with the same paragraph of project anchors — the framework versions, the SSR flag, the "prefer primitives before bespoke styles" line — restated in each body.
-- **Why bad.** The family shares one truth with N copies. When the framework version or the plugin order changes, the copies drift apart and the reader cannot tell which is current; and a session that loads three of them pays for the same paragraph three times.
-- **Fix.** One home per fact. Keep the anchor block in the family's entry-point skill (`ui-overview` in the worked example), and in the siblings replace it with a one-line pointer: `➜ See skill: <family-entry-point> — project anchors and plugin wiring.` Same remedy as B6, applied to a family instead of a pair.
+- **Symptom.** Every `ui-*` skill opens with the same paragraph of framework versions and flags.
+- **Why bad.** N copies of one truth drift apart, and a session loading three pays three times.
+- **Fix.** One home per fact (the family's entry point, `ui-overview`); siblings carry a one-line pointer.
 
 ## C. Sub-agents
 
-### C1. Sub-agent runs validation
+### C1. A sub-agent that validates on its own initiative — Universal
 
-- **Symptom.** The `vue` agent runs `npm test` after editing a component.
-- **Why bad.** Violates the centralised-validation rule.
-- **Fix.** Remove validation calls. Orchestrator delegates to `hooks` after return.
+- **Symptom.** A `shop-checkout` implementer runs the full test suite after each file it touches.
+- **Why bad.** The delegator loses control of when and how often validation runs; a slow suite
+  runs N times, and results arrive scattered across returns.
+- **Fix.** Decide where validation lives and write it in the delegation contract: either the
+  sub-agent runs a named, bounded check and reports it, or it returns and the caller validates once.
 
-### C2. Sub-agent delegates to another sub-agent
+### C2. Unbounded delegation — Universal
 
-- **Symptom.** The `design` agent calls the `server` agent to fix an SSR error.
-- **Why bad.** Sub-agents stay flat; the orchestrator owns delegation.
-- **Fix.** Report the error in structured return; orchestrator decides the follow-up.
+- **Symptom.** An agent may spawn others, which may spawn others, with no statement of depth, scope
+  or return shape.
+- **Why bad.** [sub-agents](https://code.claude.com/docs/en/sub-agents): a sub-agent can spawn
+  sub-agents, up to three layers below the main conversation. Intermediate output stays hidden;
+  only the top summary returns, so a wrong turn two levels down is invisible.
+- **Fix.** When an agent needs no children, omit `Agent` from its `tools` (or add it to
+  `disallowedTools`). When it does, restrict the types it may spawn and say what each must return.
 
-### C3. Agent body restates its own skill
+### C3. Agent body restates its own skill — Universal
 
-**Symptom.** The agent paraphrases a skill it also names as the source of truth, so the two drift and the reader cannot tell which wins.
-**Fix.** Name the skill in the agent's `skills:` field — the full body is injected at startup — and delete the paraphrase. Keep in the body only what the skill does not own. Note that a skill carrying `disable-model-invocation: true` cannot be preloaded; those must be read by path.
+- **Fix.** Name the skill in `skills:` (the full body is injected at startup) and delete the
+  paraphrase. A skill with `disable-model-invocation: true` cannot be preloaded.
 
-### C4. A read-only agent that fans out to a writable one
+### C4. A read-only agent that fans out to a writable one — Universal
 
-**Symptom.** An agent advertises itself as read-only, then spawns `general-purpose` workers that carry `Edit` and `Write`. The guarantee ends at the first hop.
-**Fix.** Fan out to an agent type with the same envelope, and say so in the body. A guarantee that only the prompt enforces is not a guarantee.
+- **Symptom.** An agent advertises itself as read-only, then spawns `general-purpose` workers
+  carrying `Edit` and `Write`.
+- **Fix.** Fan out to a type with the same tool envelope; a guarantee only the prompt enforces is none.
 
-### C5. Out-of-scope edits
+### C5. Out-of-scope edits — Universal
 
-- **Symptom.** Sub-agent fixes a "while we're at it" bug in an unrelated file.
-- **Why bad.** Inflates the diff, breaks the orchestrator's mental model.
-- **Fix.** Report discovery in structured return. Orchestrator dispatches separately.
+- **Fix.** The sub-agent reports the discovery in its return; the caller dispatches separately.
 
-### C6. Agent body restates CLAUDE.md hard rules
+### C6. Agent body restates `CLAUDE.md` — Universal
 
-**Symptom.** An agent body opens by repeating "no code comments", "English only", "never commit without asking" — rules the agent already receives.
-**Why bad.** Every custom sub-agent is given the whole `CLAUDE.md` hierarchy at startup. The restatement buys nothing, costs tokens on every dispatch, and creates a second copy that will eventually contradict the first — at which point nobody can say which one the agent followed. (The two exceptions are `Explore` and `Plan`, which skip `CLAUDE.md`; a rule they must honour goes in the delegation prompt, not in an agent file.)
-**Fix.** Delete the restatement. Keep in the body only what `CLAUDE.md` and the agent's `skills:` preload do not already carry: the agent's scope, its return shape, and the domain judgement nobody else owns. This is C3's sibling — C3 duplicates a _skill_, C6 duplicates `CLAUDE.md`.
+- **Why bad.** [sub-agents](https://code.claude.com/docs/en/sub-agents): custom sub-agents load the
+  `CLAUDE.md` hierarchy; `Explore` and `Plan` skip it. The copy costs tokens per dispatch and will
+  eventually contradict the original.
+- **Fix.** Delete it. For `Explore`/`Plan`, put the rule in the delegation prompt.
 
-### C7. Agent description front-loads _how_ instead of _when_
+### C7. Agent description front-loads *how* instead of *when* — Universal
 
-**Symptom.** A description opens with the agent's method — "Runs a render-critique-refine loop, rasterizing each draft before returning" — and reaches the delegation trigger, if at all, in its last clause.
-**Why bad.** The description is read every turn to answer exactly one question: _should I route this request here?_ Method text answers a question nobody asked at routing time, while the trigger keywords that would earn the dispatch sit past the point where attention has moved on. Combined agent descriptions are also budgeted upstream (a startup warning past 15,000 tokens), so words spent on method are words not spent on discrimination.
-**Fix.** Lead with the trigger surface — domain, file paths, the verbs a user would type — then the anti-triggers. Method belongs in the body, which loads only once the agent is actually dispatched.
+- **Fix.** Lead with the trigger surface (domain, paths, verbs a user would type); method belongs
+  in the body, which loads only on dispatch.
 
-## D. Native hooks
+## D. Hooks and agent teams
 
-### D1. Reintroducing native hooks ad hoc
+### D1. Hooks added ad hoc — Universal
 
-- **Symptom.** A `PreToolUse`/`PostToolUse`/`Stop` hook appears in `.claude/settings.json`, e.g. re-running `eslint` after every Edit or re-adding a Stop-time validation chain.
-- **Why bad.** A per-edit hook is slow and noisy, and it duplicates a validation path the project
-  usually already has — a request-gated agent, or a rule. It adds time to every task, including the
-  ones that did not need it.
-- **Fix.** Treat any new hook as an architecture decision — explicit approval from the maintainer,
-  recorded in the project's own `.claude/audit/decisions.md` — never an ad-hoc addition. An
-  observation hook that only measures and reports is the exception: it blocks nothing.
+- **Symptom.** A `PostToolUse` hook re-runs the linter after every edit, added in passing.
+- **Why bad.** [best-practices](https://code.claude.com/docs/en/best-practices): hooks are
+  deterministic — which is their value and their cost. A per-edit hook adds latency to every task,
+  including those that did not need it, and may duplicate a check that already runs elsewhere.
+- **Fix.** Use a hook for what "must happen every time with zero exceptions"; justify each one,
+  and prefer the cheapest event that achieves it (a `Stop` gate over a per-edit run).
 
-### D2. Enabling agent teams with a named-subagent fleet
+### D2. Agent teams enabled alongside `skills:`-dependent agents — Universal
 
-- **Symptom.** `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is exported "to try the new orchestration", in a project whose every delegation names its agent type.
-- **Why bad.** Two documented behaviours combine badly here. While the flag is on, **a named subagent launches as a teammate** instead of a sub-agent — so every dispatch changes shape — and **teammates ignore a definition's `skills:` field**. Twelve of the fourteen agents get their domain knowledge from that preload; they would run stripped of it, silently, with no error and no marker in the output. The failure looks like the model getting worse, not like a config change.
-- **Fix.** Leave it off. If teams are ever wanted, treat it as an architecture decision with a case study, and re-derive how each agent gets its knowledge without `skills:` first. ➜ See [agent-anatomy.md](./agent-anatomy.md) § Agent teams.
+- **Symptom.** `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set "to try it", in a project whose
+  agents get their knowledge from `skills:`.
+- **Why bad.** [agent-teams](https://code.claude.com/docs/en/agent-teams): while enabled, a
+  sub-agent Claude names launches as a teammate, and a teammate does not apply the definition's
+  `skills`. The agents run stripped of their preload, with no error.
+- **Fix.** Leave it off, or re-derive how each agent gets its knowledge before enabling it.
 
-## E. Workflow / process
+## E. Layout
 
-### E1. Editing locale JSON directly
+### E1. Global script pool (`.claude/scripts/`) — House convention (`13-no-global-scripts`, WARN)
 
-- **Symptom.** Orchestrator edits `src/translate/en.json` directly to add a key.
-- **Why bad.** Locale files must stay in sync; the `translate` agent enforces this.
-- **Fix.** Delegate to the `translate` agent.
-
-### E2. Validating after every micro-change
-
-- **Symptom.** Orchestrator runs `npm test` after each `edit` call.
-- **Why bad.** Violates "validation is centralised at task end". Wastes time.
-- **Fix.** Make all changes, then delegate validation to the `hooks` agent at task end (measured 2026-09-20: the only hooks here are observation hooks — nothing validates automatically).
-
-### E3. Patching a regression instead of auditing
-
-- **Symptom.** A CSS regression appears; fixer adds `!important` to override it.
-- **Why bad.** Violates the Golden Rule. Cause remains; debt doubles.
-- **Fix.** Apply the 6-step regression protocol from `shop-known-issues`.
-
-### E4. Global script pool (`.claude/scripts/`)
-
-- **Symptom.** Scripts placed in a top-level `.claude/scripts/` folder, not attached to any skill.
-- **Why bad.** Violates Anthropic's official skill anatomy. Orphan scripts have no owner, no documentation, no skill-trigger.
-- **Fix.** Move each script under the owning skill: `.claude/skills/<owner>/scripts/<script>`. Enforced by `scripts/audit.py` check #13.
+- **Symptom.** Scripts in a top-level `.claude/scripts/` folder, attached to no skill.
+- **Why bad.** A script with no owning skill has no documentation that loads with it and no
+  trigger; nobody knows when it is safe to delete. Claude Code itself does not forbid the folder.
+- **Fix.** Move each script under its owner: `.claude/skills/<owner>/scripts/<script>`.
 
 ## F. Rules (`.claude/rules/`)
 
-### F1. Rule that duplicates a skill's body
+### F1. Rule that duplicates a skill's body — Universal
 
-- **Symptom.** A rule file contains 40 lines explaining SSR architecture.
-- **Why bad.** The rule loads on every matching file, duplicating the `shop-ssr` skill.
-- **Fix.** Keep only the guardrail in the rule. Let the skill carry the knowledge.
+- **Symptom.** A rule contains 40 lines of SSR architecture.
+- **Why bad.** It loads on every matching read and duplicates `shop-ssr`.
+- **Fix.** Keep only the constraint in the rule; the skill carries the knowledge.
 
-### F2. Unconditional rule that should be in `CLAUDE.md`
+### F2. Unconditional rule — nuanced
 
-- **Symptom.** A rule file has no `paths:` frontmatter.
-- **Why bad.** Same cost as `CLAUDE.md` content but less discoverable.
-- **Fix.** Move into `CLAUDE.md` or add a proper `paths:` glob.
+- **Symptom.** A rule has no `paths:`.
+- **Not in itself a defect.** [memory](https://code.claude.com/docs/en/memory): rules without
+  `paths` load at launch "with the same priority as `.claude/CLAUDE.md`" — a documented way to
+  modularise, and they survive compaction.
+- **Defect when** the rule has frontmatter but no `paths:` (`14-rule-no-paths`): that is usually
+  a scoping attempt that failed, and the rule is global by accident.
 
-### F3. Rule too large (should be a skill)
+### F3. Rule over 2 KB — House convention (`14-rule-size`)
 
-- **Symptom.** A rule file exceeds 2 KB.
-- **Why bad.** Rules are designed to be lightweight guardrails.
-- **Fix.** Extract knowledge into a skill. Keep only the core constraint in the rule.
+- **Why bad.** A rule has no description to decide by and loads whole; past ~2 KB it is usually
+  a skill's body. The 2 KB figure is the plugin's, not Anthropic's.
+- **Fix.** Extract the knowledge into a skill; keep the constraint in the rule.
+
+### F4. Path-scoped rule meant to guard file creation — Universal
+
+- **Symptom.** `api-handler-shape.md` with `paths: ["src/api/**/*.ts"]`, written to govern how new
+  handlers are created.
+- **Why bad.** [memory](https://code.claude.com/docs/en/memory): path-scoped rules "trigger when
+  Claude reads files matching the pattern, not on every tool use". Creating a file is not reading
+  one; the rule does not fire for it (measured 2.1.280, `anthropics/claude-code#93248`).
+- **Fix.** Put a creation constraint where it is always present — a rule without `paths:`,
+  `CLAUDE.md`, or the skill that scaffolds handlers — or enforce it with a hook.
+
+### F5. Contradictory rules — Universal
+
+- **Symptom.** `ui-style.md` says "2-space indentation"; a user rule in `~/.claude/rules/` says 4.
+- **Why bad.** [memory](https://code.claude.com/docs/en/memory): "if two rules contradict each
+  other, Claude may pick one arbitrarily"; neither user nor project rules override the other.
+- **Fix.** Review `CLAUDE.md`, nested `CLAUDE.md` files and all rules together; keep one statement
+  per behaviour.
+
+### F6. Cursor-style frontmatter — Universal (`14-rule-unknown-field`)
+
+- **Symptom.** A rule scoped with `globs:` or carrying `alwaysApply:`.
+- **Why bad.** [memory](https://code.claude.com/docs/en/memory): `paths` is the only field read;
+  others are ignored without error. The rule loads globally.
+- **Fix.** Rename `globs:` to `paths:`; delete the other fields.
 
 ## G. Settings
 
-### G1. A settings key that is inert at its scope
+### G1. A settings key that is inert at its scope — Universal (`24-settings-default-mode`, `24-settings-scope`)
 
-- **Symptom.** `.claude/settings.json` carries `permissions.defaultMode: "bypassPermissions"`. Everything behaves as expected, so nobody questions it. In fact **v2.1.257 (2026-09-01) made that key ignored in `.claude/settings.json` and `.claude/settings.local.json`**, exactly like `"auto"`; the posture on this machine came entirely from user-scope `~/.claude/settings.json`.
-- **Why bad.** The worst kind of drift: the config _reads_ as the source of a behaviour it no longer causes, so the next reader reasons from a false premise. A fresh clone lands in a different mode than the file promises, and the audit script cannot catch it — `audit.py` validates structure, and the key is structurally perfect. This is the same class as a stale doc, but harder to see, because nothing is broken until someone new checks the repo out.
-- **Fix.** Delete the key from project scope and record where the posture actually lives (done 2026-09-03: user scope, or `--permission-mode bypassPermissions` on the command line). Generally: whenever a settings key is copied between scopes, re-read the scope rules for that key after a CLI upgrade — permission semantics have moved more than once. A key that no longer does what it says is worse than an absent one.
+- **Symptom.** `.claude/settings.json` carries `permissions.defaultMode: "bypassPermissions"`, and
+  everything behaves as expected on the author's machine.
+- **Why bad.** [settings](https://code.claude.com/docs/en/settings): `auto` and
+  `bypassPermissions` "don't take effect from project or local settings" (since 2.1.257). The
+  posture comes from user scope; a fresh clone lands elsewhere, and the file reads as the cause of
+  a behaviour it no longer causes.
+- **Detection.** `24-settings-default-mode` (WARN) flags this key; `24-settings-scope` (ERROR)
+  flags any key the settings reference restricts to another scope.
+- **Fix.** Delete the key from project scope; set it in user or managed settings, or pass
+  `--permission-mode`. After a CLI upgrade, re-read the scope rules of every key copied between
+  scopes.

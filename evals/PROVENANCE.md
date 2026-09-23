@@ -129,3 +129,102 @@ and one is not:
 Until someone pays that, `04-skill-description-antitrigger` says in its own message that it is
 doctrine and that the one attempt to measure it was inconclusive. A check that demands a practice
 whose benefit is unmeasured should say so in the sentence that demands it.
+
+## Four cases added on 2026-09-23 — same limit, stated
+
+`mcp-secret-committed`, `permission-rule-inert`, `hook-never-fires` and `anti-trigger-mcp-setup`
+were written by the session that wrote the checks they exercise, from the official pages those
+checks cite. They are circular in the sense above: they certify that the skill can restate the
+documentation, not that it helps on a configuration nobody designed for it. What they add is the
+**trigger** half — whether a question about hooks, permissions or MCP reaches this skill at all,
+after its description was widened to name them — and a baseline arm that runs without the plugin.
+
+## Cases with real files — `silent-*` and `probe-fixture-visible`, 2026-09-23
+
+The earlier cases paste the configuration into the prompt, so the model reasons on it directly and
+the baseline arm does as well (Δ 0 on hooks and permissions). These cases plant two silent defects
+in files a `scaffold_script` creates, and ask only "is this configuration sound?". Graded by
+`regex`, one grader per defect, no judge. Run with `--scaffold`, 10 runs per arm.
+
+| Case | Defect planted | With plugin | Without |
+| --- | --- | --- | --- |
+| `silent-agent` | `Agent(<type>)` in a subagent definition (ignored) | 10/10 | 0/10 |
+| `silent-agent` | `bypassPermissions` declared by a subagent (not honoured) | 10/10 | 0/10 |
+| `silent-settings` | allow rule on a tool that no longer exists | 10/10 | 8/10 |
+| `silent-settings` | a managed-only key in the project file | 10/10 | 10/10 |
+| `silent-hooks` | `if` on SessionStart | 10/10 | 10/10 |
+| `silent-hooks` | bare `mcp__<server>` matcher | 10/10 | 10/10 |
+
+Graders were checked by reading answers: without the plugin, the model does not merely miss the
+agent defects — it gives outdated reasons ("subagents generally can't spawn subagents"). The value
+of this plugin is where the harness changed after the model's training; where the model already
+knows, Δ is 0 — **for that model**.
+
+The same four cases on smaller models (5 runs per arm, `--model sonnet` / `--model haiku`):
+
+| Defect | Default model | Sonnet | Haiku |
+| --- | --- | --- | --- |
+| `Agent(<type>)` ignored (two wordings) | 10/0 ; 9/7 | 5/0 ; 5/0 | 4/0 ; 4/0 |
+| `bypassPermissions` not honoured (two wordings) | 10/0 ; 10/0 | 5/0 ; 5/1 | 5/2 ; 5/0 |
+| bare `mcp__<server>` matcher | 10/10 | 5/1 | 5/0 |
+| `if` on SessionStart | 10/10 | 5/5 | 5/2 |
+| allow rule on a removed tool | 10/8 | 4/0 | 4/0 |
+| managed-only key in the project file | 10/10 | 5/3 | 5/0 |
+
+(with plugin / without, out of 10 or 5.) A Δ of 0 on the strongest model is not a case to retire:
+it is a case that model no longer needs. Retire one only when its Δ is 0 on every model your
+users run. With the plugin, all three models reach 4 or 5 out of 5 on every defect — the plugin's
+most concrete effect is to make a cheaper model as reliable as the strongest one on these checks.
+
+Three more cases, default model (10 runs) / Sonnet / Haiku (5 runs), with plugin / without:
+
+| Defect | Default | Sonnet | Haiku |
+| --- | --- | --- | --- |
+| credential variable read as empty in an MCP header | 10/0 | 3/0 | 2/0 |
+| routing variable in the shared `env` | 9/10 | 5/4 | 5/0 |
+| component inside `.claude-plugin/` | 10/7 | 5/1 | 3/2 |
+| plugin path without `./` | 10/9 | 5/0 | 4/0 |
+| `AGENTS.md` beside a `CLAUDE.md` that does not import it | 10/10 | 5/0 | 4/0 |
+| `globs:` in a rule | 10/10 | 5/0 | 4/0 |
+
+The weak spot is the WITH arm on small models: `audit.py` reports the empty credential variable
+and the misplaced component as ERRORs, and the answer drops them in about half the runs. That is
+a relay failure of the skill, not a detection failure of the auditor.
+
+## A relay instruction, tested and withdrawn — 2026-09-23
+
+On small models the answer dropped ERRORs the auditor had printed. A one-line instruction in
+`SKILL.md` ("report every ERROR first, by name") was tested as a same-batch A/B: two copies of the
+plugin identical but for that line, Haiku, `silent-mcp` + `silent-plugin`, 20 runs each.
+
+| | With the line | Without |
+| --- | --- | --- |
+| Targeted ERRORs relayed | 31/40 (78 %) | 25/40 (62 %) |
+| Failures where `audit.py` did run | 8 | 14 |
+| Failures where it did not | 1 | 1 |
+
++15 points, one-sided Fisher p = 0.11: inconclusive, and the line was withdrawn. It was then
+re-tested at a size fixed in advance for a 15-point effect (60 runs per case and per variant, no
+interim look):
+
+| Case | With the line | Without |
+| --- | --- | --- |
+| `silent-mcp` — credential variable read as empty | 45/60 | 28/60 |
+| `silent-plugin` — component inside `.claude-plugin/` | 41/60 | 40/60 |
+| **Total** | **86/120 (72 %)** | **68/120 (57 %)** |
+
++15 points, one-sided Fisher p = 0.011: the effect exists, and the line is back in `SKILL.md`.
+It is not uniform: the whole gain is on the counter-intuitive defect (+28 points), none on the
+misplaced component (+2). An instruction to relay ERRORs helps where the finding contradicts what
+the model expects; it does not help where the model reads the finding and judges it minor. The diagnostic grader (`ran-audit`) located the failure: the auditor ran in 77 of
+80 runs; the answer summarised it and left the ERROR out. The next lever to test is the tool
+output, not the prose.
+
+## A recap of ERRORs at the end of `audit.py`'s output — tested and not adopted
+
+Same design, the relay instruction kept in both variants, only the tool output differing: 45 runs
+per case and per variant, Haiku. Relayed: 62/90 (69 %) with a closing "ERRORS TO REPORT" list,
+58/90 (64 %) without; one-sided Fisher p = 0.32. On the misplaced component, +6.7 points against a
+pre-registered +10. Not adopted: changing the auditor's output would have cost every consumer a
+floor re-set for no shown effect. The model reads the finding and judges it minor; formatting does
+not change a judgement.

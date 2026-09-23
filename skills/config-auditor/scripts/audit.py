@@ -49,6 +49,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 from datetime import date as _date
 from dataclasses import dataclass, field, asdict
@@ -207,6 +208,10 @@ CHECKS = (
     "38-unreadable",
     "39-eval-quality",
     "40-skill-not-loaded",
+    "42-permissions",
+    "43-mcp",
+    "44-plugin-manifest",
+    "45-command-shadowed",
 )
 # i18n-data: start — French on purpose, this is the check's own dictionary
 FRENCH_HEURISTIC_WORDS = {
@@ -229,13 +234,175 @@ ENGLISH_ONLY_SUFFIX_EXEMPT = ".fr.md"
 LOCALE_MARKED_RE = re.compile(r"(?:[-_.](?:fr|de|es|it|pt|nl|ja|zh|ru|ar)\.[a-z]+$)"
                               r"|(?:/(?:fr|de|es|it|pt|nl|ja|zh|ru|ar)/)")
 
+# Vocabulary lists are the fastest-rotting part of an auditor: every tool, model
+# or field the harness adds becomes a false positive in every project, with no
+# change to this plugin. Each list names its source page; `derive.py` on the
+# maintainer side compares them to the live docs before a release.
+# Source: code.claude.com/docs/en/tools-reference, read 2026-09-23 (46 names).
 KNOWN_TOOLS = {
-    "Read", "Edit", "Write", "Glob", "Grep", "Bash", "PowerShell", "Skill", "Agent",
-    "WebFetch", "WebSearch", "NotebookEdit", "TodoWrite", "ToolSearch", "Monitor",
-    "SendMessage", "TaskStop", "TaskOutput", "EnterWorktree", "ExitWorktree",
-    "AskUserQuestion",
+    "Agent", "Artifact", "AskUserQuestion", "Bash", "CronCreate", "CronDelete", "CronList",
+    "Edit", "EndConversation", "EnterPlanMode", "EnterWorktree", "ExitPlanMode",
+    "ExitWorktree", "Glob", "Grep", "ListAgents", "ListMcpResourcesTool", "LSP", "Monitor",
+    "NotebookEdit", "PowerShell", "PushNotification", "Read", "ReadMcpResourceTool",
+    "RemoteTrigger", "ReportFindings", "ScheduleWakeup", "SendFeedback", "SendMessage",
+    "SendUserFile", "ShareOnboardingGuide", "Skill", "SubagentHandback", "TaskCreate",
+    "TaskGet", "TaskList", "TaskOutput", "TaskStop", "TaskUpdate", "TodoWrite", "ToolSearch",
+    "WaitForMcpServers", "WebFetch", "WebSearch", "Workflow", "Write",
 }
-KNOWN_MODEL_TIERS = {"haiku", "sonnet", "opus", "inherit"}
+# Renamed tools that still resolve. "In version 2.1.63, the Task tool was renamed to
+# Agent. Existing `Task(...)` references ... still work as aliases." (sub-agents)
+TOOL_ALIASES = {"Task": "Agent"}
+# The docs disagree with themselves: tools-reference lists TaskOutput as
+# "Deprecated in favor of Read on the task's output file path", permissions lists
+# it among "tools Claude Code has removed". Accepted, with a note - never an error.
+TOOL_DEPRECATED = {"TaskOutput": "Read on the task's output file path"}
+# Source: code.claude.com/docs/en/sub-agents, `model` field, read 2026-09-23.
+KNOWN_MODEL_TIERS = {"haiku", "sonnet", "opus", "fable", "inherit"}
+# Source: code.claude.com/docs/en/sub-agents, supported frontmatter fields (18).
+AGENT_KNOWN_KEYS = {
+    "name", "description", "tools", "disallowedTools", "model", "permissionMode",
+    "maxTurns", "skills", "mcpServers", "hooks", "memory", "background", "omitClaudeMd",
+    "effort", "isolation", "color", "initialPrompt", "experimental",
+}
+AGENT_PERMISSION_MODES = {"default", "manual", "acceptEdits", "auto", "dontAsk",
+                          "bypassPermissions", "plan"}
+# Fields Claude Code ignores on an agent shipped BY A PLUGIN (plugins-reference).
+PLUGIN_AGENT_IGNORED_KEYS = {"hooks", "mcpServers", "permissionMode"}
+# Source: code.claude.com/docs/en/skills, frontmatter reference (20 fields).
+SKILL_KNOWN_KEYS = {
+    "name", "description", "when_to_use", "argument-hint", "arguments",
+    "disable-model-invocation", "user-invocable", "allowed-tools", "disallowed-tools",
+    "model", "effort", "context", "agent", "background", "hooks", "paths", "shell",
+    "metadata", "license", "compatibility",
+}
+# YAML booleans the harness accepts: `disable-model-invocation: yes` withholds the
+# skill exactly like `true`, and an auditor that only knew `true` miscounted both
+# the budget and the index.
+YAML_TRUE = {"true", "yes", "on", "1"}
+
+# House conventions: choices this plugin makes that Anthropic does not document.
+# Three families (evals/CONVENTIONS.md). A convention a MEASUREMENT supports is a
+# WARN where that measurement applies. A convention Anthropic CONTRADICTS is checked
+# on Anthropic's rule, and the house preference is an INFO. A convention with no
+# source and no measurement is an INFO - unless the project opts into this plugin's
+# conventions with `"profile": "house"` in its overlay. The same finding carries the
+# documented alternative either way: the severity says whether there is a defect,
+# the message says where the rule comes from.
+PROFILE = "doc"
+
+
+def house() -> str:
+    """Severity of a house convention with no source and no measurement."""
+    return "WARN" if PROFILE == "house" else "INFO"
+
+
+def house_note(convention: str, anthropic: str) -> str:
+    return f" House convention of this plugin: {convention}. Anthropic documents: {anthropic}."
+
+# Settings keys by the files that may set them. Source: the Scope column of
+# code.claude.com/docs/en/settings-reference, read 2026-09-23 (231 keys). "Claude
+# Code ignores the key in a repository file" - silently - when its scope excludes
+# the project file (settings, 'Why a setting doesn't apply').
+SETTINGS_KEYS_ANY = frozenset({
+    "advisorModel", "agent", "agentPushNotifEnabled", "allowedHttpHookUrls",
+    "allowedMcpServers", "alwaysThinkingEnabled", "apiKeyHelper", "attribution",
+    "attribution.commit", "attribution.pr", "attribution.sessionUrl", "autoCompactEnabled",
+    "autoCompactWindow", "autoMemoryDirectory", "autoMemoryEnabled", "autoScrollEnabled",
+    "autoUpdatesChannel", "availableModels", "awaySummaryEnabled", "awsAuthRefresh",
+    "awsCredentialExport", "axScreenReader", "bashOutputMaxChars", "claudeMdExcludes",
+    "cleanupPeriodDays", "companyAnnouncements", "crossSessionInbound", "defaultShell",
+    "deniedMcpServers", "disableAgentView", "disableAllHooks", "disableArtifact",
+    "disableAutoMode", "disableBundledSkills", "disableClaudeAiConnectors",
+    "disableDeepLinkRegistration", "disableRemoteControl", "disableSkillShellExecution",
+    "disableWorkflows", "disabledMcpjsonServers", "editorMode", "effortLevel",
+    "emojiCompletionEnabled", "enableAllProjectMcpServers", "enableArtifact", "enableWorkflows",
+    "enabledMcpjsonServers", "enabledPlugins", "enforceAvailableModels", "env",
+    "extraKnownMarketplaces", "fallbackModel", "fastMode", "fastModePerSessionOptIn",
+    "feedbackSurveyRate", "fileCheckpointingEnabled", "fileSuggestion", "forceLoginMethod",
+    "forceLoginOrgUUID", "gcpAuthRefresh", "hooks", "httpHookAllowedEnvVars",
+    "includeCoAuthoredBy", "includeGitInstructions", "inputNeededNotifEnabled",
+    "isolatePeerMachines", "keybindingFlavor", "language", "maxEffortLevel", "minimumVersion",
+    "model", "modelOverrides", "modelSettings", "otelHeadersHelper", "outputStyle",
+    "permissions", "permissions.additionalDirectories", "permissions.allow", "permissions.ask",
+    "permissions.blockReadsOutsideWorkingDirectories", "permissions.defaultMode",
+    "permissions.deny", "permissions.disableBypassPermissionsMode", "plansDirectory",
+    "prUrlTemplate", "preferredNotifChannel", "prefersReducedMotion", "promptCacheTtl",
+    "promptSuggestionEnabled", "remote.defaultEnvironmentId", "remoteControlAtStartup",
+    "respectGitignore", "respondToBashCommands", "sandbox", "sandbox.allowUnsandboxedCommands",
+    "sandbox.autoAllowBashIfSandboxed", "sandbox.credentials", "sandbox.credentials.envVars",
+    "sandbox.credentials.files", "sandbox.enableWeakerNestedSandbox",
+    "sandbox.enableWeakerNetworkIsolation", "sandbox.enabled", "sandbox.excludedCommands",
+    "sandbox.failIfUnavailable", "sandbox.filesystem", "sandbox.filesystem.allowRead",
+    "sandbox.filesystem.allowWrite", "sandbox.filesystem.denyRead",
+    "sandbox.filesystem.denyWrite", "sandbox.ignoreViolations", "sandbox.network",
+    "sandbox.network.allowAllUnixSockets", "sandbox.network.allowLocalBinding",
+    "sandbox.network.allowMachLookup", "sandbox.network.allowUnixSockets",
+    "sandbox.network.allowedDomains", "sandbox.network.deniedDomains",
+    "sandbox.network.httpProxyPort", "sandbox.network.socksProxyPort",
+    "showClearContextOnPlanAccept", "showThinkingSummaries", "showTurnDuration",
+    "skillListingBudgetFraction", "skillListingMaxDescChars", "skillOverrides",
+    "skipWebFetchPreflight", "spinnerTipsEnabled", "spinnerTipsOverride", "spinnerVerbs",
+    "statusLine", "subagentPromptCacheTtl", "subagentStatusLine", "switchModelsOnFlag",
+    "syntaxHighlightingDisabled", "taskOutputMaxChars", "teammateMode",
+    "terminalProgressBarEnabled", "terminalTitleFromRename", "theme", "timeFormat", "timeZone",
+    "tui", "ultracode", "verbose", "viewMode", "voice", "voiceEnabled",
+    "wheelScrollAccelerationEnabled", "workflowKeywordTriggerEnabled", "workflowSizeGuideline",
+    "worktree", "worktree.baseRef", "worktree.bgIsolation", "worktree.sparsePaths",
+    "worktree.symlinkDirectories"
+})
+SETTINGS_KEYS_USER_LOCAL_MANAGED = frozenset({
+    "skipDangerousModePermissionPrompt", "syncClaudeAiPlugins", "syncClaudeAiSkills",
+    "useAutoModeDuringPlan"
+})
+SETTINGS_KEYS_USER_MANAGED = frozenset({
+    "askUserQuestionTimeout", "autoContinueAtUsageLimit", "autoMode",
+    "autoMode.classifyAllShell", "bashEditDiffEnabled", "desktopSessionCleanupPeriodDays",
+    "dialogExpiry", "feedbackDrafts", "footerLinksRegexes", "modelPicker", "pluginConfigs",
+    "processWrapper", "sandbox.allowAppleEvents", "sandbox.credentials.allowPlaintextInject",
+    "sandbox.credentials.awsPairs", "sandbox.credentials.sigv4", "sandbox.filesystem.disabled",
+    "sandbox.network.strictAllowlist", "sandbox.network.tlsTerminate", "sandbox.ripgrep",
+    "skipAutoPermissionPrompt", "spellcheck", "sshConfigs", "vimInsertModeRemaps"
+})
+SETTINGS_KEYS_MANAGED = frozenset({
+    "allowAllClaudeAiMcps", "allowManagedHooksOnly", "allowManagedMcpServersOnly",
+    "allowManagedPermissionRulesOnly", "allowedChannelPlugins", "blockedMarketplaces",
+    "browserExternalPageTools", "channelsEnabled", "claudeMd",
+    "disableBrowserExternalNavigation", "disableCommandPluginSources",
+    "disableDesktopLocalSessions", "disableMobileSimulatorTools", "disableSideloadFlags",
+    "forceLoginGatewayUrl", "forceRemoteSettingsRefresh", "gatewayInternalNetworks",
+    "managedMcpServers", "managedSourcesBehavior", "modelPricing", "parentSettingsBehavior",
+    "pluginSuggestionMarketplaces", "pluginTrustMessage", "policyHelper", "policyHelper.path",
+    "policyHelper.refreshIntervalMs", "policyHelper.timeoutMs", "requiredMaximumVersion",
+    "requiredMinimumVersion", "sandbox.bwrapPath",
+    "sandbox.filesystem.allowManagedReadPathsOnly", "sandbox.network.allowManagedDomainsOnly",
+    "sandbox.socatPath", "sshHostAllowlist", "strictKnownMarketplaces",
+    "strictPluginOnlyCustomization", "strictPluginOnlyCustomization.agents",
+    "strictPluginOnlyCustomization.hooks", "strictPluginOnlyCustomization.mcp",
+    "strictPluginOnlyCustomization.skills", "wslInheritsWindowsSettings"
+})
+SETTINGS_KEYS_GLOBAL = frozenset({
+    "autoConnectIde", "autoInstallIdeExtension", "copyOnSelect", "diffTool",
+    "externalEditorContext", "permissionExplainerEnabled", "teammateDefaultModel"
+})
+
+SETTINGS_KNOWN_KEYS = (SETTINGS_KEYS_ANY | SETTINGS_KEYS_USER_LOCAL_MANAGED
+                       | SETTINGS_KEYS_USER_MANAGED | SETTINGS_KEYS_MANAGED | SETTINGS_KEYS_GLOBAL)
+# "a `false` in .claude/settings.json is ignored" for these opt-outs (settings).
+SETTINGS_PROJECT_IGNORED_FALSE = {"useAutoModeDuringPlan", "syncClaudeAiSkills",
+                                  "syncClaudeAiPlugins"}
+# Names that route requests or carry credentials. In a committed project file they
+# redirect or leak for everyone who clones it (Check Point Research, CVE-2026-21852).
+SENSITIVE_ENV_RE = re.compile(r"^(ANTHROPIC_(BASE_URL|API_KEY|AUTH_TOKEN|CUSTOM_HEADERS)"
+                              r"|.*(_TOKEN|_API_KEY|_SECRET|PASSWORD))$")
+# "The covered names are" ... credentials read as EMPTY in an MCP url or header (mcp).
+MCP_EMPTY_CREDENTIAL_VARS = re.compile(
+    r"\$\{(ANTHROPIC_API_KEY|ANTHROPIC_AUTH_TOKEN|AWS_BEARER_TOKEN_BEDROCK|HTTPS_PROXY"
+    r"|NPM_TOKEN)(:-[^}]*)?\}")
+# A literal credential, not a ${VAR} reference. Prefixes of widely used token formats.
+SECRET_LITERAL_RE = re.compile(r"(Bearer\s+[A-Za-z0-9._~+/-]{16,}|sk-[A-Za-z0-9_-]{16,}"
+                               r"|gh[pousr]_[A-Za-z0-9]{20,}|xox[abpr]-[A-Za-z0-9-]{10,}"
+                               r"|AKIA[0-9A-Z]{16})")
+BUILTIN_OUTPUT_STYLES = {"Default", "Explanatory", "Learning", "Proactive", "Concise"}
 
 # Hook vocabulary. Source: code.claude.com/docs/en/hooks, read 2026-09-22.
 # An event name that is not in this set never fires and never complains: the
@@ -269,10 +436,20 @@ MATCHERLESS_HOOK_EVENTS = frozenset({
     "TaskCreated", "TaskCompleted", "WorktreeCreate", "WorktreeRemove",
     "MessageDisplay",
 })
-HOOK_DEFAULT_TIMEOUT = 600          # seconds, for `command` hooks
+HOOK_DEFAULT_TIMEOUT = 600          # seconds, for `command`, `http` and `mcp_tool`
+# "Claude Code lowers the command, http, and mcp_tool default to 30 on
+# UserPromptSubmit, PreModelSwitch, and PostModelSwitch, and to 10 on
+# MessageDisplay. SessionEnd hooks share a 1.5-second budget" (hooks, 2026-09-23).
+HOOK_EVENT_TIMEOUT = {"UserPromptSubmit": 30, "PreModelSwitch": 30, "PostModelSwitch": 30,
+                      "MessageDisplay": 10, "SessionEnd": 1.5}
+HOOK_TYPE_FIELDS = {"command": ("command",), "http": ("url",), "mcp_tool": ("server", "tool"),
+                    "prompt": ("prompt",), "agent": ("prompt",)}
+# "Only evaluated on tool events ... On other events, a hook with `if` set never runs."
+HOOK_TOOL_EVENTS = {"PreToolUse", "PostToolUse", "PostToolUseFailure", "PermissionRequest",
+                    "PermissionDenied"}
 HOOK_PLUGIN_ROOT_VARS = ("${CLAUDE_PLUGIN_ROOT}", "$CLAUDE_PLUGIN_ROOT")
 HOOK_PROJECT_DIR_VARS = ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR")
-AGENT_VALIDATED_KEYS = {"name", "description", "tools", "model", "skills"}
+AGENT_VALIDATED_KEYS = AGENT_KNOWN_KEYS
 PROJECT_SCOPE_IGNORED_MODES = {"bypassPermissions", "auto"}
 
 WALK_PRUNE_DIRS = {
@@ -348,7 +525,7 @@ def apply_thresholds(local: dict, report: Report) -> None:
     # against an older release got no signal and wondered why nothing moved. A
     # configuration file that accepts everything and applies part of it is worse
     # than one that refuses.
-    connues = {"exemptions", "thresholds", "_comment"}
+    connues = {"exemptions", "thresholds", "profile", "_comment"}
     for k in sorted(set(local) - connues):
         report.add("31-overlay-unknown", "WARN",
                    f"`{k}` is not a key this audit reads, so it does nothing. Known keys: "
@@ -507,8 +684,10 @@ PROJECT_ONLY = (
     "check_settings_scope",
     "check_always_loaded_budget",
     "check_listing_budget_derived",
+    "check_settings_semantics",
+    "check_companions",
 )
-PLUGIN_ONLY = ("check_plugin_cost",)
+PLUGIN_ONLY = ("check_plugin_cost", "check_plugin_manifest")
 # The only things worth saying about a marketplace repository: what it is, and
 # whether its own catalogue is coherent. Everything else has no subject here.
 MARKETPLACE_CHECKS = ("check_skills",)
@@ -584,7 +763,7 @@ def detect_layout(root: Path) -> str:
     # Everything below was measured on 15 public repositories created after
     # 2026-09-22: 6 of the 7 errors reported there were this auditor mistaking a
     # shape it did not know for a project missing its CLAUDE.md.
-    if (root / "CLAUDE.md").exists() or (root / ".claude").is_dir():
+    if (root / "CLAUDE.md").exists() or (root / ".claude").is_dir() or (root / "AGENTS.md").exists():
         return "project"
     # The manifest is optional: `skills/<name>/SKILL.md` at the root loads under
     # `--plugin-dir`, named after the folder, and `claude plugin validate` passes.
@@ -607,8 +786,13 @@ def apply_layout(root: Path, layout: str) -> None:
         manifest = root / ".claude-plugin" / "plugin.json"
         try:
             declared = json.loads(manifest.read_text(encoding="utf-8")).get("skills")
+            if isinstance(declared, list) and declared and isinstance(declared[0], str):
+                declared = declared[0]          # "string|array": the first path is the home
             if isinstance(declared, str):
-                SKILLS_DIR = declared.strip("./") or "skills"
+                # A PREFIX, not a set of characters: `strip("./")` turned
+                # `./.claude/skills` into `claude/skills`.
+                d = declared[2:] if declared.startswith("./") else declared
+                SKILLS_DIR = d.rstrip("/") or "skills"
         except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             pass
     elif layout == "marketplace":
@@ -648,6 +832,21 @@ class Report:
 
 
 BLOCK_SCALAR_INDICATORS = {">", ">-", ">+", "|", "|-", "|+"}
+
+
+def _strip_inline_comment(value: str) -> str:
+    """YAML ends a plain scalar at ` #`: the rest of the line is a comment.
+
+    `model: sonnet  # needs reasoning` means `sonnet` to Claude Code. Kept whole,
+    it was an unknown model - 24 false warnings, and 22 unknown tools from list
+    items like `- Glob  # for patterns`, on one calibration sample (2026-09-23).
+    A quoted value keeps its `#`.
+    """
+    v = value.strip()
+    if v[:1] in ("'", '"'):
+        return v
+    m = re.search(r"\s#", v)
+    return v[:m.start()].rstrip() if m else v
 
 
 def parse_frontmatter(text: str) -> tuple[dict[str, str] | None, int]:
@@ -698,9 +897,9 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str] | None, int]:
             if scalar in BLOCK_SCALAR_INDICATORS:
                 block_style = scalar[0]
             else:
-                buf.append(scalar)
+                buf.append(_strip_inline_comment(scalar))
         else:
-            buf.append(raw.strip())
+            buf.append(raw.strip() if block_style else _strip_inline_comment(raw))
     flush()
     return data, end + 1
 
@@ -868,29 +1067,62 @@ def glob_match_count(pattern: str, files: Iterable[str]) -> int:
     return len(matched)
 
 
+def claude_md_path(root: Path) -> Path:
+    """The project CLAUDE.md: `./CLAUDE.md` or `./.claude/CLAUDE.md`, both official.
+
+    "A project CLAUDE.md can be stored in either ./CLAUDE.md or ./.claude/CLAUDE.md"
+    (memory, 2026-09-23). Looking only at the root reported "CLAUDE.md not found" as
+    an ERROR on a project that had one.
+    """
+    for p in (root / "CLAUDE.md", root / ".claude" / "CLAUDE.md"):
+        if p.is_file():
+            return p
+    return root / "CLAUDE.md"
+
+
 def check_claude_md(root: Path, report: Report) -> None:
-    path = root / "CLAUDE.md"
+    path = claude_md_path(root)
     if not path.exists():
-        report.add("01-claude-md-exists", "ERROR", "CLAUDE.md not found", str(path))
+        if (root / "AGENTS.md").is_file():
+            report.add("01-claude-md-exists", "INFO",
+                       "No CLAUDE.md, but an AGENTS.md: Claude Code reads AGENTS.md when no "
+                       "CLAUDE.md exists (memory, 'AGENTS.md').", str(root / "AGENTS.md"))
+            return
+        report.add("01-claude-md-exists", "INFO",
+                   "No CLAUDE.md: it is optional, and nothing here is read every session.",
+                   str(path))
         return
     size = path.stat().st_size
     if size > CLAUDE_MD_MAX_BYTES:
         report.add(
             "01-claude-md-size",
-            "ERROR",
-            f"CLAUDE.md is {size} bytes (max {CLAUDE_MD_MAX_BYTES}). Move knowledge to skills.",
+            house(),
+            f"CLAUDE.md is {size} bytes (max {CLAUDE_MD_MAX_BYTES}). Move knowledge to skills."
+            + house_note(f"at most {CLAUDE_MD_MAX_BYTES} bytes",
+                         "under 200 lines (memory) - checked by 01-claude-md-lines"),
             str(path),
         )
     else:
         report.add("01-claude-md-size", "OK", f"CLAUDE.md size {size} bytes <= {CLAUDE_MD_MAX_BYTES}.", str(path))
 
     text = path.read_text(encoding="utf-8")
+    lines = text.count("\n") + (0 if text.endswith("\n") else 1)
+    if lines > CLAUDE_MD_MAX_LINES:
+        report.add("01-claude-md-lines", "WARN",
+                   f"CLAUDE.md is {lines} lines (> {CLAUDE_MD_MAX_LINES}). \"Files over 200 lines "
+                   "consume more context and may reduce adherence\" (memory).", str(path))
+    if (root / "AGENTS.md").is_file() and "@AGENTS.md" not in text:
+        report.add("01-agents-md-unread", "WARN",
+                   "AGENTS.md sits beside a CLAUDE.md that does not import it: Claude Code reads "
+                   "AGENTS.md only when no CLAUDE.md exists. Add `@AGENTS.md`, or drop one.",
+                   str(root / "AGENTS.md"))
     stripped = strip_code_fences(text)
     if re.search(r"^\s*//", stripped, re.MULTILINE) or re.search(r"/\*[^!]", stripped):
         report.add(
             "12-no-code-comments",
-            "WARN",
-            "CLAUDE.md contains // or /* */ outside fenced code blocks.",
+            house(),
+            "CLAUDE.md contains // or /* */ outside fenced code blocks."
+            + house_note("prose only, no code comments", "nothing on this"),
             str(path),
         )
 
@@ -927,10 +1159,13 @@ def dossiers_de_skill(base: Path, report: Report) -> list[Path]:
             continue
         if entry.name.startswith("_") or entry.name.lower() in SUPPORT_DIR_NAMES:
             continue                             # support material, not a skill
-        report.add("02-skill-md-exists", "ERROR",
+        other_case = [p.name for p in entry.iterdir() if p.name.lower() == "skill.md"]
+        report.add("02-skill-md-exists", "WARN",
                    f"Directory '{entry.name}' under the skills directory holds no SKILL.md "
-                   "and no descendant that does. A skill needs one; a support directory "
-                   "should be named with a leading underscore so it reads as one.",
+                   + (f"- it holds '{other_case[0]}', and the name is case-sensitive: Claude Code "
+                      "looks for SKILL.md." if other_case else
+                      "and no descendant that does. A skill needs one; a support directory "
+                      "should be named with a leading underscore so it reads as one."),
                    str(entry))
     return trouves
 
@@ -953,13 +1188,15 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
         # A plugin may legitimately ship only commands, agents or hooks. Calling
         # that an error tells an author their working plugin is broken, which is
         # how an auditor gets uninstalled rather than heeded.
-        autre = [d for d in ("commands", "agents", "hooks") if (root / d).exists()]
+        # In a project these live under .claude/; at a plugin root, beside skills/.
+        base = root / CLAUDE_DIR if LAYOUT == "project" else root
+        autre = [d for d in ("commands", "agents", "hooks") if (base / d).exists()]
         if autre:
             report.add("02-skills-dir", "INFO",
                        f"No {SKILLS_DIR}/ — this one ships {', '.join(autre)} instead. "
                        "Skill checks have no subject here.", str(root))
         else:
-            report.add("02-skills-dir", "WARN",
+            report.add("02-skills-dir", "INFO",
                        f"{SKILLS_DIR}/ not found, and no commands/, agents/ or hooks/ either "
                        "— nothing here declares anything.", str(skills_dir))
         return {}
@@ -972,10 +1209,16 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
         text = skill_md.read_text(encoding="utf-8")
         fm, _ = parse_frontmatter(text)
         if not fm:
+            # Claude Code loads it anyway - "All fields are optional": the folder gives
+            # the name, the first non-empty line the description (skills). A defect -
+            # that first line is rarely a trigger - but not a rejection. Measured on a
+            # calibration sample, 2026-09-23: 12 such skills reported as ERRORs.
             report.add(
                 "02-skill-frontmatter",
-                "ERROR",
-                f"SKILL.md in '{entry.name}' has no valid YAML frontmatter",
+                "WARN",
+                f"SKILL.md in '{entry.name}' has no YAML frontmatter: Claude Code still loads "
+                "it, named after the folder and described by its first non-empty line - "
+                "rarely a usable trigger. The Agent Skills spec requires name and description.",
                 str(skill_md),
             )
             continue
@@ -986,6 +1229,31 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
         if not desc:
             report.add("02-skill-frontmatter", "ERROR", "Missing 'description' in frontmatter", str(skill_md))
 
+        for key in frontmatter_keys(text):
+            if key not in SKILL_KNOWN_KEYS:
+                near = [k for k in SKILL_KNOWN_KEYS if k.replace("-", "_") == key.replace("-", "_")]
+                report.add("02-skill-unknown-field", "WARN",
+                           f"Skill '{entry.name}' sets '{key}', which is not a skill field: Claude "
+                           "Code ignores it without reporting an error (skills)."
+                           + (f" Did you mean '{near[0]}'?" if near else ""), str(skill_md))
+        if re.search(r"[<>]", desc):
+            # Claude Code loads it; claude.ai upload and skill-creator's quick_validate
+            # reject it. On `rom` all five hits were Vue vocabulary (`<script setup>`):
+            # legitimate in a project that never uploads, a real risk for a plugin.
+            report.add("04-skill-description-brackets", "WARN" if LAYOUT == "plugin" else "INFO",
+                       f"Skill '{entry.name}' description contains '<' or '>': Claude Code loads "
+                       "it, but claude.ai upload and skill-creator's quick_validate reject angle "
+                       "brackets in a description (platform best practices).", str(skill_md))
+        if entry.name.lower() == "synced":
+            report.add("02-skill-md-exists", "ERROR",
+                       "A skill folder named 'synced' is skipped: the name is reserved for skills "
+                       "synced from claude.ai (skills).", str(skill_md))
+        wtu = fm.get("when_to_use", "").strip()
+        if desc and wtu and len(desc) + len(wtu) > DESCRIPTION_LISTING_MAX_CHARS:
+            report.add("04-skill-description-length", "WARN",
+                       f"Skill '{entry.name}': description + when_to_use is "
+                       f"{len(desc) + len(wtu)} chars (> {DESCRIPTION_LISTING_MAX_CHARS}); the "
+                       "listing cuts the rest (skills).", str(skill_md))
         if name and name != entry.name:
             report.add(
                 "03-skill-name-matches-folder",
@@ -1006,8 +1274,11 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
             if len(desc) < DESCRIPTION_MIN_CHARS:
                 report.add(
                     "04-skill-description-length",
-                    "WARN",
-                    f"Skill '{entry.name}' description is only {len(desc)} chars (min {DESCRIPTION_MIN_CHARS})",
+                    house(),
+                    f"Skill '{entry.name}' description is only {len(desc)} chars (min {DESCRIPTION_MIN_CHARS})."
+                    + house_note(f"at least {DESCRIPTION_MIN_CHARS} chars",
+                                 "a description that says what the skill does and when to use "
+                                 "it, up to 1,024 chars - no minimum"),
                     str(skill_md),
                 )
             if len(desc) > DESCRIPTION_MAX_CHARS:
@@ -1024,7 +1295,10 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
             if not ANTI_TRIGGER_RE.search(desc):
                 report.add(
                     "04-skill-description-antitrigger",
-                    "WARN",
+                    # Family 1: the measurement behind this clause is about confusable
+                    # pairs, and check 33 is where it applies as a WARN. On a skill with
+                    # no close neighbour the clause is only a cost paid every turn.
+                    house(),
                     f"Skill '{entry.name}' description has no anti-trigger clause. MEASURED, "
                     "2026-09-22: on a near-miss case that names the objects this skill audits "
                     "but asks for them to be authored, the skill fired in 5 of 10 runs with the "
@@ -1099,19 +1373,32 @@ def check_agents(root: Path, report: Report) -> dict[str, dict]:
         # A plugin without agents/ is simply a plugin that ships only skills -
         # the directory is optional in the manifest, so its absence is not news.
         if LAYOUT == "project":
-            report.add("08-agents-dir", "WARN", f"{AGENTS_DIR}/ not found", str(agents_dir))
+            report.add("08-agents-dir", "INFO",
+                       f"{AGENTS_DIR}/ not found - a project without agents lacks nothing.",
+                       str(agents_dir))
         return {}
     agents: dict[str, dict] = {}
-    for entry in sorted(agents_dir.iterdir()):
-        if not entry.is_file() or entry.suffix != ".md":
+    # Subdirectories are scanned recursively, and the identity is `name`, not the
+    # filename: "The filename doesn't have to match" (sub-agents, 2026-09-23).
+    seen_names: dict[str, str] = {}
+    for entry in sorted(agents_dir.rglob("*.md")):
+        if not entry.is_file():
             continue
         text = entry.read_text(encoding="utf-8")
         fm, _ = parse_frontmatter(text)
         if not fm:
+            # No frontmatter at all is a document someone keeps in agents/ (a routing
+            # guide, a reference) - not loaded as an agent. A frontmatter that does not
+            # parse is an agent that silently fails to load.
+            broken = text.lstrip().startswith("---")
             report.add(
                 "08-agent-frontmatter",
-                "ERROR",
-                f"Agent '{entry.stem}' has no valid YAML frontmatter",
+                "ERROR" if broken else "WARN",
+                f"'{entry.relative_to(agents_dir)}' " + (
+                    "has a frontmatter that does not parse: this agent does not load."
+                    if broken else
+                    "has no frontmatter: it is not loaded as an agent. Documentation kept in "
+                    "agents/ is scanned there; move it out if it is not an agent."),
                 str(entry),
             )
             continue
@@ -1138,11 +1425,23 @@ def check_agents(root: Path, report: Report) -> dict[str, dict]:
                 f"Agent '{entry.stem}' description parsed as a raw block-scalar indicator — frontmatter parser failed.",
                 str(entry),
             )
-        agents[entry.stem] = {"name": fm.get("name", ""), "description": desc, "path": str(entry)}
+        ident = (fm.get("name") or entry.stem).strip()
+        if ident in seen_names:
+            report.add("08-agent-frontmatter", "WARN",
+                       f"Two agents are named '{ident}' ({seen_names[ident]} and {entry.name}): the "
+                       "harness keeps one by filesystem read order.", str(entry))
+        seen_names[ident] = entry.name
+        agents[ident] = {"name": fm.get("name", ""), "description": desc, "path": str(entry)}
     return agents
 
 
 def check_agent_descriptions(report: Report, agents: dict[str, dict]) -> None:
+    total = sum(len(m.get("description", "")) for m in agents.values())
+    if total / CHARS_PER_TOKEN > 15000:
+        report.add("08b-agent-description", "WARN",
+                   f"Agent descriptions total {total} chars, about {int(total / CHARS_PER_TOKEN)} "
+                   "tokens: past 15,000 tokens Claude Code shows a startup warning (sub-agents).",
+                   "")
     for name, meta in agents.items():
         desc = meta.get("description", "")
         if not desc:
@@ -1150,22 +1449,26 @@ def check_agent_descriptions(report: Report, agents: dict[str, dict]) -> None:
         if len(desc) < DESCRIPTION_MIN_CHARS:
             report.add(
                 "08b-agent-description",
-                "WARN",
-                f"Agent '{name}' description is only {len(desc)} chars (min {DESCRIPTION_MIN_CHARS})",
+                house(),
+                f"Agent '{name}' description is only {len(desc)} chars (min {DESCRIPTION_MIN_CHARS})."
+                + house_note("80-900 chars", "10-5,000 chars, best 200-1,000 (plugin-dev, "
+                             "agent-development); a startup warning past 15,000 tokens in total"),
                 meta["path"],
             )
         if len(desc) > AGENT_DESCRIPTION_MAX_CHARS:
             report.add(
                 "08b-agent-description",
-                "WARN",
-                f"Agent '{name}' description is {len(desc)} chars (> {AGENT_DESCRIPTION_MAX_CHARS}). Description = trigger surface; move knowledge to the body.",
+                house(),
+                f"Agent '{name}' description is {len(desc)} chars (> {AGENT_DESCRIPTION_MAX_CHARS}). Description = trigger surface; move knowledge to the body."
+                + house_note("at most 900 chars", "10-5,000 chars, best 200-1,000 (plugin-dev)"),
                 meta["path"],
             )
         if not ANTI_TRIGGER_RE.search(desc):
             report.add(
                 "08b-agent-description",
                 "WARN",
-                f"Agent '{name}' description has no anti-trigger clause",
+                f"Agent '{name}' description has no anti-trigger clause. Anthropic's plugin-dev "
+                "(agent-development): \"Be specific about when NOT to use the agent\".",
                 meta["path"],
             )
 
@@ -1193,7 +1496,7 @@ def listing_hidden_skills(root: Path, skills: dict[str, dict]) -> set[str]:
     hidden = {
         name
         for name, data in skills.items()
-        if str(data.get("disable-model-invocation", "")).strip().lower() == "true"
+        if str(data.get("disable-model-invocation", "")).strip().lower() in YAML_TRUE
         or frontmatter_list(data.get("paths", ""))
     }
     settings = root / CLAUDE_DIR / "settings.json"
@@ -1208,10 +1511,27 @@ def listing_hidden_skills(root: Path, skills: dict[str, dict]) -> set[str]:
     return hidden
 
 
+def unreachable_skills(root: Path, skills: dict[str, dict]) -> set[str]:
+    """Withheld skills the model cannot come upon by itself - the index's subject.
+
+    `paths:` withholds a skill from the STARTING listing but does not make it
+    unreachable: measured 2026-09-23 on 2.1.280, a `paths: src/**` skill is absent
+    from the session's init event, absent after reading README.md (2 of 2), and
+    present after reading src/a.ts (2 of 2). The docs say the same: "Claude loads
+    the skill automatically only when working with files matching the patterns".
+    An earlier measurement on 2.1.259 had found it never loaded. It is counted out
+    of the budget, and not demanded in the index.
+    """
+    return {n for n in listing_hidden_skills(root, skills)
+            if not (frontmatter_list(skills[n].get("paths", ""))
+                    and str(skills[n].get("disable-model-invocation", "")).strip().lower()
+                    not in YAML_TRUE)}
+
+
 def check_always_loaded_budget(
     root: Path, report: Report, skills: dict[str, dict], agents: dict[str, dict]
 ) -> None:
-    claude_md = root / "CLAUDE.md"
+    claude_md = claude_md_path(root)
     claude_md_bytes = claude_md.stat().st_size if claude_md.exists() else 0
     hidden = listing_hidden_skills(root, skills)
     raw_skill_chars = sum(len(s.get("description", "")) for s in skills.values())
@@ -1235,14 +1555,16 @@ def check_always_loaded_budget(
     if total > ALWAYS_LOADED_ERROR_CHARS:
         report.add(
             "17-always-loaded-budget",
-            "ERROR",
-            f"{message} Exceeds the hard budget ({ALWAYS_LOADED_ERROR_CHARS}). Trim descriptions or CLAUDE.md.",
+            house(),
+            f"{message} Exceeds the hard budget ({ALWAYS_LOADED_ERROR_CHARS}). Trim descriptions or CLAUDE.md."
+            + house_note("a global always-loaded budget", "per-mechanism budgets only - the "
+                         "skill listing is sized from skillListingBudgetFraction (check 29)"),
             str(claude_md),
         )
     elif total > ALWAYS_LOADED_WARN_CHARS:
         report.add(
             "17-always-loaded-budget",
-            "WARN",
+            house(),
             f"{message} Above the target budget ({ALWAYS_LOADED_WARN_CHARS}).",
             str(claude_md),
         )
@@ -1251,12 +1573,9 @@ def check_always_loaded_budget(
     if skill_chars > SKILL_DESC_AGGREGATE_WARN_CHARS:
         report.add(
             "17-always-loaded-budget",
-            "WARN",
-            f"Skill descriptions alone total {skill_chars} chars (> {SKILL_DESC_AGGREGATE_WARN_CHARS}): "
-            "approaching the harness listing budget. `.claude/settings.json` sets "
-            "`skillListingBudgetFraction: 0.025`, scaling the ~23.1k-23.5k cutoff observed on "
-            "2026-07-19 at the 0.01 default to roughly 58k chars. Trim descriptions rather than "
-            "raising this ratchet again; the next raise needs a fresh runtime measurement.",
+            house(),
+            f"Skill descriptions alone total {skill_chars} chars (> {SKILL_DESC_AGGREGATE_WARN_CHARS}). "
+            "The harness's own listing ceiling is derived in check 29; this is a house ratchet below it.",
             str(claude_md),
         )
 
@@ -1478,7 +1797,7 @@ def check_foreign_skill_mentions(root: Path, report: Report, skills: dict[str, d
 def check_cross_refs(
     root: Path, report: Report, skills: dict[str, dict], agents: dict[str, dict]
 ) -> None:
-    claude_md = root / "CLAUDE.md"
+    claude_md = claude_md_path(root)
     if not claude_md.exists():
         return
     text = claude_md.read_text(encoding="utf-8")
@@ -1496,15 +1815,18 @@ def check_cross_refs(
         if agent_name not in referenced_agents:
             report.add(
                 "09-agent-in-claude-md",
-                "ERROR",
-                f"Agent '{agent_name}' exists in .claude/agents/ but is not listed in CLAUDE.md 'Agents directory'",
+                house(),
+                f"Agent '{agent_name}' exists in .claude/agents/ but is not listed in CLAUDE.md 'Agents directory'."
+                + house_note("an '## Agents directory' table in CLAUDE.md",
+                             "nothing - the harness already lists every agent's description, "
+                             "so the table is paid twice"),
                 str(claude_md),
             )
     for ref in referenced_agents:
         if ref not in agents:
             report.add(
                 "09-claude-md-agent-missing",
-                "ERROR",
+                "WARN",   # a table that names a missing agent points at nothing, whatever the profile
                 f"CLAUDE.md references agent '{ref}' but .claude/agents/{ref}.md does not exist",
                 str(claude_md),
             )
@@ -1579,8 +1901,9 @@ def check_english_only(root: Path, report: Report) -> None:
         if hits >= FRENCH_HEURISTIC_THRESHOLD:
             report.add(
                 "11-english-only",
-                "WARN",
-                f"File appears to contain French content ({hits} heuristic hits).",
+                house(),
+                f"File appears to contain French content ({hits} heuristic hits)."
+                + house_note("English only", "set the language explicitly; nothing requires English"),
                 str(path),
             )
 
@@ -1611,8 +1934,10 @@ def check_no_global_scripts(root: Path, report: Report) -> None:
     for path in files:
         report.add(
             "13-no-global-scripts",
-            "ERROR",
-            f"Script '{path.name}' lives in .claude/scripts/ (global pool). Move it to its owning skill: .claude/skills/<owner>/scripts/{path.name}.",
+            house(),
+            f"Script '{path.name}' lives in .claude/scripts/ (global pool). Its owning skill's scripts/ would carry it."
+            + house_note("no global .claude/scripts/",
+                         "scripts/ inside a skill as its anatomy, and nothing against a project folder"),
             str(path),
         )
 
@@ -1624,8 +1949,10 @@ def check_rules(root: Path, report: Report) -> None:
     rules_dir = root / CLAUDE_DIR / "rules"
     if not rules_dir.is_dir():
         return
-    for entry in sorted(rules_dir.iterdir()):
-        if not entry.is_file() or entry.suffix != ".md":
+    # "Rules are discovered recursively" - a rule in a subdirectory loads, and was
+    # audited by nothing.
+    for entry in sorted(rules_dir.rglob("*.md")):
+        if not entry.is_file():
             continue
         text = entry.read_text(encoding="utf-8")
         size = entry.stat().st_size
@@ -1633,8 +1960,9 @@ def check_rules(root: Path, report: Report) -> None:
         if size > RULE_MAX_BYTES:
             report.add(
                 "14-rule-size",
-                "WARN",
-                f"Rule '{entry.name}' is {size} bytes (> {RULE_MAX_BYTES}). Consider converting to a skill.",
+                house(),
+                f"Rule '{entry.name}' is {size} bytes (> {RULE_MAX_BYTES}). Consider converting to a skill."
+                + house_note(f"rules under {RULE_MAX_BYTES} bytes", "one topic per file (memory)"),
                 str(entry),
             )
 
@@ -1663,7 +1991,7 @@ def check_rules(root: Path, report: Report) -> None:
         if hits >= FRENCH_HEURISTIC_THRESHOLD:
             report.add(
                 "14-rule-english-only",
-                "WARN",
+                house(),
                 f"Rule '{entry.name}' appears to contain French content ({hits} heuristic hits).",
                 str(entry),
             )
@@ -1679,12 +2007,12 @@ def check_skill_index(root: Path, report: Report, skills: dict[str, dict]) -> No
     description. Those are exactly the entries this section must carry, and
     exactly what this check reconciles.
     """
-    claude_md = root / "CLAUDE.md"
+    claude_md = claude_md_path(root)
     if not claude_md.exists() or not skills:
         return
     text = claude_md.read_text(encoding="utf-8")
     section = re.search(r"##\s+Skills index.*?(?=^##\s|\Z)", text, re.DOTALL | re.MULTILINE)
-    hidden = listing_hidden_skills(root, skills)
+    hidden = unreachable_skills(root, skills)
     if not section:
         # The section exists to point at what the listing withholds. With nothing
         # withheld, its right content is empty, and demanding an empty heading was
@@ -1756,20 +2084,26 @@ def check_reference_sizes(root: Path, report: Report) -> None:
         if lines <= REFERENCE_TOC_LINES:
             continue
         head = "\n".join(text.splitlines()[:REFERENCE_TOC_SCAN_LINES]).lower()
-        has_toc = "contents:" in head or "## contents" in head or "# contents" in head
+        has_toc = ("contents:" in head or "## contents" in head or "# contents" in head
+                   or "table of contents" in head
+                   or len(re.findall(r"^\s*[-*]\s*\[[^\]]+\]\(#", head, re.M)) >= 3)
         rel_name = ref.relative_to(skills_dir).as_posix()
         if not has_toc:
             report.add(
                 "16-reference-size",
                 "WARN",
-                f"Reference '{rel_name}' is {lines} lines (> {REFERENCE_TOC_LINES}) with no table of contents. Add a 'Contents:' block near the top.",
+                f"Reference '{rel_name}' is {lines} lines (> {REFERENCE_TOC_LINES}) with no table of contents. "
+                "Add one near the top: \"For reference files longer than 100 lines, include a table of "
+                "contents\" (Anthropic, skill authoring best practices).",
                 str(ref),
             )
         elif lines > REFERENCE_WARN_LINES and not is_vendored_skill(skill_dir):
             report.add(
                 "16-reference-size",
-                "WARN",
-                f"Reference '{rel_name}' is {lines} lines (> {REFERENCE_WARN_LINES}) even with a table of contents. Split it.",
+                house(),
+                f"Reference '{rel_name}' is {lines} lines (> {REFERENCE_WARN_LINES}) with a table of contents."
+                + house_note(f"split past {REFERENCE_WARN_LINES} lines",
+                             "a table of contents is enough - which this file has"),
                 str(ref),
             )
 
@@ -1788,7 +2122,7 @@ def check_frontmatter_quoting(root: Path, report: Report) -> None:
     if skills_dir.is_dir():
         targets.extend(sorted(skills_dir.glob("*/SKILL.md")))
     if agents_dir.is_dir():
-        targets.extend(sorted(agents_dir.glob("*.md")))
+        targets.extend(sorted(agents_dir.rglob("*.md")))
 
     for path in targets:
         try:
@@ -1857,7 +2191,8 @@ def check_rule_globs(root: Path, report: Report) -> None:
     if not rules_dir.is_dir():
         return
     files = repo_files(root)
-    for entry in sorted(rules_dir.glob("*.md")):
+    ignored = git_ignored(root)
+    for entry in sorted(rules_dir.rglob("*.md")):
         try:
             fm, _ = parse_frontmatter(entry.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError):
@@ -1865,6 +2200,19 @@ def check_rule_globs(root: Path, report: Report) -> None:
         if not fm:
             continue
         for pattern in frontmatter_list(fm.get("paths", "")):
+            # A glob rooted in a directory git ignores (`masters/**`) loads its rule on
+            # the machines that hold those files and never on a fresh clone. Judged on
+            # the disk, the same commit gave 0 findings on one machine and 1 on another
+            # (measured 2026-09-23). Asked of git, the answer is the same everywhere -
+            # `git check-ignore` evaluates the rules, not the files.
+            fixed = re.split(r"[*?\[{]", pattern, maxsplit=1)[0]
+            probe = fixed + "x" if fixed.endswith("/") else fixed
+            if probe and ignored(probe):
+                report.add("22-rule-glob-match", "INFO",
+                           f"Rule '{entry.name}' glob '{pattern}' points into a path git ignores: "
+                           "it loads only where those untracked files exist, so whether it is "
+                           "inert depends on the machine. Not counted.", str(entry))
+                continue
             if glob_match_count(pattern, files):
                 continue
             bracket = (
@@ -1898,7 +2246,7 @@ def check_agent_frontmatter_validity(root: Path, report: Report, skills: dict[st
         return
     inventory: dict[str, int] = {}
     unvalidated: dict[str, int] = {}
-    for entry in sorted(agents_dir.glob("*.md")):
+    for entry in sorted(agents_dir.rglob("*.md")):
         try:
             text = entry.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
@@ -1907,30 +2255,49 @@ def check_agent_frontmatter_validity(root: Path, report: Report, skills: dict[st
         if not fm:
             continue
 
-        for tool in frontmatter_list(fm.get("tools", "")):
+        declared_tools = frontmatter_list(fm.get("tools", ""))
+        unknown = []
+        for tool in declared_tools:
+            base = tool.split("(", 1)[0].strip()
+            if base in TOOL_DEPRECATED:
+                report.add("23-agent-tools", "INFO",
+                           f"Agent '{entry.stem}' grants '{base}', deprecated in favor of "
+                           f"{TOOL_DEPRECATED[base]} (tools-reference).", str(entry))
+                continue
+            if base in TOOL_ALIASES:
+                report.add("23-agent-tools", "INFO",
+                           f"Agent '{entry.stem}' grants '{base}', the former name of "
+                           f"'{TOOL_ALIASES[base]}' - still accepted as an alias.", str(entry))
+                continue
             if is_known_tool(tool):
                 continue
+            unknown.append(tool)
+        # The harness drops an entry it cannot resolve and launches with the rest; only
+        # an agent left with NO tool "fails to launch". Severity follows that.
+        for tool in unknown:
             report.add(
                 "23-agent-tools",
-                "ERROR",
-                f"Agent '{entry.stem}' grants unknown tool '{tool}'. The fan-out tool is 'Agent'; "
-                "there is no 'Task'. Parameterised forms like 'Agent(review)' or 'Bash(git diff:*)' "
-                "and 'mcp__*' names are accepted.",
+                "ERROR" if len(unknown) == len(declared_tools) else "WARN",
+                f"Agent '{entry.stem}' grants unknown tool '{tool}'. Unresolvable entries are "
+                "dropped; parameterised forms like 'Bash(git diff *)' and 'mcp__*' names are "
+                "accepted (tools-reference).",
                 str(entry),
             )
 
         for preload in frontmatter_list(fm.get("skills", "")):
             if not (root / SKILLS_DIR / preload / "SKILL.md").is_file():
+                # `plugin:skill` and user skills preload legitimately and live outside
+                # this repository - unverifiable here, not missing.
                 report.add(
                     "23-agent-skills-preload",
-                    "ERROR",
-                    f"Agent '{entry.stem}' preloads skill '{preload}', but "
-                    f".claude/skills/{preload}/SKILL.md does not exist.",
+                    "INFO" if ":" in preload else "WARN",
+                    f"Agent '{entry.stem}' preloads skill '{preload}', which is not under "
+                    f"{SKILLS_DIR}/ - fine if it is a user or plugin skill, dead otherwise.",
                     str(entry),
                 )
                 continue
             flag = str(skills.get(preload, {}).get("disable-model-invocation", "")).strip().lower()
-            if flag == "true":
+            if flag in YAML_TRUE:
                 report.add(
                     "23-agent-skills-preload",
                     "WARN",
@@ -1950,10 +2317,38 @@ def check_agent_frontmatter_validity(root: Path, report: Report, skills: dict[st
                 str(entry),
             )
 
+        mode = fm.get("permissionMode", "").strip()
+        if mode and mode not in AGENT_PERMISSION_MODES:
+            report.add("23-agent-permission-mode", "WARN",
+                       f"Agent '{entry.stem}' declares permissionMode '{mode}', which is not a "
+                       f"mode ({', '.join(sorted(AGENT_PERMISSION_MODES))}).", str(entry))
+        elif mode == "bypassPermissions":
+            report.add("23-agent-permission-mode", "WARN",
+                       f"Agent '{entry.stem}' declares bypassPermissions: since 2.1.267 a subagent "
+                       "that declares it keeps the main conversation's mode instead (sub-agents).",
+                       str(entry))
+        if re.search(r"\bAgent\([^)]*\)", fm.get("tools", "")):
+            report.add("23-agent-tools", "WARN",
+                       f"Agent '{entry.stem}' restricts spawnable types with 'Agent(...)': that list "
+                       "applies only to an agent run as the main thread with `claude --agent`; in "
+                       "a subagent definition it is ignored (sub-agents).", str(entry))
+        if ":" in fm.get("name", ""):
+            report.add("08-agent-frontmatter", "ERROR",
+                       f"Agent '{entry.stem}' has a ':' in its name: the file is not loaded "
+                       "(sub-agents, 2.1.218).", str(entry))
+        if LAYOUT == "plugin":
+            for key in sorted(PLUGIN_AGENT_IGNORED_KEYS & set(frontmatter_keys(text))):
+                report.add("23-agent-frontmatter-keys", "WARN",
+                           f"Agent '{entry.stem}' sets '{key}', which Claude Code ignores on an "
+                           "agent shipped by a plugin (plugins-reference).", str(entry))
+
         for key in frontmatter_keys(text):
             inventory[key] = inventory.get(key, 0) + 1
             if key not in AGENT_VALIDATED_KEYS:
                 unvalidated[key] = unvalidated.get(key, 0) + 1
+                report.add("23-agent-frontmatter-keys", "WARN",
+                           f"Agent '{entry.stem}' sets '{key}', which is not a subagent field: "
+                           "it is ignored without a word (sub-agents lists 18).", str(entry))
 
     if inventory:
         seen = ", ".join(f"{k} ({v})" for k, v in sorted(inventory.items()))
@@ -2003,11 +2398,14 @@ def check_settings_scope(root: Path, report: Report) -> None:
         if isinstance(overrides, dict):
             for skill_name in sorted(overrides):
                 if not (root / SKILLS_DIR / skill_name / "SKILL.md").is_file():
+                    # The docs' own example is `"doctor": "off"` - a bundled skill. A key
+                    # outside the project may be bundled, personal or synced: legitimate,
+                    # and not verifiable from here.
                     report.add(
                         "24-settings-skill-overrides",
-                        "ERROR",
-                        f"skillOverrides in '{name}' names '{skill_name}', which is not a skill folder "
-                        "under .claude/skills/.",
+                        "INFO",
+                        f"skillOverrides in '{name}' names '{skill_name}', which is not a project "
+                        "skill: fine for a bundled, user or synced skill, dead if it was renamed.",
                         str(path),
                     )
 
@@ -2079,9 +2477,9 @@ def check_hooks(root: Path, report: Report) -> None:
         for event in sorted(hooks):
             if event not in KNOWN_HOOK_EVENTS:
                 report.add("35-hooks-event", "ERROR",
-                           f"'{event}' is not a hook event. It will never fire and will never "
-                           f"report that it did not. Known events: {len(KNOWN_HOOK_EVENTS)}, "
-                           "listed in KNOWN_HOOK_EVENTS.", str(path))
+                           f"'{event}' is not a hook event: it never fires. An interactive session "
+                           "warns once at startup; `claude -p` and CI say nothing. Known events: "
+                           f"{len(KNOWN_HOOK_EVENTS)} (hooks).", str(path))
                 continue
             entries = hooks[event]
             if not isinstance(entries, list):
@@ -2094,6 +2492,13 @@ def check_hooks(root: Path, report: Report) -> None:
                     report.add("35-hooks-shape", "ERROR",
                                f"{where} in '{rel}' is not an object.", str(path))
                     continue
+                m = entry.get("matcher")
+                if (isinstance(m, str) and re.fullmatch(r"mcp__[A-Za-z0-9_-]+", m)
+                        and "__" not in m[5:]):
+                    report.add("35-hooks-matcher", "ERROR",
+                               f"{where} matches '{m}', a bare MCP server prefix: it is compared "
+                               f"as an exact string and matches no tool. Use '{m}__.*' (hooks).",
+                               str(path))
                 if entry.get("matcher") and event in MATCHERLESS_HOOK_EVENTS:
                     report.add("35-hooks-matcher", "WARN",
                                f"{where} declares matcher '{entry['matcher']}' on '{event}', which "
@@ -2110,20 +2515,60 @@ def check_hooks(root: Path, report: Report) -> None:
                         report.add("35-hooks-shape", "ERROR",
                                    f"{spot} in '{rel}' is not an object.", str(path))
                         continue
+                    if "type" not in hook:
+                        report.add("35-hooks-shape", "WARN",
+                                   f"{spot} in '{rel}' has no 'type': the handler field is "
+                                   "required (hooks).", str(path))
                     kind = hook.get("type", "command")
+                    if kind not in HOOK_TYPE_FIELDS:
+                        report.add("35-hooks-shape", "ERROR",
+                                   f"{spot} in '{rel}' has type '{kind}', which is not a hook type "
+                                   f"({', '.join(sorted(HOOK_TYPE_FIELDS))}).", str(path))
+                        continue
+                    cond = hook.get("if")
+                    if cond is not None:
+                        if event not in HOOK_TOOL_EVENTS:
+                            report.add("35-hooks-if", "ERROR",
+                                       f"{spot} in '{rel}' sets 'if' on '{event}': 'if' is evaluated "
+                                       "on tool events only, and elsewhere the hook never runs "
+                                       "(hooks).", str(path))
+                        elif not isinstance(cond, str) or re.search(r"&&|\|\|", cond):
+                            report.add("35-hooks-if", "ERROR",
+                                       f"{spot} in '{rel}' combines rules in 'if': it holds exactly "
+                                       "one permission rule, with no &&, || or list (hooks).",
+                                       str(path))
+                    missing = [f for f in HOOK_TYPE_FIELDS[kind] if not hook.get(f)]
+                    if missing and kind != "command":
+                        report.add("35-hooks-shape", "ERROR",
+                                   f"{spot} in '{rel}' is a '{kind}' hook with no "
+                                   f"{', '.join(repr(f) for f in missing)}.", str(path))
                     if kind != "command":
                         continue
                     command = hook.get("command")
+                    if isinstance(command, str) and isinstance(hook.get("args"), list):
+                        # Exec form: the script can be any element, not just the command.
+                        command = " ".join([command] + [str(a) for a in hook["args"]])
+                    if isinstance(command, str) and re.search(r'(?<!")\$\{?CLAUDE_PLUGIN_ROOT\}?/', command) \
+                            and "args" not in hook:
+                        report.add("35-hooks-command", "WARN",
+                                   f"{spot} in '{rel}' uses ${{CLAUDE_PLUGIN_ROOT}} unquoted in a "
+                                   "shell-form command: a plugin root with a space splits the "
+                                   "path. Wrap it in double quotes (plugins-reference).", str(path))
                     if not isinstance(command, str) or not command.strip():
                         report.add("35-hooks-shape", "ERROR",
                                    f"{spot} in '{rel}' is a command hook with no 'command'.",
                                    str(path))
                         continue
                     if "timeout" not in hook:
-                        report.add("35-hooks-timeout", "WARN",
-                                   f"{spot} in '{rel}' sets no 'timeout': the default is "
-                                   f"{HOOK_DEFAULT_TIMEOUT}s. A hook that hangs holds the event it "
-                                   "was meant to observe.", str(path))
+                        default = HOOK_EVENT_TIMEOUT.get(event, HOOK_DEFAULT_TIMEOUT)
+                        report.add("35-hooks-timeout",
+                                   "WARN" if default >= 60 else "INFO",
+                                   f"{spot} in '{rel}' sets no 'timeout': the default on '{event}' "
+                                   f"is {default}s"
+                                   + (" (a budget shared by every SessionEnd hook)."
+                                      if event == "SessionEnd" else ".")
+                                   + (" A hook that hangs holds the event it was meant to observe."
+                                      if default >= 60 else ""), str(path))
                     for token in _hook_paths(command):
                         if token.startswith(HOOK_PLUGIN_ROOT_VARS) and LAYOUT != "plugin":
                             report.add("35-hooks-command", "ERROR",
@@ -2590,7 +3035,7 @@ def check_twin_division_tables(root: Path, report: Report, skills: dict[str, dic
             if rows is None:
                 report.add(
                     "27-twin-division-table",
-                    "WARN",
+                    house(),
                     f"Twin pair '{first}' <-> '{second}': '{name}' has no "
                     f"'Division of responsibilities' heading, so only '{twin}' documents the split.",
                     skills[name]["path"],
@@ -2599,7 +3044,7 @@ def check_twin_division_tables(root: Path, report: Report, skills: dict[str, dic
             if not any(owner == twin for _, owner in rows):
                 report.add(
                     "27-twin-division-row",
-                    "WARN",
+                    house(),
                     f"Twin pair '{first}' <-> '{second}': the table in '{name}' has no row owned by "
                     f"'{twin}', so a reader of '{name}' never learns what '{twin}' takes.",
                     skills[name]["path"],
@@ -2618,7 +3063,7 @@ def check_twin_division_tables(root: Path, report: Report, skills: dict[str, dic
             if seen and claimed and not (seen & claimed):
                 report.add(
                     "27-twin-division-text",
-                    "WARN",
+                    house(),
                     f"Twin pair '{first}' <-> '{second}': '{reader}' says '{subject}' owns "
                     f"'{sorted(seen)[0][:80]}' but '{subject}' words its own row as "
                     f"'{sorted(claimed)[0][:80]}'. The row naming the pair must read identically on both sides.",
@@ -2666,13 +3111,50 @@ def print_text_report(report: Report, tout: bool = False) -> None:
 
 # ancrage
 ANCHOR_SEVERITY = "WARN"   # ratchet: move to "ERROR" once this repository is at zero
+# The WHOLE path, never its tail. The first version opened on `\b(?:src|...)/`, and
+# `/` is not a word character, so there is a word boundary before every segment:
+# `.claude/skills/<skill>/scripts/measure.mjs` matched as `scripts/measure.mjs`, was
+# looked up from the root, and reported dead. Measured 2026-09-23 on one repository:
+# 10 dead anchors out of 10 were live paths cut in half - and the bug was there from
+# the first release that shipped this check, not introduced later. Absolute paths
+# are captured too, so they are reported as unverifiable instead of vanishing.
 ANCHOR_PATH_RE = re.compile(
-    r"\b(?:src|server|scripts|electron|docker|app|lib|packages|test|tests)"
-    r"/[A-Za-z0-9_./-]+\.[a-z]{2,4}\b"
+    r"(?<![\w./~$}-])((?:/|~/|(?:\.{1,2}/)*)(?:[\w.-]+/)*?"
+    r"(?:src|server|scripts|electron|docker|app|lib|packages|test|tests)"
+    r"/[A-Za-z0-9_./-]+\.[a-z]{2,4})\b"
 )
 ANCHOR_TEMPLATE_RE = re.compile(
     r"(MyPage|Feature|Example|Foo|Bar|YourThing|<[^>]+>|placeholder|xxx)", re.IGNORECASE
 )
+
+
+def git_ignored(root: Path):
+    """A predicate: is this repository-relative path ignored by git?
+
+    Asked of git itself rather than of a hand-written list of build folders: a
+    project that generates into `out/` or `.next/` is covered by its own
+    .gitignore. Only the repository's own rules count - never the user's global
+    excludes. Outside a git repository nothing is ignored.
+    """
+    import subprocess
+    cache: dict[str, bool] = {}
+    if not (root / ".git").exists():
+        return lambda rel: False
+
+    def ignored(rel: str) -> bool:
+        if rel not in cache:
+            try:
+                # The REPOSITORY's rules only: a user's global excludes file made the
+                # same commit read differently on two machines (measured 2026-09-23 -
+                # `**/.claude/settings.local.json` sat in ~/.config/git/ignore).
+                r = subprocess.run(["git", "-C", str(root), "-c", "core.excludesFile=",
+                                    "check-ignore", "-q", "--", rel],
+                                   capture_output=True, timeout=5)
+                cache[rel] = r.returncode == 0
+            except (OSError, subprocess.SubprocessError):
+                cache[rel] = False
+        return cache[rel]
+    return ignored
 
 
 def check_skill_anchors(root: Path, report: Report) -> None:
@@ -2689,6 +3171,8 @@ def check_skill_anchors(root: Path, report: Report) -> None:
     if not skills_dir.is_dir():
         return
     total = anchored = alive = dead = 0
+    unverifiable: list[str] = []
+    ignored = git_ignored(root)
     for skill_md in sorted(skills_dir.glob("*/SKILL.md")):
         total += 1
         name = skill_md.parent.name
@@ -2697,17 +3181,42 @@ def check_skill_anchors(root: Path, report: Report) -> None:
         except OSError:
             continue
         body = re.sub(r"^---\n.*?\n---\n", "", text, flags=re.S)
+        # The documented path variables name a base, not the filesystem root: read
+        # literally, `${CLAUDE_SKILL_DIR}/scripts/x.py` became the absolute path
+        # `/scripts/x.py`. Substituted to what they resolve to before extraction.
+        body = re.sub(r"\$\{?CLAUDE_SKILL_DIR\}?/", "./", body)
+        body = re.sub(r"\$\{?CLAUDE_(?:PROJECT_DIR|PLUGIN_ROOT)\}?/", "", body)
         refs = sorted(set(ANCHOR_PATH_RE.findall(body)))
+        fences = [(m.start(), m.end()) for m in re.finditer(r"```.*?```", body, re.S)]
         if not refs:
             continue
         anchored += 1
         for ref in refs:
-            if (root / ref).exists():
+            rel = ref[2:] if ref.startswith("./") else ref
+            # A path outside the repository, or one git ignores (`dist/`,
+            # `node_modules/`), is alive on a machine that built the project and dead
+            # on a fresh clone. Counting it either way makes the same commit give two
+            # counts - and a floor that moves with the machine is not a floor.
+            # An absolute path (`/home/<app>/infra/x.sh`) names the machine it runs on,
+            # not the repository: it cannot be checked from here either way.
+            if rel.startswith(("../", "/", "~/")) or ignored(rel):
+                unverifiable.append(f"{name}: {ref}")
+            elif (root / rel).exists():
                 alive += 1
-            elif (skill_md.parent / ref).exists():
+            elif (skill_md.parent / rel).exists():
                 alive += 1          # ${CLAUDE_SKILL_DIR}/... written relative in the body
             elif ANCHOR_TEMPLATE_RE.search(ref):
                 continue            # template / illustrative path
+            elif re.search(r"(?:e\.g\.|for example|such as|for instance)[\s,:(`]*$",
+                           body[max(0, body.find(ref) - 24):body.find(ref)], re.I):
+                unverifiable.append(f"{name}: {ref} (given as an example)")
+            elif any(a <= body.find(ref) < b for a, b in fences):
+                # A dead path inside a code block is ambiguous: an illustration of some
+                # other codebase, or a stale command. Measured on a calibration sample
+                # (2026-09-23): 42 of 45 dead anchors sat in example blocks of a kit
+                # whose skills describe the projects it is installed into. A live path
+                # there still counts; a dead one is not claimed either way.
+                unverifiable.append(f"{name}: {ref} (in an example block)")
             else:
                 dead += 1
                 report.add(
@@ -2724,6 +3233,16 @@ def check_skill_anchors(root: Path, report: Report) -> None:
             f"Falsifiability: {anchored}/{total} skills name at least one checkable path "
             f"({100 * anchored / total:.0f}%). Live anchors {alive}, dead {dead}. "
             "A skill that names nothing verifiable cannot be proven wrong - it can only rot quietly.",
+            str(skills_dir),
+        )
+    if unverifiable:
+        shown = ", ".join(unverifiable[:5]) + (f" (+{len(unverifiable) - 5})" if len(unverifiable) > 5 else "")
+        report.add(
+            "28-skill-anchors",
+            "INFO",
+            f"{len(unverifiable)} anchor(s) not verifiable from the repository - ignored by git "
+            f"or outside it, so their existence depends on the machine: {shown}. Counted neither "
+            "alive nor dead.",
             str(skills_dir),
         )
 
@@ -2854,14 +3373,17 @@ def check_skill_names(root: Path, report: Report, skills: dict[str, dict]) -> No
         # standard is worse than no rule: the reader learns it, and learns it wrong.
         # Kept as INFO, sourced honestly, because the concern is real - a name
         # carrying a vendor's is a poor name - but it is an opinion, not a rule.
+        # Corrected 2026-09-23: the open spec has no reserved word, but Anthropic's
+        # platform does - "Cannot contain reserved words: 'anthropic', 'claude'"
+        # (platform.claude.com, agent-skills best practices). Claude Code accepts the
+        # name; claude.ai and the Skills API refuse it. WARN: rejected somewhere real.
         hit = [t for t in RESERVED_NAME_TOKENS if t in declared.lower()]
         if hit:
             report.add(
-                "32-skill-name-reserved", "INFO",
-                f"Skill name `{declared}` contains `{', '.join(hit)}`. No specification "
-                "forbids this - checked against agentskills.io/specification, which lists "
-                "the `name` constraints in full. It is an opinion: a name carrying a "
-                "vendor's says who made the skill rather than when to use it.",
+                "32-skill-name-reserved", "WARN",
+                f"Skill name `{declared}` contains `{', '.join(hit)}`: Claude Code loads it, "
+                "but claude.ai and the Skills API reject reserved words in `name` "
+                "(platform.claude.com, agent-skills best practices).",
                 loc)
 
 
@@ -2926,15 +3448,43 @@ def check_description_overlap(root: Path, report: Report, skills: dict[str, dict
                 pairs.append((score, names[i], names[j]))
     pairs.sort(reverse=True)
 
+    # The overlap is a proxy; the defect is the model picking the wrong skill. The
+    # remedy this check recommends - each description excluding the other - is
+    # visible in the text, so the check must see it before firing. Measured
+    # 2026-09-23 on one repository: 8 of 9 flagged pairs already excluded each other
+    # both ways, all 16 references inside a "Don't use for" clause, and the ninth was
+    # the only real gap. Only an exclusion counts: a name mentioned as "see also"
+    # separates nothing.
+    def excludes(a: str, b: str) -> bool:
+        m = ANTI_TRIGGER_RE.search(listed[a])
+        return bool(m) and re.search(rf"(?<![\w-]){re.escape(b)}(?![\w-])",
+                                     listed[a][m.start():]) is not None
+
+    declared = 0
     for score, x, y in pairs:
-        report.add("33-description-overlap", "WARN",
-                   f"`{x}` and `{y}` overlap at {score:.2f} (threshold "
-                   f"{OVERLAP_THRESHOLD:.2f}). They compete for the same requests: give each an "
-                   "anti-trigger naming the other, or merge them.",
-                   str(root / SKILLS_DIR / x / "SKILL.md"))
+        xy, yx = excludes(x, y), excludes(y, x)
+        where = str(root / SKILLS_DIR / x / "SKILL.md")
+        if xy and yx:
+            declared += 1
+            report.add("33-description-overlap", "INFO",
+                       f"`{x}` and `{y}` overlap at {score:.2f}, and each excludes the other: "
+                       "separated by declaration, not measured. A selection eval on the pair "
+                       "would settle it.", where)
+        elif xy or yx:
+            src, dst = (y, x) if xy else (x, y)
+            report.add("33-description-overlap", "WARN",
+                       f"`{x}` and `{y}` overlap at {score:.2f}, and only one side draws the "
+                       f"line: `{src}` does not exclude `{dst}`. Add `{dst}` to `{src}`'s "
+                       "anti-trigger clause.", str(root / SKILLS_DIR / src / "SKILL.md"))
+        else:
+            report.add("33-description-overlap", "WARN",
+                       f"`{x}` and `{y}` overlap at {score:.2f} (threshold "
+                       f"{OVERLAP_THRESHOLD:.2f}). They compete for the same requests: give each an "
+                       "anti-trigger naming the other, or merge them.", where)
     report.add("33-description-overlap", "INFO",
                f"{len(pairs)} confusable pair(s) among {n} listed description(s) at threshold "
-               f"{OVERLAP_THRESHOLD:.2f}. Scored on the listing only - a withheld skill cannot "
+               f"{OVERLAP_THRESHOLD:.2f}, {declared} of them separated by mutual exclusion. "
+               "Scored on the listing only - a withheld skill cannot "
                f"steal an activation ({len(hidden)} excluded).", str(root / SKILLS_DIR))
 
 
@@ -3142,6 +3692,331 @@ def check_floor(root: Path, report: Report) -> int:
     return 0
 
 
+# --- Settings and permissions -----------------------------------------------
+def _rule_tool(rule: str) -> str:
+    return rule.split("(", 1)[0].strip()
+
+
+def check_settings_semantics(root: Path, report: Report) -> None:
+    """What a settings file says and the harness does not do - silently.
+
+    Every finding here is a line that looks like configuration and is not: a key
+    ignored at its scope, an allow rule that approves nothing, an approval a
+    cloned repository cannot grant itself. None of them produces an error at
+    runtime; the file simply means less than it says.
+    """
+    for name in ("settings.json", "settings.local.json"):
+        path = root / CLAUDE_DIR / name
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+            continue                      # 24-settings-parse already reports it
+        if not isinstance(data, dict):
+            continue
+        shared = name == "settings.json"
+        for key in sorted(data):
+            if key.startswith("$"):
+                continue
+            if key not in SETTINGS_KNOWN_KEYS:
+                report.add("24-settings-unknown-key", "INFO",
+                           f"'{key}' in '{name}' is not in the settings reference (231 keys, "
+                           "2026-09-23): a typo, or a key newer than this auditor.", str(path))
+                continue
+            barred = (SETTINGS_KEYS_MANAGED | SETTINGS_KEYS_USER_MANAGED | SETTINGS_KEYS_GLOBAL
+                      | (SETTINGS_KEYS_USER_LOCAL_MANAGED if shared else frozenset()))
+            if key in barred:
+                where = ("managed settings" if key in SETTINGS_KEYS_MANAGED else
+                         "~/.claude.json" if key in SETTINGS_KEYS_GLOBAL else
+                         "user settings" + ("" if key in SETTINGS_KEYS_USER_MANAGED
+                                            else " or .claude/settings.local.json"))
+                report.add("24-settings-scope", "ERROR",
+                           f"'{key}' in '{name}' is ignored at this scope, without a word: it "
+                           f"takes effect from {where} only (settings-reference, Scope).",
+                           str(path))
+            if shared and key in SETTINGS_PROJECT_IGNORED_FALSE and data[key] is False:
+                report.add("24-settings-scope", "ERROR",
+                           f"'{key}: false' in the shared settings.json is ignored: this opt-out "
+                           "applies from user, local or managed settings only (settings).",
+                           str(path))
+        if shared:
+            for key in ("enableAllProjectMcpServers", "enabledMcpjsonServers"):
+                if key in data:
+                    report.add("43-mcp-approval", "WARN",
+                               f"'{key}' is committed in the shared settings.json: a cloned "
+                               "repository cannot approve its own MCP servers until the workspace "
+                               "is trusted, and an approval shipped with the code is how "
+                               "CVE-2025-59536 worked. Approvals belong in settings.local.json.",
+                               str(path))
+            env = data.get("env")
+            if isinstance(env, dict):
+                for var in sorted(env):
+                    if SENSITIVE_ENV_RE.match(var):
+                        report.add("24-settings-env", "WARN",
+                                   f"'env.{var}' is set in the shared settings.json: every clone "
+                                   "sends its requests or credentials where this file says "
+                                   "(Check Point Research, CVE-2026-21852). Keep it in user or "
+                                   "local settings.", str(path))
+        else:
+            ign = git_ignored(root)
+            if (root / ".git").exists() and not ign(f"{CLAUDE_DIR}/settings.local.json"):
+                tracked = subprocess.run(["git", "-C", str(root), "ls-files", "--error-unmatch",
+                                          f"{CLAUDE_DIR}/settings.local.json"],
+                                         capture_output=True).returncode == 0
+                report.add("24-settings-local", "WARN",
+                           "settings.local.json " + ("is COMMITTED: everyone who clones gets "
+                           "these personal approvals and overrides" if tracked else
+                           "is not ignored by git: it holds personal approvals and overrides")
+                           + ", and Claude Code only adds it to .gitignore when it creates the "
+                           "file itself (settings).", str(path))
+
+        perms = data.get("permissions")
+        if isinstance(perms, dict):
+            lists = {k: [r for r in (perms.get(k) or []) if isinstance(r, str)]
+                     for k in ("allow", "ask", "deny")}
+            for rule in sorted(set(lists["allow"]) & (set(lists["deny"]) | set(lists["ask"]))):
+                report.add("42-permissions-conflict", "WARN",
+                           f"'{rule}' is both allowed and denied/asked in '{name}': deny, then ask, "
+                           "then allow - the allow entry never applies (permissions).", str(path))
+            for rule in lists["allow"]:
+                tool = _rule_tool(rule)
+                outside = re.sub(r"\([^)]*\)", "", rule)
+                if "*" in outside and not re.match(r"mcp__[A-Za-z0-9_-]+__", outside):
+                    report.add("42-permissions-rule", "ERROR",
+                               f"allow rule '{rule}' in '{name}' is an unanchored glob: it is "
+                               "skipped with a warning and approves nothing. Globs are accepted "
+                               "only after a literal `mcp__<server>__` prefix (permissions).",
+                               str(path))
+                    continue
+                if (tool not in KNOWN_TOOLS and tool not in TOOL_ALIASES
+                        and not tool.startswith("mcp__")):
+                    report.add("42-permissions-rule", "WARN",
+                               f"allow rule '{rule}' in '{name}' names no known tool: unlike a "
+                               "deny or ask rule, a mistyped allow rule raises no startup "
+                               "warning - it just approves nothing (permissions).", str(path))
+            for kind, rules in lists.items():
+                for rule in rules:
+                    if rule.startswith("mcp__") and "(" in rule:
+                        report.add("42-permissions-rule", "ERROR",
+                                   f"{kind} rule '{rule}' in '{name}': Claude Code skips any "
+                                   "`mcp__` rule that has parentheses when it loads a settings "
+                                   "file (permissions).", str(path))
+                    elif re.search(r":\*\s*\S", rule.split("(", 1)[-1].rstrip(")")):
+                        report.add("42-permissions-rule", "WARN",
+                                   f"{kind} rule '{rule}' in '{name}': `:*` is recognised only at "
+                                   "the end of a pattern; here the colon is literal and the rule "
+                                   "matches nothing it seems to (permissions).", str(path))
+
+        sl = data.get("statusLine")
+        if isinstance(sl, dict):
+            ri = sl.get("refreshInterval")
+            if isinstance(ri, (int, float)) and ri < 1:
+                report.add("24-settings-statusline", "ERROR",
+                           f"statusLine.refreshInterval is {ri} in '{name}': the minimum is 1 "
+                           "(statusline).", str(path))
+            for token in _hook_paths(str(sl.get("command", ""))):
+                resolved = token
+                for var in HOOK_PROJECT_DIR_VARS:
+                    resolved = resolved.replace(var, "")
+                resolved = resolved[2:] if resolved.startswith("./") else resolved.lstrip("/")
+                if not (root / resolved).exists():
+                    report.add("24-settings-statusline", "WARN",
+                               f"statusLine command in '{name}' runs '{token}', which does not "
+                               "exist: a status line that fails goes blank (statusline).",
+                               str(path))
+        style = data.get("outputStyle")
+        if isinstance(style, str) and style:
+            custom = {p.stem for d in (root / CLAUDE_DIR / "output-styles",)
+                      if d.is_dir() for p in d.glob("*.md")}
+            for d in (root / CLAUDE_DIR / "output-styles",):
+                if d.is_dir():
+                    for p in d.glob("*.md"):
+                        fm, _ = parse_frontmatter(p.read_text(encoding="utf-8", errors="replace"))
+                        if fm and fm.get("name"):
+                            custom.add(fm["name"].strip())
+            if style not in BUILTIN_OUTPUT_STYLES | custom:
+                near = [x for x in BUILTIN_OUTPUT_STYLES | custom if x.lower() == style.lower()]
+                if near or not custom:
+                    report.add("24-settings-output-style", "WARN" if near else "INFO",
+                               f"outputStyle '{style}' in '{name}' "
+                               + (f"differs from '{near[0]}' only by case: a value that does not "
+                                  "match exactly gives the Default style (output-styles)."
+                                  if near else "matches no built-in or project style - fine if "
+                                  "it is a user or plugin style."), str(path))
+
+
+# --- MCP ----------------------------------------------------------------------
+def check_mcp(root: Path, report: Report) -> None:
+    """Project MCP servers (`.mcp.json`): the configuration that holds secrets.
+
+    It is committed by design - shared with everyone who clones - which is what
+    makes a literal token in it a leak, and a credential variable in a URL a
+    header sent empty.
+    """
+    path = root / ".mcp.json"
+    if not path.is_file():
+        return
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        report.add("43-mcp-shape", "ERROR", f"'.mcp.json' is not valid JSON: {exc}", str(path))
+        return
+    servers = data.get("mcpServers") if isinstance(data, dict) else None
+    if not isinstance(servers, dict):
+        return
+    for srv, conf in sorted(servers.items()):
+        if not isinstance(conf, dict):
+            continue
+        if conf.get("url") and not conf.get("type"):
+            report.add("43-mcp-shape", "ERROR",
+                       f"MCP server '{srv}' has a url and no type: Claude Code skips it (mcp).",
+                       str(path))
+        if str(conf.get("type", "")).lower() == "sse":
+            report.add("43-mcp-shape", "INFO",
+                       f"MCP server '{srv}' uses the SSE transport, which is deprecated (mcp).",
+                       str(path))
+        blobs = [("url", conf.get("url"))]
+        blobs += [(f"headers.{k}", v) for k, v in (conf.get("headers") or {}).items()]
+        blobs += [(f"env.{k}", v) for k, v in (conf.get("env") or {}).items()]
+        blobs += [(f"args[{i}]", v) for i, v in enumerate(conf.get("args") or [])]
+        for where, val in blobs:
+            if not isinstance(val, str):
+                continue
+            if SECRET_LITERAL_RE.search(val) and "${" not in val:
+                report.add("43-mcp-secret", "WARN",
+                           f"MCP server '{srv}' {where} holds what looks like a literal "
+                           "credential in a file every clone receives. Reference an environment "
+                           "variable instead: \"${VAR}\" (mcp).", str(path))
+            if where == "url" or where.startswith("headers."):
+                m = MCP_EMPTY_CREDENTIAL_VARS.search(val)
+                if m:
+                    report.add("43-mcp-credential-var", "ERROR",
+                               f"MCP server '{srv}' {where} uses ${{{m.group(1)}}}: in a remote "
+                               "server's url and headers this name reads as EMPTY, whether set "
+                               "or not, and a :-default is ignored (mcp).", str(path))
+
+
+# --- Plugin manifest ----------------------------------------------------------
+PLUGIN_PATH_FIELDS = ("skills", "agents", "commands", "hooks", "mcpServers", "outputStyles",
+                      "lspServers")
+
+
+def check_plugin_manifest(root: Path, report: Report) -> None:
+    """What `claude plugin validate` does not say about a plugin's layout."""
+    cp = root / ".claude-plugin"
+    for d in ("skills", "agents", "hooks", "commands"):
+        if (cp / d).exists():
+            report.add("44-plugin-layout", "ERROR",
+                       f".claude-plugin/{d}/ is not loaded: component directories belong at the "
+                       "plugin root, not inside .claude-plugin/ (plugins-reference).",
+                       str(cp / d))
+    manifest = cp / "plugin.json"
+    try:
+        data = json.loads(manifest.read_text(encoding="utf-8")) if manifest.is_file() else {}
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+        return
+    for field in PLUGIN_PATH_FIELDS:
+        vals = data.get(field)
+        vals = vals if isinstance(vals, list) else [vals]
+        for v in vals:
+            if not isinstance(v, str):
+                continue
+            if not v.startswith("./"):
+                report.add("44-plugin-path", "ERROR",
+                           f"plugin.json '{field}': '{v}' - every component path must be relative "
+                           "and start with './' (plugins-reference).", str(manifest))
+                continue
+            try:
+                inside = (root / v).resolve().is_relative_to(root.resolve())
+            except (OSError, ValueError):
+                inside = True
+            if not inside:
+                report.add("44-plugin-path", "ERROR",
+                           f"plugin.json '{field}': '{v}' escapes the plugin directory, and that "
+                           "component does not load (plugins-reference).", str(manifest))
+    for field, folder in (("agents", "agents"), ("commands", "commands"),
+                          ("outputStyles", "output-styles"), ("workflows", "workflows"),
+                          ("themes", "themes")):
+        vals = data.get(field)
+        if vals is None or not (root / folder).is_dir():
+            continue
+        listed = {(root / v).resolve() for v in (vals if isinstance(vals, list) else [vals])
+                  if isinstance(v, str)}
+        stray = [p for p in (root / folder).glob("*.md")
+                 if p.resolve() not in listed and p.parent.resolve() not in listed]
+        if stray:
+            report.add("44-plugin-path", "WARN",
+                       f"plugin.json declares '{field}', which REPLACES the default {folder}/ "
+                       f"directory: {len(stray)} file(s) there are not loaded ({stray[0].name}...).",
+                       str(manifest))
+    market = cp / "marketplace.json"
+    if market.is_file() and data.get("version"):
+        try:
+            entries = json.loads(market.read_text(encoding="utf-8")).get("plugins") or []
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError, AttributeError):
+            entries = []
+        for e in entries:
+            if (isinstance(e, dict) and e.get("name") == data.get("name")
+                    and e.get("version") and e["version"] != data["version"]):
+                report.add("44-plugin-version", "WARN",
+                           f"marketplace.json says {e['version']}, plugin.json says "
+                           f"{data['version']}: Claude Code always uses plugin.json, without a "
+                           "warning (plugins-reference).", str(market))
+
+
+# --- Commands, rules, CLAUDE.md companions -----------------------------------
+def check_companions(root: Path, report: Report, skills: dict[str, dict]) -> None:
+    """Files beside the configuration that change what it means."""
+    cmd_dir = root / CLAUDE_DIR / "commands"
+    if cmd_dir.is_dir():
+        for p in sorted(cmd_dir.rglob("*.md")):
+            if p.stem in skills:
+                report.add("45-command-shadowed", "WARN",
+                           f"commands/{p.name} and the skill '{p.stem}' share a name: the skill "
+                           "wins, and the command never runs (skills).", str(p))
+            fm, _ = parse_frontmatter(p.read_text(encoding="utf-8", errors="replace"))
+            for key in ("name", "paths"):
+                if fm and key in fm:
+                    report.add("45-command-shadowed", "WARN",
+                               f"commands/{p.name} sets '{key}', which a command file does not "
+                               "support (skills, 'Command files').", str(p))
+    rules_dir = root / CLAUDE_DIR / "rules"
+    if rules_dir.is_dir():
+        for p in sorted(rules_dir.rglob("*.md")):
+            text = p.read_text(encoding="utf-8", errors="replace")
+            for key in frontmatter_keys(text):
+                if key != "paths":
+                    report.add("14-rule-unknown-field", "WARN" if key in ("globs", "path", "glob") else "INFO",
+                               f"Rule '{p.name}' sets '{key}': `paths` is the only field a rule "
+                               "reads" + (" - `globs:` is Cursor's name for it" if key == "globs"
+                                          else "") + " (memory).", str(p))
+    ign = git_ignored(root)
+    local = root / "CLAUDE.local.md"
+    if local.is_file() and (root / ".git").exists() and not ign("CLAUDE.local.md"):
+        report.add("01-claude-local", "WARN",
+                   "CLAUDE.local.md is not ignored by git: it holds personal, per-machine "
+                   "instructions, and committed it becomes everyone's (memory).", str(local))
+    md = claude_md_path(root)
+    if md.is_file():
+        body = strip_code_fences(md.read_text(encoding="utf-8", errors="replace"))
+        body = re.sub(r"`[^`]*`", "", body)
+        # The `@` must open the token: `@./node_modules/@scope/pkg/AGENTS.md` is one
+        # import, and a second `@` inside the path was read as a second one.
+        for m in re.finditer(r"(?<![\w./@-])@((?:~/|\.{0,2}/)?[\w./@-]+\.[A-Za-z0-9]+)\b", body):
+            ref = m.group(1)
+            if ref.startswith("~/") or ref.startswith("/"):
+                continue                  # outside the repository: approval dialog, unverifiable
+            rel = ref[2:] if ref.startswith("./") else ref
+            if ign(rel):
+                continue                  # generated or installed (node_modules/): machine-dependent
+            target = (md.parent / ref)
+            if not target.exists() and not (root / ref).exists():
+                report.add("01-claude-md-import", "WARN",
+                           f"CLAUDE.md imports '@{ref}', which does not exist - the import "
+                           "resolves relative to the importing file (memory).", str(md))
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Audit Claude configuration.")
     parser.add_argument("--root", default=".", help="Repository root (default: cwd)")
@@ -3174,6 +4049,8 @@ def main(argv: list[str]) -> int:
     global ENGLISH_ONLY_EXEMPT
     _local = load_local_config(root)
     ENGLISH_ONLY_EXEMPT = exemption_paths(_local, "11-english-only")
+    global PROFILE
+    PROFILE = "house" if str(_local.get("profile", "")).strip().lower() == "house" else "doc"
     report = Report()
     # Before any check runs: a moved threshold must move for EVERY check that
     # reads it, not only for the ones that happen to run afterwards.
@@ -3254,6 +4131,10 @@ def main(argv: list[str]) -> int:
     run(check_skill_names, root, report, skills)
     run(check_description_overlap, root, report, skills)
     run(check_unloadable_skills, root, report)
+    run(check_settings_semantics, root, report)
+    run(check_mcp, root, report)
+    run(check_plugin_manifest, root, report)
+    run(check_companions, root, report, skills)
 
     apply_overlay(report, _local, root)
     floor_rc = check_floor(root, report) if args.check_floor else 0

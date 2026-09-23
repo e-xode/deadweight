@@ -110,7 +110,10 @@ Each report ends with the number of check groups it ran. Check ids are stable (s
 | **Whether it loads** | configuration Claude Code never reads | skills outside a loaded location (`40`), withheld skills nothing points at (`15`), `name` not matching its folder |
 | **Whether skills compete** | two descriptions close enough to steal each other's triggers | description overlap, missing anti-triggers |
 | **Whether it can be shown wrong** | claims nothing can refute | skills naming no checkable path, eval suites that cannot fail or cannot run |
-| **Plugin packaging** | a plugin that routes to what it does not ship | manifest, routing to foreign skills, hook shapes and timeouts |
+| **What executes** | hooks that never fire, or fire with the wrong budget | unknown events, `if` on a non-tool event, bare `mcp__<server>` matchers, per-event timeouts |
+| **What is silently ignored** | settings and permissions that look active and do nothing | keys outside their scope, allow rules naming no tool, a rule both allowed and denied |
+| **What leaks** | credentials in files every clone receives | literal tokens in `.mcp.json`, credential variables read as empty, committed MCP approvals, routing `env` |
+| **Plugin packaging** | a plugin that ships what does not load | components inside `.claude-plugin/`, paths without `./`, fields replacing a default directory, version drift |
 
 It recognises the container before judging it: a **project** (`.claude/`), a **plugin** (manifest,
 or `skills/` at the root without one), a **marketplace**, a **library** of skills kept at the root,
@@ -144,6 +147,11 @@ One file, in **your** project, never in the plugin:
   }
 }
 ```
+
+**House conventions.** Some checks encode this plugin's own conventions rather than Anthropic's
+documentation — each is listed, with its source and its evidence, in
+[`evals/CONVENTIONS.md`](evals/CONVENTIONS.md). By default they report as INFO, naming what
+Anthropic documents instead. `"profile": "house"` in the overlay turns them into warnings.
 
 `reason` and `date` are required: an exemption without a reason is a decision nobody can review,
 and one without a date is a decision nobody can age out. `severity` is optional and accepts only

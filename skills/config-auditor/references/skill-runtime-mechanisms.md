@@ -8,283 +8,292 @@
 
 # Skill runtime mechanisms
 
-Contents: [Frontmatter fields](#frontmatter-fields) · [Portability outside Claude Code](#portability-outside-claude-code) · [Path-scoped skills](#path-scoped-skills) · [Listing visibility and the budget](#listing-visibility-and-the-budget) · [Skill content lifecycle](#skill-content-lifecycle) · [Running a skill as a subagent](#running-a-skill-as-a-subagent) · [Skills as slash commands](#skills-as-slash-commands) · [Discovery and precedence](#discovery-and-precedence) · [Measuring the real cost](#measuring-the-real-cost) · [Bundled skill collisions](#bundled-skill-collisions) · [Settings scope](#settings-scope--a-key-that-is-silently-ignored)
+Verified against the docs on 2026-09-23 (Claude Code 2.1.280).
 
-What Claude Code actually supports for skills, and which of it this project has adopted. Verified
-2026-09-03 against Claude Code 2.1.259, the `code.claude.com/docs/en/skills` page and the Agent
-Skills spec.
+Contents: [Frontmatter fields](#frontmatter-fields) · [Portability outside Claude Code](#portability-outside-claude-code) · [Path-scoped skills](#path-scoped-skills) · [Listing visibility and the budget](#listing-visibility-and-the-budget) · [Skill content lifecycle](#skill-content-lifecycle) · [Running a skill as a subagent](#running-a-skill-as-a-subagent) · [Skills as slash commands](#skills-as-slash-commands) · [Discovery and precedence](#discovery-and-precedence) · [Bundled skills](#bundled-skills) · [Measuring the real cost](#measuring-the-real-cost) · [Settings scope](#settings-scope--a-key-that-is-silently-ignored)
+
+What Claude Code actually does with a skill. Unless marked **measured** or **house convention**,
+every statement comes from [code.claude.com/docs/en/skills](https://code.claude.com/docs/en/skills)
+(cited by section). Authoring rules live in [skill-anatomy.md](./skill-anatomy.md).
 
 ## Frontmatter fields
 
 | Number | What it caps | Source |
 | --- | --- | --- |
-| **1,024** | `description` **alone** — hard cap of the Agent Skills spec. Past it, upload and packaging fail. | [platform.claude.com — agent-skills/best-practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices) |
-| **1,536** | `description` **+** `when_to_use` **combined** — truncation in the skill listing, nothing else. | [code.claude.com — skills](https://code.claude.com/docs/en/skills) |
+| **1,024** | `description` **alone** — Agent Skills spec cap; past it, upload and packaging fail. | [platform best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices) |
+| **1,536** | `description` **+** `when_to_use` combined — listing truncation only, set by `skillListingMaxDescChars`. | skills § Frontmatter reference |
 
-Two mechanisms, two documents, two pages. **Author against 1,024.** A 1,200-character description
-passes the listing and still hard-fails on upload. Table added 2026-09-20: two readers had confused
-the two figures that day, one of them the author of this doctrine.
+Author against 1,024 (`04-skill-description-length`). In Claude Code every field is optional:
+`name` defaults to the folder name, and a missing `description` falls back to "the first non-empty
+line of the markdown content". Booleans accept `yes/no/on/off/1/0` as well as `true/false` since
+2.1.218 ([changelog](https://code.claude.com/docs/en/changelog)).
 
-Every field is optional; only `description` is recommended, and it falls back to the first markdown
-paragraph when omitted. `name` is capped at 64 characters (lowercase letters, digits and hyphens)
-and must match the folder; `description` is capped at **1,024 characters by the Agent Skills spec**.
-The 1,536-character figure is a different thing entirely — the _listing_ cap on `description` +
-`when_to_use` combined, set by `skillListingMaxDescChars`. Booleans accept `yes/no/on/off/1/0` as
-well as `true/false` since v2.1.218.
+The documented table carries **twenty fields** (skills § Frontmatter reference):
 
-The documented table carries **twenty fields**. This project takes a position on the ones marked.
+| Field | Effect |
+| --- | --- |
+| `name` | Display label. For a personal or project skill the **typed command comes from the folder name**; only plugin skills take it from `name`. |
+| `description` | The trigger surface. Put the key use case first — the listing truncates. |
+| `when_to_use` | Extra trigger text, appended to `description` in the listing and counted against the **same** 1,536 cap: readability, never budget. |
+| `argument-hint` | Autocomplete hint, e.g. `[order-id]`. |
+| `arguments` | Named positional arguments for `$name` substitution, in order. |
+| `disable-model-invocation: true` | Only the user can invoke it. The description leaves the model's context. Also blocks `skills:` preload and, since 2.1.196, firing from a scheduled task. |
+| `user-invocable: false` | Only Claude can invoke it: hidden from the `/` menu, typed `/name` does not run it. The description stays in context. |
+| `allowed-tools` | Pre-approves tools for the turn that invokes the skill; clears on the next user message. Restricts nothing. **Not gated by workspace trust** (skills § Pre-approve tools). |
+| `disallowed-tools` | Removes tools from the pool while the skill is active (2.1.152); clears on the next user message. The only skill-level restriction. |
+| `model` | Model for the rest of the current turn (with `context: fork`, the forked subagent's). Accepts `inherit`. 2.1.259 fixed it being ignored in interactive sessions. |
+| `effort` | `low` … `max` while the skill is active; overrides the session level. |
+| `context: fork` | Runs the skill as a subagent; the body becomes the prompt. |
+| `agent: <type>` | With `context: fork`, the executing agent type. |
+| `background: false` | With `context: fork`, waits for the result in the invoking turn (default `true`, 2.1.218+). |
+| `hooks` | Registers hooks when the skill is invoked, for the rest of the session. |
+| `paths` | Glob patterns that limit automatic activation. See [below](#path-scoped-skills). |
+| `shell` | `bash` (default) or `powershell` for `` !`command` `` injection. |
+| `metadata` | Free-form map for your own tooling; Claude Code ignores its contents and drops a non-map value. |
+| `license` | Spec field; accepted, not acted on. |
+| `compatibility` | Spec field (≤ 500 chars); accepted, not acted on. |
 
-| Field                            | Effect                                                                                                                                                                                                                                                   |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`                           | Display label in listings. For a personal or project skill the **typed command comes from the folder name**, not from this field; only plugin skills take their command from `name`.                                                                     |
-| `description`                    | The trigger surface. Spec cap 1,024 chars. Put the key use case first — the listing truncates.                                                                                                                                                           |
-| `when_to_use`                    | A second trigger field (phrases, example requests). Appended to `description` in the listing and counted against the **same** 1,536-char cap, so it buys readability, never budget.                                                                      |
-| `argument-hint`                  | Autocomplete hint, e.g. `[issue-number]`.                                                                                                                                                                                                                |
-| `arguments`                      | Named positional arguments for `$name` substitution, in order.                                                                                                                                                                                           |
-| `disable-model-invocation: true` | Only the user can invoke the skill, with `/name`. **The description leaves the model's context entirely** — the strongest budget lever, and the only one that also removes the name. Also blocks `skills:` preload and (2.1.196+) scheduled-task firing. |
-| `user-invocable: false`          | Only Claude can invoke it. The description stays in context; the skill disappears from the `/` menu.                                                                                                                                                     |
-| `allowed-tools`                  | Pre-approves the listed tools for the turn that invokes the skill. Clears on the next user message. Does **not** restrict anything.                                                                                                                      |
-| `disallowed-tools`               | Removes tools from the pool while the skill is active (2.1.152). Also clears on the next user message. The only skill-level restriction.                                                                                                                 |
-| `model`                          | Model override while the skill is active, for the rest of the current turn (with `context: fork`, sets the forked subagent's model instead). Accepts `inherit`. **2.1.259 fixed `model:` being ignored in interactive sessions.**                        |
-| `effort`                         | `low` / `medium` / `high` / `xhigh` / `max` while the skill is active; overrides the session level.                                                                                                                                                      |
-| `context: fork`                  | Runs the skill as a subagent; the SKILL.md body becomes the prompt.                                                                                                                                                                                      |
-| `agent: <type>`                  | With `context: fork`, picks the executing agent type. Defaults to `general-purpose`.                                                                                                                                                                     |
-| `background: false`              | With `context: fork`, waits for the result in the invoking turn instead of backgrounding it (default `true` since 2.1.218).                                                                                                                              |
-| `hooks`                          | Registers session-lifetime hooks when the skill is invoked; supports `once: true`. Available, **not adopted** — core rule 10.                                                                                                                            |
-| `paths`                          | Glob patterns scoping _automatic_ activation; same syntax as path-scoped rules. See below.                                                                                                                                                               |
-| `shell`                          | `bash` (default) or `powershell` for `` !`command` `` injection.                                                                                                                                                                                         |
-| `metadata`                       | Free-form YAML map for external tooling. Claude Code ignores its contents and drops a non-map value.                                                                                                                                                     |
-| `license`                        | Spec field; accepted, not acted on.                                                                                                                                                                                                                      |
-| `compatibility`                  | Spec field (≤ 500 chars); accepted, not acted on.                                                                                                                                                                                                        |
+Frontmatter is read only when the opening `---` is the file's first line. Malformed YAML loads the
+body "with empty metadata": `/name` works, description matching does not; `claude plugin validate
+.claude/skills` finds such files (2.1.233+) (skills § Skill not triggering). **Measured, not
+documented** (2026-09-23, 2.1.280): an unknown key is silently ignored — `claude plugin validate` passed a probe
+carrying one. `02-skill-frontmatter`, `02-skill-unknown-field`.
 
-Frontmatter is only read when the opening `---` is the file's very first line. Otherwise the whole
-file — markers included — is treated as skill body.
-
-Skill edits are picked up **live**: Claude Code watches `~/.claude/skills/`, the project
-`.claude/skills/` and any `--add-dir` skills directory and applies `SKILL.md` text changes without a
-restart. A brand-new top-level skills directory needs a restart; a skill folder that is _also_ a
-plugin needs `/reload-plugins` for its `hooks/`, `.mcp.json`, `agents/` and `output-styles/` changes.
+Edits are picked up **live** under `~/.claude/skills/`, the project `.claude/skills/` and an
+`--add-dir` skills directory — `SKILL.md` text only; a skill folder that is also a plugin needs
+`/reload-plugins` for its `hooks/`, `.mcp.json`, `agents/` and `output-styles/` (skills § Edit a
+skill during a session).
 
 ## Portability outside Claude Code
 
-Claude Code accepts all twenty fields. Everything else does not: claude.ai skill uploads, the Skills
-API and `package_skill.py` accept only the spec's six — `name`, `description`, `license`,
-`compatibility`, `metadata`, `allowed-tools` — and **fail with a hard error**, not a warning, on any
-other key (`Unexpected key(s) in SKILL.md frontmatter: …`). A skill that must stay portable therefore
-cannot carry `paths`, `when_to_use`, `model`, `effort` or `disable-model-invocation`. Nothing in this
-project is distributed that way today, so the constraint costs nothing here — but it is the reason
-the vendored `skill-creator` keeps its frontmatter to the spec subset.
+claude.ai uploads, the Skills API and `package_skill.py` accept only the spec's six fields — `name`,
+`description`, `license`, `compatibility`, `metadata`, `allowed-tools` — and **fail with a hard
+error** on any other key: `Unexpected key(s) in SKILL.md frontmatter: …` (skills § Using skill
+frontmatter outside Claude Code). A skill meant to travel there cannot carry `paths`,
+`when_to_use`, `model`, `effort` or `disable-model-invocation`, and its `` !`command` `` injections
+do not run. Those targets also require `name` and `description`, forbid XML in both, and reject
+`anthropic`/`claude` in `name`
+([platform best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)).
 
 ## Path-scoped skills
 
-`paths:` limits _automatic_ activation to files matching the globs, using the same syntax and the
-same brace-expansion budget as `.claude/rules/` (see [rules-anatomy.md](./rules-anatomy.md)). It
-promises a skill boundary that is mechanical instead of semantic — the direct answer to two skills
-whose descriptions both plausibly match one request. **Measured twice, it does not deliver that.**
-This project piloted it and then removed it; no skill here carries `paths:` today.
+**Doc.** `paths` takes globs in the path-specific-rules format; "When set, Claude loads the skill
+automatically only when working with files matching the patterns" (skills § Frontmatter
+reference). The docs say nothing about the listing.
 
-**Measured 2026-09-03, Claude Code 2.1.259, headless `claude -p` sessions** (socket pair +
-`shop-js-style` carrying `paths:`, sandbox copy of the config with probe files):
+**Measured, 2026-09-23, Claude Code 2.1.280** (2 runs per branch, all concordant):
 
-- A `paths:`-scoped skill is **absent from the listing — name and description** — while no matching
-  file is in play. It is therefore a fourth budget lever, and a hard one.
-- It is **not invocable by name** either: the Skill tool answers `Unknown skill: shop-js-style`.
-- Reading or editing a matching file (`src/server/socket.probe.js`, `scripts/probe.mjs`) injected the
-  path-scoped **rules** as usual but **no skill body**, and the skill stayed unlisted for the rest of
-  the turn. A prose question in the skill's domain ("which STATUS codes exist?") went unanswered: the
-  model reported the skill "was not surfaced this turn".
-  **Measured 2026-09-09, interactive Claude Code session, Opus 5 (1M context), against the live
-  project config — not a sandbox.** This is the one branch the headless run could not reach, since a
-  `-p` run has no next turn:
+| Situation | Is the scoped skill offered? |
+| --- | --- |
+| Session start (`init` event) | **No** — absent, name and description |
+| After reading a file **outside** the globs | **No** |
+| After reading a file **matching** the globs | **Yes** |
 
-- `Read` on `server.js` — a file matching `shop-js-style`'s `paths:` globs — injected the path-scoped
-  **rules** `js-code-style` and `api-security` exactly as expected, and **no skill body**.
-- On the **next** user turn the skill was still not offered: `Skill(shop-js-style)` answered
-  `Unknown skill: shop-js-style`. There is no deferred next-turn offer; touching a matching file
-  changes nothing about the skill's availability, in that turn or the one after.
+What that means:
 
-Verdict, no longer conditional: `paths:` is a **withholding mechanism in both headless and
-interactive modes** — never a scoping or disambiguation one, and never a routing lever. The socket
-pair had it removed on 2026-09-03 (its inventory is asked for in prose and must stay discoverable).
+- `paths:` **takes a skill out of the starting listing**: it is not paid for on turns where no
+  matching file is in play. That is a budget effect, and `audit.py` counts a non-empty `paths:`
+  among the withholding levers for that reason (`15-skill-index` then expects the skill in the
+  `CLAUDE.md` skills index).
+- It does **not** make the skill unreachable: touching a matching file brings it in, as the doc
+  says.
+- It is still **not a disambiguation lever**. Two skills scoped to the same globs both come in
+  once a matching file is read; `paths:` only decides *when* they compete.
+- Keep it off skills whose trigger is a **question** rather than a file (`shop-lore`,
+  `content-strategy`): they may be needed before any file is touched. House convention.
 
-**Closed 2026-09-09: `paths:` was removed from `shop-js-style` as well, and no skill in the measured
-project carries it any more.** The pilot delivered none of the three things it was set up
-to deliver — no automatic load, no invocation by name, no listing presence — while costing the skill
-its whole discoverable trigger surface; and rule `.claude/rules/js-code-style.md` already fires
-deterministically on the same globs, so `paths:` bought nothing the rule did not already provide.
-The accepted price of reverting is that the skill's 449-char description re-enters the
-always-loaded listing budget — in the project where this was measured, near 41,100 chars against
-a 43,000 ratchet.
+An earlier measurement on 2.1.259 concluded that a `paths:` skill was withheld and never loaded.
+**It is obsolete**: re-measure on every Claude Code upgrade before relying on either answer.
 
-`scripts/audit.py` still counts a non-empty `paths:` as a withholding lever, deliberately: if anyone
-adds one again, the "every withheld skill must be named in the `CLAUDE.md` Skills index" check fires
-instead of the skill going silently unreachable.
+**Protocol.** In a scratch repository, create two probe skills, identical except that one carries
+`paths: ["src/checkout/**"]` (the control has none), plus `src/checkout/cart.js` and
+`docs/notes.md`. Then:
 
-**Before trusting `paths:` again** — a future Claude Code release could change its behaviour — re-run
-the two-step check that produced this verdict: (1) in a fresh session, confirm whether the scoped
-skill appears in the listing and whether `Skill(<name>)` resolves; (2) read or edit a matching file,
-then on the **next** user turn try `Skill(<name>)` again. Both steps must pass before `paths:` is
-treated as anything other than a fourth budget lever. Independently of the outcome, keep it off
-advisory skills (`shop-lore`, `marketing-*`, `content-strategy`, `shop-art-direction`), whose trigger
-is a question, not a file.
+1. `claude -p "<prompt>" --output-format stream-json --verbose` and read the `skills` array of the
+   first `{"type":"system","subtype":"init"}` event: the control is listed, the scoped probe is not.
+2. Prompt a read of `docs/notes.md` (outside the globs), then ask whether the scoped probe is
+   available / invoke it by name: it is not.
+3. Prompt a read of `src/checkout/cart.js` (matching), then the same question: it is.
+
+Run each branch at least twice; a single run is an anecdote.
 
 ## Listing visibility and the budget
 
-Every visible skill's name and description are injected into the system prompt each turn. The
-listing "always contains every skill name"; when it overflows, **Claude Code drops descriptions
-starting with the skills you invoke least, so the skills you use most keep their full text**
-(verbatim, `docs/en/skills` § "Skill descriptions are cut short", re-fetched 2026-09-03). This
-corrects the alphabetical-cliff conclusion recorded in case study CS-6, and it settles a
-disagreement between the two 2026-09-03 research sweeps: one found the rule on the skills page, the
-other found no official statement. The page states it.
+Every listed skill's name and description are injected on every turn. "The listing always contains
+every skill name"; the budget "scales at 1% of the model's context window", and on overflow
+"Claude Code drops descriptions starting with the skills you invoke least, so the skills you use
+most keep their full text" (skills § Skill descriptions are cut short). Degradation, not a cliff.
 
-Three levers size that budget:
+| Lever | Unit | Default |
+| --- | --- | --- |
+| `skillListingBudgetFraction` | fraction of context window | docs: **1 %**; changelog 2.1.32 shipped "2 % of context" |
+| `SLASH_COMMAND_TOOL_CHAR_BUDGET` | fixed character count | unset |
+| `skillListingMaxDescChars` | chars per entry | 1,536 (`description` + `when_to_use`) |
 
-| Lever                            | Unit                       | Default                                                                                  |
-| -------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------- |
-| `skillListingBudgetFraction`     | fraction of context window | docs say **1 %**; changelog 2.1.32 (2026-02-05) shipped "**2 % of context**" — see below |
-| `SLASH_COMMAND_TOOL_CHAR_BUDGET` | fixed character count      | unset                                                                                    |
-| `skillListingMaxDescChars`       | chars per entry            | 1,536 (`description` + `when_to_use`), stated in prose, not rendered as a default        |
+The two sources for the fraction disagree, and the budget is set against a token window while the
+override counts characters. **Never extrapolate headroom from the fraction — measure it**
+(`/doctor`, `/context`). `29-listing-budget-derived` reports a derived ceiling and says how
+optimistic it is; `30-plugin-cost` reports what a plugin's own descriptions cost every consumer.
 
-The two sources for the fraction genuinely disagree, and the unit is ambiguous on top of that: the
-budget is expressed against a context window measured in tokens while the override env var counts
-characters. **Never extrapolate a headroom figure from the fraction.** Measure it.
+`skillOverrides` in settings controls visibility without editing the skill (skills § Override skill
+visibility from settings). It does **not** apply to plugin skills — manage those through `/plugin`.
 
-`skillOverrides` in settings controls visibility per skill without editing the skill file, which
-matters for anything checked into a shared repo. It does **not** apply to plugin skills.
+| Value | Listed to Claude | In the `/` menu |
+| --- | --- | --- |
+| `"on"` (default) | Name and description | yes |
+| `"name-only"` | Name only | yes |
+| `"user-invocable-only"` | **Hidden — name too** | yes |
+| `"off"` | **Hidden — name too** | hidden |
 
-| Value                   | Listed to Claude     | In the `/` menu |
-| ----------------------- | -------------------- | --------------- |
-| `"on"` (default)        | Name and description | yes             |
-| `"name-only"`           | Name only            | yes             |
-| `"user-invocable-only"` | Hidden               | yes             |
-| `"off"`                 | Hidden               | hidden          |
+So three settings remove the **name** as well as the description: `disable-model-invocation: true`,
+`"user-invocable-only"` and `"off"`. `"name-only"` is the only lever that keeps the name. `"off"`
+also hides the skill from Remote Control and Agent SDK command lists (2.1.199+).
 
-The `/skills` menu writes `skillOverrides` to `.claude/settings.local.json`. This project keeps it
-in the tracked `.claude/settings.json` instead, so the decision is shared and reviewable.
+The `/skills` menu writes `skillOverrides` to `.claude/settings.local.json`. **House convention:**
+keep it in the tracked `.claude/settings.json`, so the decision is shared and reviewable
+(`24-settings-skill-overrides` checks every entry names an existing skill).
 
-`scripts/audit.py` reads both mechanisms and reports the **effective** listing cost alongside the
-raw character total. A skill withheld from the listing costs nothing per turn but also cannot be
-discovered semantically — so every withheld skill must be named in the `CLAUDE.md` Skills index and
-reachable through an explicit pointer. The audit enforces that pairing.
-
-Since **2.1.222** a `disable-model-invocation` skill also fails safer: instead of paraphrasing the
-workflow from memory, Claude asks the user to run the skill. That removes the failure mode that
-made withholding feel risky.
+A withheld skill costs nothing per turn and cannot be discovered semantically, so **house
+convention** requires every withheld skill to be named in the `CLAUDE.md` skills index and reached
+through an explicit pointer — `15-skill-index`. Since 2.1.222, when Claude tries to invoke a
+`disable-model-invocation` skill it is told to ask the user to run it instead of replicating the
+workflow ([changelog](https://code.claude.com/docs/en/changelog)).
 
 ## Skill content lifecycle
 
-Invoked skill content enters the conversation as one message and stays for the session; Claude Code
-does not re-read the file on later turns. Write guidance that must hold throughout a task as
-standing instructions, not one-time steps.
+Invoked content enters the conversation as one message and stays for the session; the file is not
+re-read on later turns — write guidance that must hold as standing instructions (skills § Skill
+content lifecycle). An `allowed-tools` grant does not persist: it clears on the next message.
 
-Auto-compaction re-attaches only **the first 5,000 tokens of each invoked skill**, within a
-**25,000-token combined budget** filled most-recent-first, so older skills can be dropped whole.
-Two consequences the doctrine leans on:
+Auto-compaction re-attaches the most recent invocation of each skill, keeping **the first 5,000
+tokens** of each, within a **25,000-token combined budget** filled most-recent-first — older skills
+can be dropped whole. Consequences:
 
-- **Truncation keeps the start of the file.** Whatever sits past ~5,000 tokens (≈ 20 KB of prose)
-  silently stops applying after the first compaction. Front-load the rules; put the encyclopedia in
-  `references/`.
-- **Skill _descriptions_ are not reloaded after compaction** — only invoked bodies are. A skill that
-  was never invoked before the compaction is not re-advertised.
+- **Truncation keeps the start.** Past ~5,000 tokens (≈ 20 KB of prose) a body silently stops
+  applying after the first compaction: front-load the rules. `21-skill-md-compaction`.
+- **Descriptions are not what is re-attached** — invoked bodies are.
 
-Re-invoking a skill whose rendered content is already in context adds a short note rather than a
-second copy. A user can stack skills at the start of one message: Claude Code expands the first
-skill plus **up to five more** (six in total), stopping at the first token that is not an inline
-user-invocable skill.
+Re-invoking a skill whose rendered content is identical adds a short note, not a second copy. A
+user can stack skills at the start of one message: the first plus **up to five more** expand,
+stopping at the first token that is not an inline user-invocable skill (skills § Pass arguments).
 
 ## Running a skill as a subagent
 
-`context: fork` and a subagent's `skills:` field are inverses of the same mechanism:
+`context: fork` and a subagent's `skills:` field are inverses (skills § Run skills in a subagent):
 
-| Approach                   | System prompt        | Task                        | Also loads                                     |
-| -------------------------- | -------------------- | --------------------------- | ---------------------------------------------- |
-| Skill with `context: fork` | from the agent type  | the SKILL.md body           | CLAUDE.md, unless the agent is Explore or Plan |
-| Subagent with `skills:`    | the agent's own body | Claude's delegation message | preloaded skill content + CLAUDE.md            |
+| Approach | System prompt | Task | Also loads |
+| --- | --- | --- | --- |
+| Skill with `context: fork` | from the agent type | the SKILL.md content | CLAUDE.md per the agent's startup context (Explore and Plan skip it) |
+| Subagent with `skills:` | the agent's own body | Claude's delegation message | preloaded skill content + CLAUDE.md |
 
-`context: fork` only makes sense for a skill that states an actionable task. A skill that is pure
-guidance ("use these conventions") forks into an agent with no work to do.
-
-A skill carrying `disable-model-invocation: true` **cannot** be preloaded via `skills:` — preloading
-draws from the same pool Claude can invoke. Agents that need such a skill must read its `SKILL.md`
-by path.
+`context: fork` only makes sense for a skill that states a task; pure guidance forks into an agent
+"without meaningful output". The fork does not see the conversation history. In `-p` mode, and when
+a scheduled task fires it, Claude Code waits for the result even without `background: false`. A
+`disable-model-invocation` skill **cannot** be preloaded via `skills:` — an agent that needs it
+reads its `SKILL.md` by path.
 
 ## Skills as slash commands
 
-`.claude/commands/` has been merged into skills: a skill is invocable as `/name`, and `$ARGUMENTS`
-carries whatever the caller passed. This project has no `.claude/commands/` directory and does not
-need one. Available substitutions include `$ARGUMENTS`, `$ARGUMENTS[N]`, `$N`, `$name`,
-`${CLAUDE_SKILL_DIR}`, `${CLAUDE_PROJECT_DIR}` and `${CLAUDE_SESSION_ID}`.
+`.claude/commands/` still works but is the older format; a skill is invocable as `/name`, and a
+skill wins over a command file of the same name (`45-command-shadowed`). Available substitutions
+(skills § Available string substitutions):
+
+| Placeholder | Expands to |
+| --- | --- |
+| `$ARGUMENTS`, `$ARGUMENTS[N]`, `$N` | all arguments, or one by position |
+| `$name` | a named argument declared in `arguments` |
+| `${CLAUDE_SKILL_DIR}` / `${CLAUDE_PROJECT_DIR}` | the skill's folder / the project root |
+| `${CLAUDE_SESSION_ID}` | the session id |
+| `${CLAUDE_EFFORT}` | the current effort level (`low` … `max`) |
+| `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_PLUGIN_DATA}` | plugin skills only: the install directory / the persistent data directory that survives updates |
+
+When arguments are passed but **no placeholder receives one**, Claude Code appends
+`ARGUMENTS: <value>` to the end of the content. The directory variables are also substituted in
+`allowed-tools` Bash rules, which lets a skill pre-approve its own bundled script.
+
+`` !`<command>` `` runs before the content reaches Claude and is replaced by its output. **A failed
+command aborts the whole invocation** — Claude never sees the skill — with `Shell command failed
+for pattern "..."`; any non-zero exit fails except exit 1 from search and comparison commands.
+Append `|| true` to a check that exits 1 on findings (skills § When an injected command fails).
 
 ## Discovery and precedence
 
-Enterprise overrides personal, personal overrides project, and any of them overrides a bundled
-skill of the same name — **but not that bundled skill's aliases**. The docs' own example: a project
-`code-review` skill replaces the bundled `/code-review`, yet typing the alias `/review` never
-reaches it.
+Skills are found **by location**: enterprise, personal (`~/.claude/skills/`), project
+(`.claude/skills/` in the start directory and every parent up to the repository root), nested,
+`--add-dir`, plugin (`<plugin>/skills/`), and claude.ai-synced (skills § Choose where skills load).
+A `SKILL.md` anywhere else loads nowhere — `40-skill-not-loaded`.
 
-⚠️ **Live consequence here, to verify at runtime.** This project ships a skill named `review`, and
-`/review` is the bundled `code-review`'s alias. Typing `/review` may therefore reach the bundled
-skill rather than the project one. The Skill tool can still select `review` by name, and the
-`review` **agent** is unaffected — only the typed slash command is in doubt. Confirm with `/review`
-in a fresh session before relying on it; if it resolves upstream, either invoke the project skill
-by tool name or rename it.
+Nested `.claude/skills/` directories below the start directory load the first time Claude reads or
+edits a file there; until then they are neither listed nor invocable. A clashing nested skill is
+offered as `/<subdir>:<name>`.
 
-Plugin skills are namespaced `plugin-name:skill-name` and cannot collide. Where a skill and a
-`.claude/commands/` file share a name, the skill wins.
+When two skills share a name (skills § Resolve skills that share a name):
 
-Nested `.claude/skills/` directories below the working directory are also discovered: a skill in
-`apps/web/.claude/skills/` is offered as `apps/web:deploy` and applies when Claude works on files in
-that subtree. Not used here — the repo is single-package — but it is the answer if it ever splits.
+| Same name in | Which one runs |
+| --- | --- |
+| Two of enterprise, personal, project | enterprise over personal over project |
+| One of those and a bundled skill | yours replaces the bundled command, **but not its aliases** |
+| A skill and a `.claude/commands/` file | the skill |
+| A plugin skill and any other | both, since plugin skills are namespaced `plugin:name` |
+| Anything and a claude.ai-synced skill | the other one; the synced skill stays reachable as `/anthropic-skills:<name>` |
+
+The alias carve-out is the trap: a project `code-review` skill replaces `/code-review`, yet "the
+bundled alias `/review` never runs your skill". A project skill named after a bundled alias is
+therefore not what the typed alias reaches — invoke it through the Skill tool, or rename it
+(`shop-review`). Against a synced skill, names compare ignoring case, spacing and dash variants.
+
+## Bundled skills
+
+Claude Code ships prompt-based bundled skills (`/code-review`, `/doctor`, `/loop`, `/claude-api`,
+…), listed beside project skills and changing with every release (skills § Bundled skills). A
+bundled skill **can** be hidden from the project side: `disableBundledSkills: true` turns them all
+off, and a `skillOverrides` entry set to `"off"` hides one — the documented example is
+`"doctor": "off"`.
+
+Typical collisions, in the fictional shop:
+
+| Bundled skill | Competes with | How it shows |
+| --- | --- | --- |
+| `code-review` (alias `/review`) | a project `review` skill | the typed `/review` reaches the bundled one |
+| `claude-api` | an `api-<vendor>` skill named after a model vendor | vendor terms appear in every related prompt, so both match |
+| `run` | a `shop-preview` skill that launches the storefront | two paths to the running app, one blind to the project's conventions |
+
+Mitigations: name the bundled competitor in the project skill's `Don't use for:` clause; qualify
+arrows that mean "delegate to an agent" (`→ ui-design agent`) so a pointer never resolves to a
+bundled skill; or hide the bundled one with `skillOverrides`. Re-read the bundled listing at each
+audit — it is not stable.
 
 ## Measuring the real cost
 
-`audit.py` counts characters statically. It cannot see what the harness injected. The audit method
-requires a runtime pass after any change to the listing — see `SKILL.md` § Audit Step 2 for the full
-command set (`/doctor`, `/context all`, `/skills`, `/usage`, `/skill-doctor`, `--safe-mode`). The
-releases that introduced them, so a missing command is read as version drift rather than as a wrong
-name: `/skills` 2.1.111, `/context all` 2.1.139, `/usage` 2.1.149, `claude --safe-mode` 2.1.169,
-`/doctor` 2.1.206, `/skill-doctor` 2.1.247 (early access, enabled on this account).
+`audit.py` counts characters statically; it cannot see what the harness injected. After any change
+to the listing, a runtime pass is required — see `SKILL.md` § Audit Step 2. Documented tools and
+their minimum versions, so a missing command reads as version drift rather than a wrong name:
+
+| Tool | What it shows | Minimum | Source |
+| --- | --- | --- | --- |
+| `/doctor` | estimated listing cost and its biggest contributors | bundled skill since 2.1.205 | skills § Bundled skills |
+| `/context` | per-category context use, per-skill estimates | — | [context-window](https://code.claude.com/docs/en/context-window) |
+| `/skill-doctor` | per-skill cost and usage, to pick what to turn off | **2.1.252** | skills § Find unused skills |
+| `claude plugin validate <dir>` | `SKILL.md` files whose frontmatter does not parse | 2.1.233 | skills § Skill not triggering |
+| `claude --safe-mode` | a session with every customization disabled, as a baseline | 2.1.169 | [changelog](https://code.claude.com/docs/en/changelog) |
+| `--debug` | the listing-overflow warning, YAML parse errors | — | skills § Skill descriptions are cut short |
 
 If the runtime figures disagree with the audit's effective total, trust the runtime and reconcile
 the script.
 
-Measured 2026-09-03 with `/context` on a 1M-token-context model, 51 listed project skills: Skills row
-10.2k tokens (≈ 7.3k project descriptions + ≈ 2.9k bundled skills), every listed description present —
-no truncation at the 2.5 % fraction, and none expected at the 1 % default (≈ 10k tokens); custom
-agents 2.8k; `CLAUDE.md` + memory files 5.6k; system tools 17.3k; deferred MCP pool 60.9k (loaded on
-demand, not resident). The always-loaded ratchet (43,000 chars ≈ 10.7k tokens) therefore sits at
-about one percent of the window on this model — the ratchet is a discipline, not a cliff. It is a
-**project** ratchet: no equivalent aggregate exists upstream, the nearest analogue being the
-15,000-token combined-agent-description startup warning ([agent-anatomy.md](./agent-anatomy.md)).
-
-## Bundled skill collisions
-
-The harness lists its own bundled skills beside the project's, and four of them overlap project
-names or triggers (found in the 2026-09-16 listing):
-
-| Bundled skill                                  | Collides with                         | How it shows                                                                         |
-| ---------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------ |
-| `design` (Claude Design canvas)                | the `design` **agent**                | a bare `→ design` arrow now names two things                                         |
-| `code-review` / `simplify` / `security-review` | the `review` skill and agent          | "review this diff" has a project-aware and a convention-blind candidate              |
-| `claude-api`                                   | any project skill named after a vendor | a vendor term appears in nearly every prompt about that vendor, so both always match |
-| `run` (launch / screenshot / confirm the app)  | `visual-qa` and the never-verify rule | a second path to the running app that bypasses the request-gated verification agents |
-
-Mitigations, all on the project side because a bundled skill cannot be withheld from here:
-
-- Arrows that mean "delegate to an agent" carry the `agent` qualifier (`→ design agent`,
-  `→ translate agent`), so a pointer never resolves to a bundled skill by accident.
-- A project description that competes with a bundled skill names it in its anti-trigger clause
-  (a vendor-named project skill renamed to `api-vendor`; a bare `review` renamed to `shop-review`).
-- The collision is documented, not fought: the bundled listing changes with every CLI release, so
-  re-read it at each audit and update this table.
+**House convention.** `17-always-loaded-budget` caps `CLAUDE.md` + listed skill descriptions +
+agent descriptions at 43,000 / 47,000 chars. No aggregate of that kind exists upstream — the
+nearest is the combined agent-description startup warning described in
+[agent-anatomy.md](./agent-anatomy.md). On a 1M-token window it sits near one percent of the
+context: a discipline that keeps the listing reviewable, not a cliff.
 
 ## Settings scope — a key that is silently ignored
 
-`permissions.defaultMode` is **ignored at project scope** since **2.1.257 (2026-09-01)**, exactly
-like the value `"auto"`. It has to be set in user or managed settings, or passed as
-`--permission-mode`. A fresh clone therefore inherits nothing from a repository that declares it.
+Since **2.1.257**, `permissions.defaultMode: "bypassPermissions"` in `.claude/settings.json` or
+`.claude/settings.local.json` is **ignored**, like `"auto"` before it; set it in user or managed
+settings, or pass `--permission-mode` ([changelog](https://code.claude.com/docs/en/changelog)).
+Other `defaultMode` values still apply at project scope. `24-settings-default-mode` flags the two
+dead values.
 
 *A key that no longer does what it says is worse than an absent one* — it reads as a posture and
-produces none. See [antipatterns.md](./antipatterns.md) G1. Measured on one fleet, 2026-09-20:
-three repositories still carried the dead key, unnoticed since the version bump.
+produces none. See [antipatterns.md](./antipatterns.md) G1.

@@ -1,219 +1,298 @@
-<!-- The worked examples in this file (skill names like `shop-ssr`, `api-socket`,
-     `ui-scss`) describe one fictional project: an online shop, Node SSR, with a
-     design system, a socket API and a content team. It is invented, and it is
-     deliberately not `foo`/`bar`: a model learns from the SHAPE of an example, and a
-     placeholder with no domain teaches nothing about naming, scoping or overlap.
-     Where only the structure matters, the examples use <angle-bracket> placeholders
-     instead, which cannot rot into dead references. -->
+<!-- The worked examples in this file (agent names like `shop-review`, `api-socket`,
+     `ui-scss`, `data-i18n`) describe one fictional project: an online shop, Node SSR,
+     with a design system, a socket API and a content team. It is invented, and it is
+     deliberately not a pair of meaningless placeholders: a model learns from the SHAPE
+     of an example, and a name with no domain teaches nothing about naming, scoping or
+     overlap. Where only the structure matters, the examples use <angle-bracket>
+     placeholders instead, which cannot rot into dead references. -->
 
 # Sub-agent anatomy
 
-Contents: [Folder and file](#folder-and-file) · [Frontmatter](#frontmatter) · [Sub-agent contract (non-negotiable)](#sub-agent-contract-non-negotiable) · [Current agent fleet (14 agents)](#current-agent-fleet-14-agents) · [What a sub-agent actually receives](#what-a-sub-agent-actually-receives) · [Model resolution](#model-resolution) · [Agent teams — off, and why](#agent-teams--off-and-why) · [Advisory agents](#advisory-agents) · [Coherence with `CLAUDE.md`](#coherence-with-claudemd) · [When to create a new sub-agent (vs. extending one)](#when-to-create-a-new-sub-agent-vs-extending-one) · [Anti-patterns specific to agents](#anti-patterns-specific-to-agents)
+Verified against the docs on 2026-09-23 (Claude Code 2.1.280).
 
-Verified 2026-09-03 against Claude Code 2.1.259.
+Contents: [How to read this page](#how-to-read-this-page) · [Folder and file](#folder-and-file) · [Frontmatter](#frontmatter) · [Tools](#tools) · [Permission mode](#permission-mode) · [Model resolution](#model-resolution) · [What a sub-agent receives](#what-a-sub-agent-receives) · [Foreground and background](#foreground-and-background) · [Agents shipped by a plugin](#agents-shipped-by-a-plugin) · [Agent teams](#agent-teams) · [The delegation message](#the-delegation-message) · [House conventions](#house-conventions) · [When to create a new sub-agent](#when-to-create-a-new-sub-agent) · [Anti-patterns](#anti-patterns)
 
-Partially re-verified 2026-09-20, at the source, on these points only: the 1,024-character cap on `description` (agent-skills/best-practices), the 1,536-character listing truncation of `description` + `when_to_use` (skills), the hook event catalogue and the semantics of `SessionStart` (hooks), and the behaviour of `disable-model-invocation` (skills). **Everything else on this page still carries the 2026-09-03 date** — it was not re-checked.
+## How to read this page
 
+Every statement carries one of three registers:
+
+- **doc** — stated by an official page, linked where it is used. Sources: [sub-agents], [agent-teams],
+  [tools-reference], [permissions], [sdk-subagents].
+- **measured** — produced by running something; the command is named.
+- **house convention** — this plugin's own rule, with its reason. `audit.py` reports these as WARN,
+  never ERROR: a convention is an opinion, and an audit must not dress an opinion as a spec.
+
+`audit.py` check identifiers are given in brackets, e.g. `[23-agent-tools]`.
 
 ## Folder and file
 
 ```
-.claude/agents/<agent-name>.md
+.claude/agents/<agent-name>.md        project scope
+~/.claude/agents/<agent-name>.md      user scope
 ```
 
-- **One file per agent.** Flat directory preferred.
-- **`<agent-name>` is kebab-case** and matches the frontmatter `name`.
-- Listed in **one place** in `CLAUDE.md`: the `## Agents directory` table (mandatory, enforced both ways by `scripts/audit.py`).
+All doc, [sub-agents]:
+
+- **Priority** when two scopes define the same `name`: managed settings > `--agents` CLI flag >
+  project `.claude/agents/` > user `~/.claude/agents/` > a plugin's `agents/`.
+- **Subfolders are scanned recursively** (`agents/review/`, `agents/research/`). The path does not
+  affect identity; identity comes only from `name`. In a plugin, by contrast, a subfolder becomes part
+  of the scoped identifier.
+- **The filename does not have to match `name`.** Keeping them equal is a readability habit, not a rule.
+- **Duplicate `name` in the same tree**: one file is loaded, chosen by filesystem read order — no
+  documented precedence. `[08-agent-frontmatter]` warns.
+- **A `:` in `name`** is reserved for plugin-scoped identifiers: since 2.1.218 the file is not loaded,
+  and the error goes only to the debug log. `[08-agent-frontmatter]` reports it as ERROR.
+- A frontmatter that does not parse can be found with `claude plugin validate .claude/agents`.
+
+`[08-agents-dir]` notes a missing `.claude/agents/`; `[08-agent-frontmatter]` requires valid YAML with
+`name` and `description` (the only two required fields).
 
 ## Frontmatter
 
 ```yaml
 ---
-name: hooks
-description: '<single string — same rules as a skill description>'
-tools: Bash
-model: haiku
+name: shop-review
+description: '<when to delegate here, and when not - same rules as a skill description>'
+tools: Read, Grep, Glob
+model: sonnet
 ---
 ```
 
-### The seventeen fields
+### The eighteen fields
 
-Only `name` and `description` are required. Claude Code documents seventeen; the ones this project
-has a position on are marked.
+Doc, [sub-agents]. A key outside this list is **ignored without an error** — `[23-agent-frontmatter-keys]`
+reports it, because a typo such as `tool:` silently widens the agent to every tool.
 
-| Field                                  | Used here | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| -------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`                                 | yes       | Lowercase + hyphens, no `:` (reserved for plugin scoping). Must match the row in `CLAUDE.md`. Hooks receive it as `agent_type`.                                                                                                                                                                                                                                                                                                                                                                                  |
-| `description`                          | yes       | Same discriminating + pushy + anti-trigger rules as skills; 80–900 chars (audit-warned), paid every turn from the always-loaded budget.                                                                                                                                                                                                                                                                                                                                                                          |
-| `tools`                                | yes       | Allowlist. Restrict to the minimum. **Quote nothing you cannot justify from the body**: an unused grant is an unenforced boundary.                                                                                                                                                                                                                                                                                                                                                                               |
-| `disallowedTools`                      | no        | Denylist applied _before_ `tools` resolves. Composes with inheritance — often cleaner than a maximal allowlist. Accepts `mcp__<server>` patterns.                                                                                                                                                                                                                                                                                                                                                                |
-| `model`                                | yes       | `sonnet`, `opus`, `haiku`, `fable`, a full model ID, or `inherit` (the default). Tier to the judgement the work needs, not to its importance.                                                                                                                                                                                                                                                                                                                                                                    |
-| `effort`                               | no        | `low` … `max`, independent of model tier. Reach for this before promoting an agent a whole tier.                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `skills`                               | **yes**   | Preloads the **full body** of the named skills at startup. Prefer this over restating a skill inside the agent body — see the anti-patterns below.                                                                                                                                                                                                                                                                                                                                                               |
-| `memory`                               | **no**    | `user` / `project` / `local`. `project` writes to `.claude/agent-memory/<name>/` and injects that file's first 200 lines / 25 KB into the agent's system prompt. Documented; **recommendation: decline**. An advisory agent already persists its rulings into its skill's `references/`, and a second store is a second source of truth — one written by the agent and read by nothing else. |
-| `permissionMode`                       | no        | `default` (labelled _Manual_ in the UI) / `acceptEdits` / `auto` / `dontAsk` / `bypassPermissions` / `plan`. There is **no separate `manual` value** — an earlier note here said otherwise. A parent in `bypassPermissions` or `acceptEdits` wins and cannot be overridden. Ignored on plugin agents.                                                                                                                                                                                                            |
-| `maxTurns`                             | no        | Hard stop on agentic turns (2.1.246+). Output is marked _partial_ and the agent is resumable with `SendMessage`. The cheapest runaway guard for a loop that can fail to converge — `svg-artist` and `sfx-designer` run render-critique-refine loops and are the obvious candidates.                                                                                                                                                                                                                              |
-| `isolation`                            | no        | `worktree` gives the agent its own checkout off the default branch, auto-cleaned when unchanged; Bash/PowerShell/Monitor are confined to it. Only worth it for a parallel fan-out that mutates the same files — the one-writer-per-file rule already prevents that case here.                                                                                                                                                                                                                                    |
-| `hooks`                                | **no**    | Agent-scoped lifecycle hooks (`Stop` becomes `SubagentStop`; they live only while the agent runs). Available, deliberately not adopted — see core rule 10 and case study CS-8. Ignored on plugin agents.                                                                                                                                                                                                                                                                                                         |
-| `background`                           | no        | Force background execution. Backgrounding is already the interactive default since v2.1.198 — but **not in `-p` / SDK runs, where subagents run in the foreground with the full tool set**.                                                                                                                                                                                                                                                                                                                      |
-| `experimental`                         | no        | `cacheTtl: 5m` or `1h` (v2.1.248) — a per-agent prompt cache. A 14-agent fleet re-pays a cold cache on every dispatch; `1h` is a one-line change, billed at a higher cache-write rate and ignored on usage credits.                                                                                                                                                                                                                                                                                              |
-| `color`, `initialPrompt`, `mcpServers` | no        | Display colour, auto-submitted first turn when run as the main agent, per-agent MCP scoping (`mcpServers` ignored on plugin agents).                                                                                                                                                                                                                                                                                                                                                                             |
+| Field | What the doc says | Note |
+| --- | --- | --- |
+| `name` | Required. Lowercase + hyphens; hooks receive it as `agent_type`. | See [Folder and file](#folder-and-file). |
+| `description` | Required. When Claude should delegate here. | Combined custom descriptions over **15,000 tokens** trigger a startup warning. `[08b-agent-description]`: 80–900 chars and an anti-trigger clause (house convention: the description is the only routing signal, and it is paid every turn). |
+| `tools` | Optional; inherits every tool available to sub-agents if omitted. | See [Tools](#tools). `[23-agent-tools]` |
+| `disallowedTools` | Removed from the inherited or listed set. | An entry with a specifier (`Bash(git push *)`) still removes the **whole** tool. |
+| `model` | `sonnet`, `opus`, `haiku`, `fable`, `inherit`, or a full model id. | See [Model resolution](#model-resolution). `[23-agent-model]` |
+| `permissionMode` | `default`, `acceptEdits`, `auto`, `dontAsk`, `bypassPermissions`, `plan`, or `manual`. | See [Permission mode](#permission-mode). `[23-agent-permission-mode]` |
+| `maxTurns` | Hard stop; output marked partial (2.1.246+), resumable. | The cheapest guard on a loop that can fail to converge. |
+| `skills` | Preloads the **full content** of the named skills at startup. | Controls preloading, **not access** — see [Tools](#tools). `[23-agent-skills-preload]` |
+| `mcpServers` | Server names or inline definitions scoped to this agent. | Inline servers from a project agent load only once the folder is trusted. |
+| `hooks` | Lifecycle hooks scoped to the agent; `Stop` becomes `SubagentStop`. | Project-agent hooks are **skipped until the folder is trusted**; a `-p` session does not count as trusted. |
+| `memory` | `user`, `project` or `local`: a persistent directory; first 200 lines / 25 KB of its `MEMORY.md` injected. | **Automatically enables `Read`, `Write`, `Edit`** — see [Anti-patterns](#anti-patterns). |
+| `background` | `true` keeps the agent in the background even when Claude asks for foreground. | See [Foreground and background](#foreground-and-background). |
+| `omitClaudeMd` | `true` launches without user/project/local CLAUDE.md (managed policy still loads). 2.1.271+. | Ignored when the agent runs as the main session via `--agent`. |
+| `effort` | `low`, `medium`, `high`, `xhigh`, `max`; overrides the session level. | Try this before promoting an agent a whole model tier (house convention: effort is cheaper to reverse). |
+| `isolation` | `worktree`: a temporary git worktree branched from the default branch, cleaned up if unchanged. | Worth it only for parallel writers on the same files. |
+| `color` | Display colour in the task list and transcript. | — |
+| `initialPrompt` | First user turn when the agent runs as the main session (`--agent`). | — |
+| `experimental` | A map; `cacheTtl: 5m` or `1h` sets this agent's prompt-cache lifetime. | Must sit inside the map, not at top level. `1h` is ignored while on usage credits. |
 
-**Upstream description budget.** Combined agent descriptions over **15,000 tokens** trigger a
-startup warning. That is the only aggregate limit Anthropic publishes anywhere near this project's
-always-loaded ratchet; the fleet's ~7 KB of descriptions sit around 12 % of it. Keep descriptions
-short and move detail into the body — the project's own 80–900-char rule is the stricter proxy.
+## Tools
 
-**Structural validation.** `claude plugin validate --strict --json .claude/agents` would parse agent
-frontmatter with upstream's own parser, but measured on 2.1.259 (2026-09-03) it inspects nothing on a
-bare directory — `success: true`, empty `contents`. `audit.py` check 23 (tools, `skills:` targets,
-`model`) is the structural check until a manifest-bearing wrapper exists; re-test after upgrades.
+All doc unless marked.
 
-### Tool-name accuracy
+**Vocabulary.** The valid names are those of [tools-reference] (46 at the date above). This page does
+not copy the list — it would rot. `[23-agent-tools]` checks every `tools` entry against it: an entry
+that resolves to nothing is dropped (WARN); if **no** entry resolves, the agent fails to launch (ERROR).
+Parameterised forms (`Bash(git diff *)`) and `mcp__*` names are accepted.
 
-The fan-out tool is **`Agent`**. There is no `Task` tool. The environment does expose
-`TaskStop`/`TaskOutput` tools, but those manage background tasks (`Bash run_in_background`, named
-background agents/monitors) — they are not sub-agent fan-out and do not contradict this. An entry
-that resolves to nothing is
-dropped, and if _nothing_ in the list resolves the agent refuses to launch. Restrict which types an
-agent may spawn with `Agent(<type>)`.
+**`Task` is `Agent`.** The fan-out tool was renamed `Agent` in 2.1.63; `Task(...)` in agent
+definitions and settings still works as an alias ([sub-agents]). `[23-agent-tools]` reports it as INFO.
+In the SDK the tool still appears as `"Task"` in the `system:init` list ([sdk-subagents]).
 
-`AskUserQuestion`, `EnterPlanMode`, `ExitPlanMode`, `EndConversation`, `ScheduleWakeup`,
-`TaskOutput`, `WaitForMcpServers` and `Workflow` are removed from every sub-agent, and `Agent`
-itself is stripped at the spawn-depth limit — an agent cannot ask the user anything, so its prompt
-must be self-sufficient.
+**`TaskOutput` — the docs disagree.** [tools-reference] lists it as *deprecated in favor of `Read` on
+the task's output file path*; [permissions] calls it one of "the tools Claude Code has removed". Either
+way, do not grant it. `[23-agent-tools]` reports it as deprecated (INFO).
 
-A **background** sub-agent (the interactive default) keeps only this built-in set: `Read`, `Grep`,
-`Glob`, `Bash`, `PowerShell`, `Edit`, `Write`, `NotebookEdit`, `WebFetch`, `WebSearch`, `TodoWrite`,
-`Skill`, `ToolSearch`, `EnterWorktree`, `ExitWorktree`, `Monitor`, `TaskStop`, `SendMessage` — plus
-every MCP tool. The same definition therefore resolves to different tools in the foreground and the
-background, so never build a contract on a tool outside that set. In `-p` / SDK runs the question
-does not arise: subagents run foreground with the full set.
+**Removed from every sub-agent**, even when listed ([sub-agents]): `AskUserQuestion`, `EndConversation`,
+`EnterPlanMode`, `ScheduleWakeup`, `WaitForMcpServers`, `Workflow`; `ExitPlanMode` **unless**
+`permissionMode: plan`; `Agent` at the spawn-depth limit (3 layers by default,
+`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`). A sub-agent cannot ask the user anything: its prompt must be
+self-sufficient.
 
-## Sub-agent contract (non-negotiable)
+**Background set.** A background sub-agent keeps every MCP tool but only these built-ins: `Read`,
+`Grep`, `Glob`, `LSP` (2.1.280+), `Bash`, `PowerShell`, `Edit`, `Write`, `NotebookEdit`, `WebFetch`,
+`WebSearch`, `TodoWrite`, `Skill`, `ToolSearch`, `EnterWorktree`, `ExitWorktree`, `Monitor`, `TaskStop`,
+`SendMessage`, `Artifact`, plus `SubagentHandback` for an agent that reports through it. The removal is
+silent. **The same definition resolves to different tools in the foreground and the background**, so a
+contract built on a tool outside this set holds only half the time.
 
-1. **Scoped work.** The orchestrator gives the agent a precise scope. The agent does that work and nothing more. Out-of-scope discoveries are **reported, not acted on**.
-2. **No validation** (single exception: the `hooks` agent). Sub-agents never run `npm test/build/lint/format`. Validation is centralised on the `hooks` agent invoked by the orchestrator at task end.
-3. **No code comments** in produced output (`.vue`/`.js`/`.mjs`/`.scss`/`.css`), same as the rest of the project.
-4. **Structured return.** What was done / which files were modified / blockers encountered / suggested follow-ups.
-5. **Self-contained prompts.** When the orchestrator launches a fleet (multiple sub-agents in parallel), each prompt is complete — sub-agents do not share context with each other.
+**`Agent(<type>)` restricts nothing in a sub-agent.** The type allowlist applies only to an agent run as
+the main thread with `claude --agent`. In a sub-agent definition, `Agent` lets it spawn (within the depth
+limit) and **the list in parentheses is ignored**. `[23-agent-tools]` warns. Consequence: an exception
+like "`shop-review` may fan out, but only to `shop-review` workers" can be held **only by the prompt**,
+not by the frontmatter.
 
-## Current agent fleet (14 agents)
+**`skills` is not an access control.** Without it the agent can still discover and invoke project, user
+and plugin skills through `Skill`. To forbid skills, omit `Skill` from `tools`. A skill carrying
+`disable-model-invocation: true` cannot be preloaded — `[23-agent-skills-preload]` warns, and also warns
+when a preloaded name has no `SKILL.md` in the repository.
 
-The roster, scopes, and delegation triggers live in `CLAUDE.md` § Agents directory — the single
-source of truth, kept in sync with `.claude/agents/` by `scripts/audit.py`. Only the
-anatomy-relevant differentiators are recorded here:
+## Permission mode
 
-- **Model tiers** (read from `.claude/agents/*.md` frontmatter, 2026-09-09) — `haiku` for the two
-  mechanical runners, `hooks` and `release`; `opus` for the three that must judge a rendered or
-  audible result, `svg-artist`, `sfx-designer` and `visual-qa`; `sonnet` for the other nine
-  (`content`, `deploy`, `design`, `lore`, `marketing`, `review`, `server`, `translate`, `vue`). The
-  advisory agents (`lore`, `marketing`) are **sonnet**: their output is prose anchored in their own
-  skill's `references/`, not an artefact that has to be looked at to be graded.
-- **Tool envelopes** — read-only agents (`review`, `visual-qa`) carry no write tools; advisory
-  agents (`lore`, `marketing`) write only their skill's `references/`; `hooks` runs `Bash` alone.
-- **Delegation shape** — `review` alone ships the `Agent` tool, for its sanctioned fan-out, and
-  spawns `review` workers so the read-only envelope survives one level down (see anti-patterns).
+Doc, [sub-agents]:
 
-## What a sub-agent actually receives
+- Unset → the agent inherits the main conversation's mode.
+- Parent in `bypassPermissions`, `acceptEdits` or `auto` → the agent runs in **that** mode, and its own
+  `permissionMode` is ignored.
+- Parent in `default`, `dontAsk` or `plan` → the agent's mode applies, **except** `bypassPermissions`:
+  since 2.1.267 an agent that declares it keeps the main conversation's mode instead.
+- `manual` is an alias of `default` (2.1.200+).
 
-A non-fork sub-agent starts with a fresh context containing its own system prompt (the markdown
-body), the orchestrator's delegation message, **the whole CLAUDE.md hierarchy**, a git-status
-snapshot, and the full content of any skill named in `skills:`. It does **not** see the
-conversation, the files already read, or the skills already invoked.
-
-The built-in `Explore` and `Plan` agents are the only ones that skip CLAUDE.md and git status. A
-rule that must reach them has to be restated in the delegation prompt.
-
-Practical consequences for writing an agent body:
-
-- Do not restate CLAUDE.md hard rules. Every custom agent already loads them.
-- Do restate anything the agent must not infer from its own domain skill.
-- Concurrency: 20 running sub-agents per session (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`), nested
-  spawn depth 3 (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`, raised from 1 in 2.1.219). There is no cap
-  on how many agents may be _defined_.
-- A finished agent can be resumed with `SendMessage`; `Explore` and `Plan` cannot.
-- Sub-agents inherit the session's extended-thinking setting; there is no per-agent switch.
-- **`/rewind` does not restore a background sub-agent's edits.** Checkpoints cover the main
-  session's file-editing tools only. With a background-by-default fleet, git is the only undo —
-  which is why the no-auto-commit rule never means no-branch.
+`[23-agent-permission-mode]` warns on an unknown value and on `bypassPermissions` (it no longer does
+what it says).
 
 ## Model resolution
 
-Highest wins: an explicit per-spawn model → the definition's `model:` → `CLAUDE_CODE_SUBAGENT_MODEL`
-→ the main session model.
+Doc, [sub-agents]. First match wins:
 
-**The order reversed on 2026-08-28 (v2.1.251).** `CLAUDE_CODE_SUBAGENT_MODEL` used to override the
-definition; it is now only a _default_, and the frontmatter wins. All 14 agents pin `model:`, so
-they win either way — **no action needed**, but the inverse held for any reasoning recorded before
-that date. `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1` (2.1.257) overrides everything, frontmatter
-included; if an agent ever runs on an unexpected tier, check that variable before editing the file.
+1. the model Claude passes for that spawn;
+2. the definition's `model:` (`inherit` = the main conversation's model);
+3. `CLAUDE_CODE_SUBAGENT_MODEL`;
+4. the main conversation's model.
 
-## Agent teams — off, and why
+`CLAUDE_CODE_SUBAGENT_MODEL` is therefore a **default**, not an override (it came first before 2.1.251).
+To force one model everywhere, set `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`; then every definition's `model`
+is ignored. If an agent runs on an unexpected model, check those two variables before editing the file.
 
-`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` turns subagents into teammates: flat peers with a shared
-task list and mailboxes. It is experimental, off by default, interactive-only, and Anthropic's own
-docs warn it uses significantly more tokens.
+**A family alias follows the parent.** When the main conversation's model belongs to the alias's family,
+`model: opus` resolves to the parent's **exact** model, `[1m]` suffix included — not to the version the
+alias points to. An alias in `CLAUDE_CODE_SUBAGENT_MODEL` always resolves to the aliased version.
+Extended thinking is inherited from the session; there is no per-agent switch.
 
-**Do not enable it on this repo.** Two documented behaviours would break the fleet contract:
+## What a sub-agent receives
 
-1. **A named subagent silently launches as a teammate** while the flag is on. Every delegation in
-   this project names its agent type.
-2. **Teammates ignore a definition's `skills:` field.** Twelve of the fourteen agents rely on that
-   preload for their domain knowledge; they would run stripped of it, and nothing would say so.
+Doc, [sub-agents]. A non-fork sub-agent starts with a fresh context:
 
-If teams are ever wanted, they are a separate architecture decision with a case study, not a flag
-flipped mid-task.
+- its own body as system prompt, and the delegation message;
+- the **CLAUDE.md hierarchy**, unless `omitClaudeMd: true`. The built-in `Explore` and `Plan` skip it;
+- a **git-status snapshot**, unless turned off with `includeGitInstructions`. `Explore` and `Plan` skip it;
+- the full content of every skill in `skills:`;
+- a **sibling roster** (2.1.206+): `main` and every other named agent in the session, each a valid
+  `SendMessage` target — when the agent has `SendMessage` and there is at least one other.
 
-## Advisory agents
+It does **not** see the conversation, the files already read, or the skills already invoked. A rule that
+must reach `Explore` or `Plan` has to be restated in the delegation message.
 
-`lore`, `marketing` and `content` are **advisory**: they decide and persist, they never ship the
-thing they decided. They share one contract, defined here once so the three bodies do not each carry
-a copy that drifts.
+Also doc: at most 20 sub-agents running at once per session; a finished custom agent can be resumed with
+`SendMessage`, but `Explore` and `Plan` are one-shot and cannot.
 
-An advisory agent:
+Consequences for an agent body (house convention, reason: the body is loaded on every spawn):
 
-1. **Writes only its own skill's `references/`.** Never game code, fixtures, locale JSON or visuals.
-   It recommends the change and delegates it. One carve-out, stated in the agent's own body:
-   `content` additionally writes the content trees it owns — `src/assets/social/**`,
-   `src/content/codex/**` and `src/json/codex.json` — because a post or a Codex entry _is_ its
-   deliverable, not a decision about one. `lore` and `marketing` stay references-only.
-2. **Delivers a decision with its rationale**, persisted as a reference — not a chat answer. A ruling
-   that is not written down did not happen. A ruling it cannot anchor in the repo is an open
-   question, and goes in the skill's open-questions file.
-3. **Hands off explicitly.** Words to `content`, i18n keys to `translate`, visuals to `design`,
-   mechanics to `server`/`vue`. Out-of-scope discoveries are reported, never acted on.
-4. **Runs no validation** (the general sub-agent contract above), and returns the structured summary.
+- Do not restate CLAUDE.md hard rules — every agent without `omitClaudeMd` already has them.
+- Do restate what the agent cannot infer from its own domain skill.
+- An agent built to take everything from its delegation message (a narrow worker) is the case
+  `omitClaudeMd: true` exists for.
 
-They are kept separate rather than merged because their judgement is not interchangeable: in-world
-canon, go-to-market positioning and editorial voice are three different competences, and a merged
-agent would have to load all three skill sets to answer any one request. What was duplicated was the
-contract, not the agents — so the contract moved here.
+## Foreground and background
 
-## Coherence with `CLAUDE.md`
+Doc, [sub-agents]. For each spawn, the first matching case decides:
 
-`scripts/audit.py` enforces (as ERRORS):
+1. spawned by an in-process agent-team teammate → foreground;
+2. `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` → foreground, everywhere;
+3. **fork mode on** (the default in an interactive session) → background, and Claude **cannot** ask for
+   the foreground;
+4. **fork mode off** (the default in `-p` and in the Agent SDK) → background by default, **foreground when
+   Claude needs the result before continuing**. `background: true` keeps an agent in the background
+   even then.
 
-- Every file in `.claude/agents/` has a corresponding row in `CLAUDE.md` § Agents directory.
-- Every agent name referenced in that section exists as `.claude/agents/<name>.md`.
+So neither "interactive = background, `-p` = foreground" nor its inverse holds. In `-p` / SDK runs a
+sub-agent can land on either side, and therefore on either tool set. Build nothing on a tool outside the
+[background set](#tools).
 
-## When to create a new sub-agent (vs. extending one)
+## Agents shipped by a plugin
 
-Create a new agent when:
+Doc, [sub-agents]: a plugin agent **ignores `hooks`, `mcpServers` and `permissionMode`** (security), and
+`initialPrompt`. To use them, copy the file into `.claude/agents/` or `~/.claude/agents/`.
+`[23-agent-frontmatter-keys]` warns when an agent under a plugin layout sets one.
 
-- A class of tasks has a **clear domain boundary** (e.g., i18n JSON handled by a `data-i18n` agent: locale files, fleet parallelism is natural).
-- Tasks need a **different tool set or model** (`hooks` runs only `Bash` on `haiku`; `review` is read-only).
-- The orchestrator would otherwise **repeat the same long preamble** to delegate the work.
+## Agent teams
 
-Extend an existing agent when:
+Doc, [agent-teams]. `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` makes agents flat teammates with a shared
+task list and mailboxes. Experimental, off by default, and "significantly more tokens" than a single
+session: each teammate is a separate instance with its own context.
 
-- The new task fits inside an existing scope (e.g., a new Vue pattern → still the `vue` agent).
-- Splitting would just mean two agents called in sequence on the same files.
+What changes for a definition used as a teammate:
 
-## Anti-patterns specific to agents
+- **A named sub-agent launches as a teammate** while the flag is on — including delegation you never
+  framed as team work, since Claude can name agents on its own. Set the variable to `0` to restore
+  sub-agents.
+- **`skills` is ignored.** The teammate still loads the project's and the user's skills like any session;
+  it loses only the **preload**. An agent whose body assumes its skill is already in context will run
+  without it, and nothing says so.
+- Start with **3 to 5 teammates**.
+- Quality gates: the `TeammateIdle`, `TaskCreated` and `TaskCompleted` hooks can block with exit code 2
+  and send feedback.
 
-- **A sub-agent that validates its own work.** Violates the centralised-validation rule.
-- **A sub-agent that delegates to another sub-agent.** Sub-agents stay flat; only the orchestrator delegates. Single sanctioned exception: `review` fans out `review` workers via `Agent` on large diffs (≥ 5 files / ≥ 2 domains) — a review must cover its whole surface in one pass. Fanning out to `general-purpose` would be a defect: that type carries `Edit`/`Write`, so the read-only guarantee would end at the first hop.
-- **An agent body that restates its own skill.** The body and the skill drift apart, and the reader cannot tell which is authoritative. Name the skill in `skills:` and delete the restatement; keep in the body only what the skill does not own.
-- **An agent description that lists "use for any …" without anti-triggers.** Triggers on too much.
-- **Agents kept "in case we need them".** Each agent costs context and decision overhead.
+House convention: enable teams as an architecture decision, not a flag flipped mid-task — the first two
+points silently change what every existing definition does.
+
+## The delegation message
+
+Anthropic's engineering post [multi-agent research system][research] (doc register, but a blog, not the
+product docs) names what a delegation message needs: **an objective, an output format, guidance on tools
+and sources, and clear task boundaries**. Vague delegation produced duplicated work and gaps. The same
+post measures multi-agent runs at **about 15× the tokens of a chat** — the fan-out has to buy something.
+
+## House conventions
+
+These are this plugin's rules, not the harness's. Each is reported as WARN at most.
+
+**1. An `## Agents directory` table in CLAUDE.md** — `[09-agent-in-claude-md]` (agent file with no row),
+`[09-claude-md-agent-missing]` (row with no file). The harness does **not** need it: it already lists
+every agent's description to the model. The table is therefore **paid twice** in the always-loaded
+budget. Its reason: a human entry point — one place where a reader sees the roster and the delegation
+triggers without opening each file. A repository that does not want that trade can ignore both checks.
+
+```markdown
+## Agents directory
+
+| Agent | Delegate when |
+| --- | --- |
+| `shop-review` | A diff touches ≥ 5 files or ≥ 2 domains; read-only. |
+| `data-i18n` | Locale JSON changes; never touches components. |
+```
+
+**2. The sub-agent contract.** Reason: the orchestrator is the only one that sees the whole task.
+
+1. **Scoped work.** The agent does the scope it was given. Out-of-scope discoveries are reported, not acted on.
+2. **Centralised validation.** Test/build/lint runs where the orchestrator decides, once, at task end —
+   not in every agent, which would multiply cost and produce conflicting verdicts.
+3. **Structured return.** What was done / files modified / blockers / suggested follow-ups.
+4. **Self-contained prompts** when several agents run in parallel — they share no context.
+
+**3. Minimal `tools`.** Reason: an unused grant is an unenforced boundary. Prefer `disallowedTools` when
+the agent needs almost everything.
+
+## When to create a new sub-agent
+
+House convention. Create one when:
+
+- a class of tasks has a **clear domain boundary** (locale files → `data-i18n`, parallel by nature);
+- it needs a **different tool envelope or model** (`shop-review` read-only; a mechanical runner on `haiku`);
+- the orchestrator would otherwise **repeat the same long preamble** on every delegation.
+
+Extend an existing one when the task fits its scope (a new component pattern → still `ui-scss`), or when
+splitting would only mean two agents called in sequence on the same files.
+
+## Anti-patterns
+
+- **A read-only agent that declares `memory`.** `memory` enables `Read`, `Write` and `Edit` automatically
+  (doc, [sub-agents]): the read-only envelope is gone, and the frontmatter still looks read-only.
+- **Restricting fan-out with `Agent(<type>)` in a sub-agent.** Ignored (doc). If `shop-review` fans out,
+  the prompt must say "spawn only `shop-review` workers" — and fanning out to `general-purpose` would be a
+  defect, since that type carries `Edit`/`Write` and the read-only guarantee ends at the first hop.
+- **`skills:` used to fence an agent in.** It preloads; it does not restrict. Remove `Skill` from `tools`.
+- **`disallowedTools: Bash(git push *)` to block one command.** It removes all of `Bash`. Use a
+  permission rule or a hook for command-level control.
+- **A body that restates its own skill.** The two drift and the reader cannot tell which is
+  authoritative. Name the skill in `skills:` and keep in the body only what the skill does not own.
+- **A contract that needs a tool outside the background set.** It holds in the foreground only.
+- **Hooks in a project agent relied on in CI.** Skipped in `-p` (the folder is not trusted there).
+- **A description that says "use for any …" with no anti-trigger.** `[08b-agent-description]`.
+- **Agents kept "in case we need them".** Each costs listing tokens every turn and a routing decision.
+
+[sub-agents]: https://code.claude.com/docs/en/sub-agents
+[agent-teams]: https://code.claude.com/docs/en/agent-teams
+[tools-reference]: https://code.claude.com/docs/en/tools-reference
+[permissions]: https://code.claude.com/docs/en/permissions
+[sdk-subagents]: https://code.claude.com/docs/en/agent-sdk/subagents
+[research]: https://www.anthropic.com/engineering/multi-agent-research-system
