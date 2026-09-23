@@ -3209,6 +3209,8 @@ def check_skill_anchors(root: Path, report: Report) -> None:
                 alive += 1
             elif (skill_md.parent / rel).exists():
                 alive += 1          # ${CLAUDE_SKILL_DIR}/... written relative in the body
+            elif (skills_dir / rel).exists():
+                alive += 1          # a sibling skill's file, the base the overlay resolves against too
             elif ANCHOR_TEMPLATE_RE.search(ref):
                 continue            # template / illustrative path
             elif re.search(r"(?:e\.g\.|for example|such as|for instance)[\s,:(`]*$",

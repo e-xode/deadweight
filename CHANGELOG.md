@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.12.0 — 2026-09-23
+
+**This release changes `audit.py`, so a floor set with 0.11.0 stops comparing.** One check moves:
+`28-skill-anchors` stops reporting paths written from `.claude/skills/`, so a count can only drop.
+Re-set the floor after reading both counts (see
+[Versions and your floor](README.md#versions-and-your-floor)).
+
+### Fixed
+
+- **A skill naming a sibling skill's file from `.claude/skills/` was reported as a dead anchor**
+  (`28-skill-anchors`). A body that says `shop-refunds/scripts/measure.mjs` resolves against the
+  skills folder, the base the overlay already tried for its own paths; check 28 tried the
+  repository root and the citing skill's folder only. The file existed, the finding said it did
+  not, and the one way to silence it was to rewrite a correct `SKILL.md` around the auditor.
+
 ## 0.11.0 — 2026-09-23
 
 **This release changes `audit.py`, so a floor set with 0.10.0 stops comparing.** The counts
