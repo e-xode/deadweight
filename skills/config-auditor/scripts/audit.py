@@ -222,7 +222,6 @@ FRENCH_HEURISTIC_WORDS = {
 }
 # i18n-data: end
 FRENCH_HEURISTIC_THRESHOLD = 3
-ENGLISH_ONLY_EXEMPT: set[str] = set()   # filled from audit.local.json, see below
 # A file that IS the French version of localised content is not drift: a
 # multilingual project has to carry each language properly, French included, and a
 # check that flags `pricing-fr.md` for being in French is wrong in a way that costs
@@ -573,26 +572,13 @@ def apply_thresholds(local: dict, report: Report) -> None:
                    f"({spec['date']}): {spec['reason']}", "")
 
 
-def exemption_paths(local: dict, check: str) -> set[str]:
-    """Paths exempt from one check, from the structured `exemptions` list."""
-    out: set[str] = set()
-    for e in local.get("exemptions") or ():
-        chk = e.get("check") if isinstance(e, dict) else None
-        chk = CHECK_ID_ALIASES.get(chk, chk)
-        if isinstance(e, dict) and chk == check and isinstance(e.get("path"), str):
-            out.add(e["path"])
-    return out
-
-
-ENGLISH_ONLY_EXEMPT: set[str] = set()   # filled from audit.local.json in main()
-
-
 # An exemption may never silence the checks that audit the exemptions, nor the
 # ratchet. A release valve able to disconnect its own pressure gauge is not a
 # valve: it is a way of not knowing.
 UNEXEMPTABLE = frozenset({
     "31-overlay", "31-overlay-parse", "31-overlay-schema", "31-overlay-stale",
     "31-overlay-alias", "31-overlay-unknown-check", "31-overlay-threshold",
+    "31-overlay-unused",
     "34-audit-sha", "00-layout",
 })
 DOWNGRADE_TO = ("WARN", "INFO")
@@ -611,11 +597,13 @@ def apply_overlay(report: "Report", local: dict, root: Path) -> None:
     With it, the finding stays visible at a severity that does not fail CI, and
     `--check-floor` still watches it grow.
     """
-    entries = [e for e in (local.get("exemptions") or ()) if isinstance(e, dict)]
+    raw = local.get("exemptions")
+    entries = list(enumerate(raw)) if isinstance(raw, list) else []
+    entries = [(i, e) for i, e in entries if isinstance(e, dict)]
     if not entries:
         return
-    resolus: list[tuple[str, Path, str | None]] = []
-    for e in entries:
+    resolus: list[tuple[str, Path, str | None, int]] = []
+    for i, e in entries:
         chk = CHECK_ID_ALIASES.get(e.get("check"), e.get("check"))
         pth = e.get("path")
         if not isinstance(chk, str) or not isinstance(pth, str) or not pth:
@@ -626,10 +614,11 @@ def apply_overlay(report: "Report", local: dict, root: Path) -> None:
         sev = sev if isinstance(sev, str) and sev.upper() in DOWNGRADE_TO else None
         for base in (root / SKILLS_DIR / pth, root / pth):
             if base.exists():
-                resolus.append((chk, base.resolve(), sev and sev.upper()))
+                resolus.append((chk, base.resolve(), sev and sev.upper(), i))
                 break
     if not resolus:
         return
+    servies: set[int] = set()
     gardees: list[Finding] = []
     for f in report.findings:
         cible = None
@@ -638,17 +627,37 @@ def apply_overlay(report: "Report", local: dict, root: Path) -> None:
                 cible = Path(f.location).resolve()
             except OSError:
                 cible = None
-        couvert = next(
-            (sev for chk, base, sev in resolus
+        match = next(
+            ((sev, i) for chk, base, sev, i in resolus
              if chk == f.check and cible is not None
              and (cible == base or base in cible.parents)),
-            "__rien__")
-        if couvert == "__rien__":
+            None)
+        if match is None:
             gardees.append(f)
-        elif couvert is not None:
+            continue
+        couvert, i = match
+        servies.add(i)
+        if couvert is not None:
             gardees.append(Finding(f.check, couvert, f.message + " [excused by overlay]",
                                    f.location))
     report.findings = gardees
+    # An exemption that excused nothing on this run. Check 31 already catches an
+    # unknown check id and a vanished path; it did not catch the third way an
+    # exemption dies - the check still exists, the file still exists, but the
+    # auditor stopped firing there (0.10.0 fixed false positives in 22, 28 and 33).
+    # Such an entry is harmless today and dangerous later: the day a REAL defect of
+    # that check appears under that path, it is hidden without anyone deciding so.
+    # INFO, not WARN: a check that only fires in some runs (a threshold, a layout)
+    # can leave an exemption idle legitimately.
+    overlay = str(root / STATE_DIR / "audit.local.json")
+    for chk, _base, _sev, i in resolus:
+        if i not in servies:
+            e = raw[i]
+            report.add("31-overlay-unused", "INFO",
+                       f"exemptions[{i}] (`{chk}` on `{e.get('path')}`, {e.get('date')}) "
+                       "excused nothing in this run: the finding it was written for is gone. "
+                       "Drop it, so it cannot hide a new defect of the same check there.",
+                       overlay)
 
 
 # --- Layout -----------------------------------------------------------------
@@ -1854,8 +1863,6 @@ def check_english_only(root: Path, report: Report) -> None:
                             + list(skill.rglob("*.sh"))):
                 if p.name.endswith(ENGLISH_ONLY_SUFFIX_EXEMPT):
                     continue
-                if p.relative_to(skills_dir).as_posix() in ENGLISH_ONLY_EXEMPT:
-                    continue
                 targets.append(p)
     src_dir = root / "src"
     if src_dir.is_dir():
@@ -1866,14 +1873,11 @@ def check_english_only(root: Path, report: Report) -> None:
                     continue
                 if LOCALE_MARKED_RE.search(p.as_posix()):
                     continue          # declared as a locale: French there is correct
-                # An exemption must cover EVERY path the check reports. Until
-                # 2026-09-22 this branch never consulted the overlay, so a project
-                # could declare an exception on a file under src/ and keep being
-                # reported for it - the mechanism meant to remove the noise produced
-                # it instead. Paths here are relative to the project root, since
-                # that is how a reader names a file under src/.
-                if p.relative_to(root).as_posix() in ENGLISH_ONLY_EXEMPT:
-                    continue
+                # Exemptions are NOT consulted here: apply_overlay() drops the
+                # finding, as for every other check. Skipping the file upstream (the
+                # 0.2-0.10.0 behaviour) hid which exemption served, so each one looked
+                # idle to `31-overlay-unused`, and a `severity` downgrade was ignored
+                # for this check alone. One place applies exemptions, or none knows.
                 if translate_dir not in p.parents:
                     targets.append(p)
     for path in targets:
@@ -3527,19 +3531,29 @@ def check_project_overlay(root: Path, report: Report, local: dict) -> None:
                    "Absent is a valid state - do not go looking for one.", str(path))
         return
 
+    profile = local.get("profile")
+    if profile is not None and str(profile).strip().lower() not in ("house", "doc"):
+        # Any other value falls back to "doc" in main(), so a typo silently turns the
+        # house conventions back into INFO - the opposite of what was written.
+        report.add("31-overlay-schema", "WARN",
+                   f'`profile` is `{profile}`; only "house" and "doc" are read, so this '
+                   'overlay runs the default profile ("doc").', str(path))
+
     raw = local.get("exemptions")
     if raw is None:
-        # An overlay that carries only `thresholds` is legitimate since 0.4.0: a
-        # project may hold its own doctrine number without granting any exemption.
-        # Demanding both keys would make the file a form to fill rather than a place
-        # to record what this project decided.
-        if local.get("thresholds"):
+        # An overlay that carries only `thresholds` is legitimate since 0.4.0, and
+        # one that carries only `profile` since 0.10.0: a project may hold its own
+        # doctrine number, or its severity profile, without granting any exemption.
+        # 0.10.0 added `profile` and left this test alone, so a profile-only overlay
+        # - exactly what the README suggests - was reported as an ERROR that "does
+        # nothing". Every key that changes a run must be listed here.
+        if local.get("thresholds") or profile is not None:
             return
         report.add("31-overlay-schema", "ERROR",
-                   "audit.local.json has neither `exemptions` nor `thresholds`, so it "
-                   'does nothing. Schema: {"exemptions": [{"check", "path", "reason", '
-                   '"date"}], "thresholds": {"<NAME>": {"value", "reason", "date"}}}.',
-                   str(path))
+                   "audit.local.json has none of `exemptions`, `thresholds` or `profile`, "
+                   'so it does nothing. Schema: {"profile": "house", "exemptions": '
+                   '[{"check", "path", "reason", "date"}], "thresholds": {"<NAME>": '
+                   '{"value", "reason", "date"}}}.', str(path))
         return
     if not isinstance(raw, list):
         report.add("31-overlay-schema", "ERROR",
@@ -4046,9 +4060,7 @@ def main(argv: list[str]) -> int:
     layout = detect_layout(root) if args.layout == "auto" else args.layout
     apply_layout(root, layout)
 
-    global ENGLISH_ONLY_EXEMPT
     _local = load_local_config(root)
-    ENGLISH_ONLY_EXEMPT = exemption_paths(_local, "11-english-only")
     global PROFILE
     PROFILE = "house" if str(_local.get("profile", "")).strip().lower() == "house" else "doc"
     report = Report()

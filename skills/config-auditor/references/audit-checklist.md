@@ -138,7 +138,7 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[AUTO 13-no-global-scripts]` Scripts live under the skill that runs them — house convention.
 - `[AUTO 18-see-skill-target]` Every `➜ See skill:` target exists.
 - `[AUTO 11-english-only]` One declared language — house convention, exemptable.
-- `[AUTO 31-overlay-*]` / `[AUTO 34-*]` Exemptions carry a reason and a date; the floor compares one instrument only.
+- `[AUTO 31-overlay-*]` / `[AUTO 34-*]` Exemptions carry a reason and a date, and still excuse something (`31-overlay-unused`); the floor compares one instrument only.
 
 ## Required exit
 

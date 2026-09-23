@@ -154,7 +154,9 @@ documentation — each is listed, with its source and its evidence, in
 Anthropic documents instead. `"profile": "house"` in the overlay turns them into warnings.
 
 `reason` and `date` are required: an exemption without a reason is a decision nobody can review,
-and one without a date is a decision nobody can age out. `severity` is optional and accepts only
+and one without a date is a decision nobody can age out. An exemption that no longer excuses anything is reported
+(`31-overlay-unused`, INFO): after an update that fixed a false positive, drop it, or it will hide
+the next real finding of that check under that path. `severity` is optional and accepts only
 `WARN` or `INFO` — the finding stays in the report, marked `[excused by overlay]`, at a level that
 does not fail CI. Prefer it to erasing: an erased finding is one `--check-floor` can no longer
 watch grow.
@@ -210,6 +212,22 @@ an auditor and does not run it on itself has the exact defect it exists to catch
 While the plugin is `0.x`, a minor release is the breaking one. Even a fix that removes a false
 positive changes the counts, so it ships as a minor. The CHANGELOG opens with a warning whenever
 the auditor changed.
+
+**After a minor update**, in this order:
+
+1. Open a new session (a plugin loads at session start), then run `--check-floor`. No
+   `34-floor` warning means `audit.py` did not change: nothing else to do.
+2. Compare the floor's `warning_ids` with the new run's: gone ids are the auditor's fixes, new ids
+   are what to read. Read every ERROR.
+3. `--set-floor` on the configuration as it is, and commit `floor.json` alone — the commit records a
+   change of instrument, not an improvement.
+4. Fix, or exempt with a reason; drop the exemptions reported unused; `--set-floor` again, committed
+   with the fixes. Two commits keep `git log -p .claude/audit/floor.json` able to tell the
+   auditor's changes from yours.
+
+`--set-floor` writes whatever this run measured, higher or lower, without asking: the commit is
+where the judgement goes. `--fresh` only re-measures for the status line; it touches neither the
+floor nor the overlay.
 
 ## Two channels, two prices
 

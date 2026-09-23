@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.11.0 — 2026-09-23
+
+**This release changes `audit.py`, so a floor set with 0.10.0 stops comparing.** The counts
+themselves barely move: one false ERROR disappears, and a new check reports at INFO, which a floor
+does not count. Re-set the floor after reading both counts (see
+[Versions and your floor](README.md#versions-and-your-floor)).
+
+### Fixed
+
+- **An overlay holding only `"profile": "house"` was reported as an ERROR** (`31-overlay-schema`,
+  "does nothing") — the exact file the README suggests. 0.10.0 added `profile` and left the schema
+  check listing `exemptions` and `thresholds` only. Measured on the fleet this plugin comes from:
+  10 repositories carried that one false ERROR.
+- **`severity` on an `11-english-only` exemption was ignored.** That check skipped exempted files
+  before the overlay ran, so an exemption could erase its finding but not downgrade it. Exemptions
+  are now applied in one place for every check.
+
+### New
+
+- **`31-overlay-unused` (INFO)**: an exemption that excused nothing in this run. Check 31 already
+  caught an exemption naming an unknown check or a vanished file; it missed the third way one dies —
+  the auditor stopped firing there, as 0.10.0 did for false positives in checks 22, 28 and 33. Such
+  an entry is harmless today and hides the next real defect of that check under that path.
+- **`31-overlay-schema` (WARN)** on a `profile` other than `house` or `doc`: a typo silently ran the
+  default profile.
+
 ## 0.10.0 — 2026-09-23
 
 **This release changes `audit.py`, so a floor set with an earlier version stops comparing.**
