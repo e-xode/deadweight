@@ -56,7 +56,7 @@ fifth file, `~/.claude.json`, holds trust decisions, MCP configurations and the 
 `User, local, or managed`, `User or managed`, `Managed`, or `Global config` (`~/.claude.json`).
 A key outside its scope is ignored; the table is not reproduced here, audit.py carries it.
 
-- **`24-settings-unknown-key`** (INFO) — a key absent from the reference: a typo, or a key newer
+- **`24-settings-unknown-key`** (NOTICE) — a key absent from the reference: a typo, or a key newer
   than the auditor.
 - **`24-settings-scope`** (ERROR) — a key ignored in the file it sits in. Examples [doc]:
   - `modelPicker` — *User or managed*: a cloned repository cannot relabel the picker.
@@ -74,7 +74,7 @@ A key outside its scope is ignored; the table is not reproduced here, audit.py c
   work from a project file for terminal sessions; the VS Code extension reads only user, managed and
   `--settings` for the starting mode (`permission-modes`). See
   [antipatterns.md](./antipatterns.md) § G1.
-- **`24-settings-skill-overrides`** (INFO) — a `skillOverrides` key naming no project skill: fine
+- **`24-settings-skill-overrides`** (NOTICE) — a `skillOverrides` key naming no project skill: fine
   for a bundled, user or synced skill, dead if the skill was renamed [house].
 
 ## Rule order: deny, ask, allow
@@ -201,7 +201,7 @@ folder`; `settings § A committed key doesn't reach teammates`.
   settings (`statusline § Troubleshooting`).
 - **`24-settings-output-style`** — [doc] `outputStyle` is **case-sensitive**; a value that does not
   match exactly (`explanatory`) gives the **Default** style, silently, while `/output-style` ignores
-  case (`output-styles`). WARN when the value differs from a known style by case only; INFO when it
+  case (`output-styles`). WARN when the value differs from a known style by case only; NOTICE when it
   matches no built-in and no project style (it may be a user or plugin style). Built-ins: `Default`,
   `Explanatory`, `Learning`, `Proactive`, `Concise`.
 

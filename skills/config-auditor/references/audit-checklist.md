@@ -9,7 +9,9 @@ Contents: [How to run](#how-to-run) · [`CLAUDE.md`](#claudemd) · [Skills](#ski
 Verified against the docs on 2026-09-23 (Claude Code 2.1.280). Each item is tagged `[AUTO]` with
 the check id that covers it, or `[MANUAL]` — the qualitative half no script sees. Severity follows
 one rule: **ERROR** when the harness rejects or silently ignores the thing, **WARN** for a probable
-defect or a house convention, **INFO** for what cannot be verified from the repository.
+defect or a house convention the project opted into, **NOTICE** for what names a file without being a
+defect (a house convention by default, what cannot be verified from the repository), **INFO** for a
+measurement every run emits. Counters and the floor leave INFO out; a report never does.
 
 ## How to run
 
@@ -76,7 +78,7 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[AUTO 08-agent-frontmatter]` Frontmatter parses; `name` and `description` present; no `:` in `name`; no duplicate `name`.
 - `[AUTO 08b-agent-description]` 80–900 chars with an anti-trigger clause — house convention.
 - `[AUTO 09-*]` Listed in `## Agents directory` and back — house convention (WARN).
-- `[AUTO 23-agent-tools]` Every tool resolves (tools-reference); `Task` is an alias (INFO); `Agent(<type>)` in a subagent definition is ignored (WARN); ERROR only when no entry resolves.
+- `[AUTO 23-agent-tools]` Every tool resolves (tools-reference); `Task` is an alias (NOTICE); `Agent(<type>)` in a subagent definition is ignored (WARN); ERROR only when no entry resolves.
 - `[AUTO 23-agent-model]` `sonnet`, `opus`, `haiku`, `fable`, `inherit` or a `claude-*` id.
 - `[AUTO 23-agent-permission-mode]` A documented mode; `bypassPermissions` declared by a subagent is not honoured.
 - `[AUTO 23-agent-skills-preload]` Preload targets exist (a `plugin:skill` target is INFO).
@@ -88,7 +90,7 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 
 - `[AUTO 14-rule-no-paths]` A frontmatter block holds a non-empty `paths:`.
 - `[AUTO 14-rule-unknown-field]` `paths` is the only field read (`globs:` is ignored).
-- `[AUTO 22-rule-glob-match]` Every glob matches a file; a glob into a directory git ignores is INFO, not counted.
+- `[AUTO 22-rule-glob-match]` Every glob matches a file; a glob into a directory git ignores is NOTICE, not in the floor.
 - `[AUTO 14-rule-size]` / `[AUTO 14-rule-code-comments]` / `[AUTO 14-rule-english-only]` House conventions.
 - `[MANUAL]` A rule meant to guard file **creation** does not rely on `paths:` — rules trigger on reads.
 - `[MANUAL]` Two rules never contradict each other: Claude may pick one arbitrarily.
@@ -111,7 +113,7 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[AUTO 24-settings-default-mode]` No `bypassPermissions` / `auto` default mode in a project file.
 - `[AUTO 24-settings-env]` No credential or request-routing variable in the shared file.
 - `[AUTO 24-settings-local]` `settings.local.json` ignored by the repository's git rules.
-- `[AUTO 24-settings-skill-overrides]` Keys name a project skill, or are INFO (bundled, user, synced).
+- `[AUTO 24-settings-skill-overrides]` Keys name a project skill, or are NOTICE (bundled, user, synced).
 - `[AUTO 24-settings-statusline]` / `[AUTO 24-settings-output-style]` The script exists, `refreshInterval` ≥ 1; the style name matches exactly.
 - `[AUTO 42-permissions-conflict]` No rule both allowed and denied or asked.
 - `[AUTO 42-permissions-rule]` Allow rules name known tools, no unanchored glob, no `mcp__…(…)`, `:*` only at the end.
@@ -119,7 +121,7 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 
 ## MCP
 
-- `[AUTO 43-mcp-shape]` `.mcp.json` parses; a `url` has a `type`; SSE is deprecated (INFO).
+- `[AUTO 43-mcp-shape]` `.mcp.json` parses; a `url` has a `type`; SSE is deprecated (NOTICE).
 - `[AUTO 43-mcp-secret]` No literal credential — reference `${VAR}`.
 - `[AUTO 43-mcp-credential-var]` No protected credential variable in a remote `url` or header (read as empty).
 - `[AUTO 43-mcp-approval]` No server approval committed in the shared settings file.

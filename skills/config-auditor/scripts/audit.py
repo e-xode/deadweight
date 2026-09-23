@@ -282,8 +282,8 @@ YAML_TRUE = {"true", "yes", "on", "1"}
 # House conventions: choices this plugin makes that Anthropic does not document.
 # Three families (evals/CONVENTIONS.md). A convention a MEASUREMENT supports is a
 # WARN where that measurement applies. A convention Anthropic CONTRADICTS is checked
-# on Anthropic's rule, and the house preference is an INFO. A convention with no
-# source and no measurement is an INFO - unless the project opts into this plugin's
+# on Anthropic's rule, and the house preference is a NOTICE. A convention with no
+# source and no measurement is a NOTICE - unless the project opts into this plugin's
 # conventions with `"profile": "house"` in its overlay. The same finding carries the
 # documented alternative either way: the severity says whether there is a defect,
 # the message says where the rule comes from.
@@ -292,7 +292,7 @@ PROFILE = "doc"
 
 def house() -> str:
     """Severity of a house convention with no source and no measurement."""
-    return "WARN" if PROFILE == "house" else "INFO"
+    return "WARN" if PROFILE == "house" else "NOTICE"
 
 
 def house_note(convention: str, anthropic: str) -> str:
@@ -463,7 +463,7 @@ EVALS_ANTI_EXPECTATION_TOKENS = ("defer", "does not trigger", "should not")
 DIVISION_HEADING_RE = re.compile(r"^#{1,6}\s+.*division of responsibilities", re.IGNORECASE | re.MULTILINE)
 POINTER_RE = re.compile(r"→\s*([a-z0-9][a-z0-9-]*)")
 
-SEVERITY_ORDER = {"OK": 0, "INFO": 1, "WARN": 2, "ERROR": 3}
+SEVERITY_ORDER = {"OK": 0, "INFO": 1, "NOTICE": 2, "WARN": 3, "ERROR": 4}
 
 
 VALID_CHECK_IDS: set[str] = set()   # filled in main() from the findings vocabulary
@@ -581,7 +581,7 @@ UNEXEMPTABLE = frozenset({
     "31-overlay-unused",
     "34-audit-sha", "00-layout",
 })
-DOWNGRADE_TO = ("WARN", "INFO")
+DOWNGRADE_TO = ("WARN", "NOTICE", "INFO")
 
 
 def apply_overlay(report: "Report", local: dict, root: Path) -> None:
@@ -653,7 +653,7 @@ def apply_overlay(report: "Report", local: dict, root: Path) -> None:
     for chk, _base, _sev, i in resolus:
         if i not in servies:
             e = raw[i]
-            report.add("31-overlay-unused", "INFO",
+            report.add("31-overlay-unused", "NOTICE",
                        f"exemptions[{i}] (`{chk}` on `{e.get('path')}`, {e.get('date')}) "
                        "excused nothing in this run: the finding it was written for is gone. "
                        "Drop it, so it cannot hide a new defect of the same check there.",
@@ -834,7 +834,7 @@ class Report:
         return any(f.severity == "ERROR" for f in self.findings)
 
     def counts(self) -> dict[str, int]:
-        c = {"OK": 0, "INFO": 0, "WARN": 0, "ERROR": 0}
+        c = {"OK": 0, "INFO": 0, "NOTICE": 0, "WARN": 0, "ERROR": 0}
         for f in self.findings:
             c[f.severity] = c.get(f.severity, 0) + 1
         return c
@@ -1249,7 +1249,7 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
             # Claude Code loads it; claude.ai upload and skill-creator's quick_validate
             # reject it. On `rom` all five hits were Vue vocabulary (`<script setup>`):
             # legitimate in a project that never uploads, a real risk for a plugin.
-            report.add("04-skill-description-brackets", "WARN" if LAYOUT == "plugin" else "INFO",
+            report.add("04-skill-description-brackets", "WARN" if LAYOUT == "plugin" else "NOTICE",
                        f"Skill '{entry.name}' description contains '<' or '>': Claude Code loads "
                        "it, but claude.ai upload and skill-creator's quick_validate reject angle "
                        "brackets in a description (platform best practices).", str(skill_md))
@@ -1324,7 +1324,7 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
         if size > SKILL_MD_ERROR_BYTES:
             report.add(
                 "05-skill-md-size",
-                "INFO" if vendored else "ERROR",
+                "NOTICE" if vendored else "ERROR",
                 f"SKILL.md in '{entry.name}' is {size} bytes (> {SKILL_MD_ERROR_BYTES}). Split it."
                 + (" Vendored skill — reported for information only." if vendored else ""),
                 str(skill_md),
@@ -1332,7 +1332,7 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
         elif size > SKILL_MD_COMPACTION_WARN_BYTES:
             report.add(
                 "21-skill-md-compaction",
-                "INFO" if vendored else "WARN",
+                "NOTICE" if vendored else "WARN",
                 f"SKILL.md in '{entry.name}' is {size} bytes (> {SKILL_MD_COMPACTION_WARN_BYTES}, "
                 "roughly 5,000 tokens): content past ~5,000 tokens is dropped after the first "
                 "auto-compaction; move detail to references."
@@ -2212,7 +2212,7 @@ def check_rule_globs(root: Path, report: Report) -> None:
             fixed = re.split(r"[*?\[{]", pattern, maxsplit=1)[0]
             probe = fixed + "x" if fixed.endswith("/") else fixed
             if probe and ignored(probe):
-                report.add("22-rule-glob-match", "INFO",
+                report.add("22-rule-glob-match", "NOTICE",
                            f"Rule '{entry.name}' glob '{pattern}' points into a path git ignores: "
                            "it loads only where those untracked files exist, so whether it is "
                            "inert depends on the machine. Not counted.", str(entry))
@@ -2264,12 +2264,12 @@ def check_agent_frontmatter_validity(root: Path, report: Report, skills: dict[st
         for tool in declared_tools:
             base = tool.split("(", 1)[0].strip()
             if base in TOOL_DEPRECATED:
-                report.add("23-agent-tools", "INFO",
+                report.add("23-agent-tools", "NOTICE",
                            f"Agent '{entry.stem}' grants '{base}', deprecated in favor of "
                            f"{TOOL_DEPRECATED[base]} (tools-reference).", str(entry))
                 continue
             if base in TOOL_ALIASES:
-                report.add("23-agent-tools", "INFO",
+                report.add("23-agent-tools", "NOTICE",
                            f"Agent '{entry.stem}' grants '{base}', the former name of "
                            f"'{TOOL_ALIASES[base]}' - still accepted as an alias.", str(entry))
                 continue
@@ -2407,7 +2407,7 @@ def check_settings_scope(root: Path, report: Report) -> None:
                     # and not verifiable from here.
                     report.add(
                         "24-settings-skill-overrides",
-                        "INFO",
+                        "NOTICE",
                         f"skillOverrides in '{name}' names '{skill_name}', which is not a project "
                         "skill: fine for a bundled, user or synced skill, dead if it was renamed.",
                         str(path),
@@ -2566,7 +2566,7 @@ def check_hooks(root: Path, report: Report) -> None:
                     if "timeout" not in hook:
                         default = HOOK_EVENT_TIMEOUT.get(event, HOOK_DEFAULT_TIMEOUT)
                         report.add("35-hooks-timeout",
-                                   "WARN" if default >= 60 else "INFO",
+                                   "WARN" if default >= 60 else "NOTICE",
                                    f"{spot} in '{rel}' sets no 'timeout': the default on '{event}' "
                                    f"is {default}s"
                                    + (" (a budget shared by every SessionEnd hook)."
@@ -2604,7 +2604,7 @@ def check_hooks(root: Path, report: Report) -> None:
                 injecting.append(event)
 
         if injecting:
-            report.add("35-hooks-context", "INFO",
+            report.add("35-hooks-context", "NOTICE",
                        f"'{rel}' declares hooks on {', '.join(injecting)}: for these events Claude "
                        "Code adds plain-text stdout to the context. Whatever they print is paid in "
                        "tokens on every session - a cost the harness's own estimate leaves out, "
@@ -2765,7 +2765,7 @@ def check_eval_quality(root: Path, report: Report) -> None:
         elif not mecanique:
             report.add(
                 "39-eval-all-llm",
-                "INFO",
+                "NOTICE",
                 f"Case '{dossier.name}': every grader is an llm judge. Whatever in it can "
                 "be counted is being voted on instead - measured on this plugin, a judge "
                 "carries a standard deviation near 0.49 where a counter carries 0.000.",
@@ -2782,7 +2782,7 @@ def check_eval_quality(root: Path, report: Report) -> None:
     if sans_fixture == len(cas):
         report.add(
             "39-eval-no-fixture",
-            "INFO",
+            "NOTICE",
             f"None of the {len(cas)} eval case(s) declares a `scaffold_script`, so every "
             "case runs against an empty workspace. A rubric that asks the run to measure a "
             "CLAUDE.md, a skill or a budget is asking about files that are not there, and "
@@ -3084,10 +3084,10 @@ ROLLUP_AFTER = 5
 
 
 def print_text_report(report: Report, tout: bool = False) -> None:
-    by_sev: dict[str, list[Finding]] = {"ERROR": [], "WARN": [], "INFO": [], "OK": []}
+    by_sev: dict[str, list[Finding]] = {"ERROR": [], "WARN": [], "NOTICE": [], "INFO": [], "OK": []}
     for f in report.findings:
         by_sev.setdefault(f.severity, []).append(f)
-    for sev in ("ERROR", "WARN", "INFO"):
+    for sev in ("ERROR", "WARN", "NOTICE", "INFO"):
         items = by_sev.get(sev, [])
         if not items:
             continue
@@ -3104,13 +3104,28 @@ def print_text_report(report: Report, tout: bool = False) -> None:
                 if n > ROLLUP_AFTER:
                     print(f"  [{chk}] ... and {n - ROLLUP_AFTER} more of the same "
                           f"({n} total). Run with --all, or --json, to see them.")
+    # Four severities, two kinds. ERROR, WARN and NOTICE each point at something in
+    # this configuration; INFO is a measurement every run emits (the layout, the
+    # budget, a coverage rate), so it never reaches zero and is never counted. The
+    # last line is the one a model summarising this output repeats: it may say
+    # "passed" only when nothing above points anywhere. Until 0.12.0 it said so over
+    # 19 notices on one fleet repository, and the orchestrator relayed "0 error(s),
+    # 0 warning(s)" as the whole audit.
     counts = report.counts()
     print(
         f"\nExecuted {len(CHECKS)} check groups. "
-        f"Summary: {counts['ERROR']} error(s), {counts['WARN']} warning(s)."
+        f"Summary: {counts['ERROR']} error(s), {counts['WARN']} warning(s), "
+        f"{counts['NOTICE']} notice(s)."
     )
     if not report.has_errors() and counts["WARN"] == 0:
-        print("All checks passed.")
+        if counts["NOTICE"]:
+            print(f"No error or warning. {counts['NOTICE']} notice(s) above: report them "
+                  "too - each one names a file, and none is a clean bill.")
+        else:
+            print("All checks passed.")
+    if counts["INFO"]:
+        print(f"{counts['INFO']} measurement(s) (INFO) above are not findings: give their count "
+              "and offer to show them.")
 
 
 # ancrage
@@ -3245,7 +3260,7 @@ def check_skill_anchors(root: Path, report: Report) -> None:
         shown = ", ".join(unverifiable[:5]) + (f" (+{len(unverifiable) - 5})" if len(unverifiable) > 5 else "")
         report.add(
             "28-skill-anchors",
-            "INFO",
+            "NOTICE",
             f"{len(unverifiable)} anchor(s) not verifiable from the repository - ignored by git "
             f"or outside it, so their existence depends on the machine: {shown}. Counted neither "
             "alive nor dead.",
@@ -3472,7 +3487,7 @@ def check_description_overlap(root: Path, report: Report, skills: dict[str, dict
         where = str(root / SKILLS_DIR / x / "SKILL.md")
         if xy and yx:
             declared += 1
-            report.add("33-description-overlap", "INFO",
+            report.add("33-description-overlap", "NOTICE",
                        f"`{x}` and `{y}` overlap at {score:.2f}, and each excludes the other: "
                        "separated by declaration, not measured. A selection eval on the pair "
                        "would settle it.", where)
@@ -3577,7 +3592,7 @@ def check_project_overlay(root: Path, report: Report, local: dict) -> None:
                     "nobody can review; without a date, one nobody can age out.", str(path))
         chk, pth = e.get("check"), e.get("path")
         if isinstance(chk, str) and chk in CHECK_ID_ALIASES:
-            report.add("31-overlay-alias", "INFO",
+            report.add("31-overlay-alias", "NOTICE",
                        f"{where} names `{chk}`, renamed to `{CHECK_ID_ALIASES[chk]}`. The old id "
                        "still works and always will; update it when convenient.", str(path))
             chk = CHECK_ID_ALIASES[chk]
@@ -3669,7 +3684,7 @@ def check_floor(root: Path, report: Report) -> int:
     """
     path = floor_path(root)
     if not path.is_file():
-        report.add("34-floor", "INFO",
+        report.add("34-floor", "NOTICE",
                    "No floor recorded. `--set-floor` freezes the current counts; until then "
                    "nothing stops the configuration from drifting upward.", str(path))
         return 0
@@ -3697,7 +3712,7 @@ def check_floor(root: Path, report: Report) -> int:
                    "on purpose and say why.", str(path))
         return 1
     if err < f_err or warn < f_warn:
-        report.add("34-floor", "INFO",
+        report.add("34-floor", "NOTICE",
                    f"Below the floor of {data.get('date')} ({err}/{warn} against "
                    f"{f_err}/{f_warn}). Lower it with `--set-floor` so the gain is kept.",
                    str(path))
@@ -3736,7 +3751,7 @@ def check_settings_semantics(root: Path, report: Report) -> None:
             if key.startswith("$"):
                 continue
             if key not in SETTINGS_KNOWN_KEYS:
-                report.add("24-settings-unknown-key", "INFO",
+                report.add("24-settings-unknown-key", "NOTICE",
                            f"'{key}' in '{name}' is not in the settings reference (231 keys, "
                            "2026-09-23): a typo, or a key newer than this auditor.", str(path))
                 continue
@@ -3854,7 +3869,7 @@ def check_settings_semantics(root: Path, report: Report) -> None:
             if style not in BUILTIN_OUTPUT_STYLES | custom:
                 near = [x for x in BUILTIN_OUTPUT_STYLES | custom if x.lower() == style.lower()]
                 if near or not custom:
-                    report.add("24-settings-output-style", "WARN" if near else "INFO",
+                    report.add("24-settings-output-style", "WARN" if near else "NOTICE",
                                f"outputStyle '{style}' in '{name}' "
                                + (f"differs from '{near[0]}' only by case: a value that does not "
                                   "match exactly gives the Default style (output-styles)."
@@ -3889,7 +3904,7 @@ def check_mcp(root: Path, report: Report) -> None:
                        f"MCP server '{srv}' has a url and no type: Claude Code skips it (mcp).",
                        str(path))
         if str(conf.get("type", "")).lower() == "sse":
-            report.add("43-mcp-shape", "INFO",
+            report.add("43-mcp-shape", "NOTICE",
                        f"MCP server '{srv}' uses the SSE transport, which is deprecated (mcp).",
                        str(path))
         blobs = [("url", conf.get("url"))]
@@ -4003,7 +4018,7 @@ def check_companions(root: Path, report: Report, skills: dict[str, dict]) -> Non
             text = p.read_text(encoding="utf-8", errors="replace")
             for key in frontmatter_keys(text):
                 if key != "paths":
-                    report.add("14-rule-unknown-field", "WARN" if key in ("globs", "path", "glob") else "INFO",
+                    report.add("14-rule-unknown-field", "WARN" if key in ("globs", "path", "glob") else "NOTICE",
                                f"Rule '{p.name}' sets '{key}': `paths` is the only field a rule "
                                "reads" + (" - `globs:` is Cursor's name for it" if key == "globs"
                                           else "") + " (memory).", str(p))

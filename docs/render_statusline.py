@@ -21,18 +21,20 @@ HERE = Path(__file__).resolve().parent
 TEMPLATE = HERE.parent / "skills" / "config-auditor" / "templates" / "statusline.py"
 COLOURS = {"31": "#e5534b", "32": "#57ab5a", "33": "#c69026", "2": "#768390"}
 
-# (label, errors, warnings, floor (errors, warnings) or None, stale, newer version)
+# (label, errors, warnings, notices, floor (errors, warnings) or None, stale, newer version)
 STATES = [
-    ("at the floor - nothing to do", 0, 19, (0, 19), False, None),
-    ("below the floor - the ratchet earned its keep", 0, 15, (0, 19), False, None),
-    ("errors - always worth seeing", 2, 19, (2, 19), False, None),
-    ("above the floor - a regression", 2, 25, (0, 19), False, None),
-    ("not comparable - run `deadweight` to see why", 0, 19, (0, 19), True, None),
-    ("a newer release is known", 0, 19, (0, 19), False, "0.9.0"),
+    ("at the floor - nothing to do", 0, 19, 0, (0, 19), False, None),
+    ("below the floor - the ratchet earned its keep", 0, 15, 0, (0, 19), False, None),
+    ("errors - always worth seeing", 2, 19, 0, (2, 19), False, None),
+    ("above the floor - a regression", 2, 25, 0, (0, 19), False, None),
+    ("notices - files to read, nothing moves the floor", 0, 0, 4, (0, 0), False, None),
+    ("nothing to report", 0, 0, 0, (0, 0), False, None),
+    ("not comparable - run `deadweight` to see why", 0, 19, 0, (0, 19), True, None),
+    ("a newer release is known", 0, 19, 0, (0, 19), False, "0.9.0"),
 ]
 
 
-def line_for(tmp, errors, warnings, floor, stale, newer):
+def line_for(tmp, errors, warnings, notices, floor, stale, newer):
     root = Path(tmp) / "shop-api"
     (root / ".claude" / "audit").mkdir(parents=True, exist_ok=True)
     cache_home, claude_home = Path(tmp) / "cache", Path(tmp) / "claude"
@@ -41,7 +43,8 @@ def line_for(tmp, errors, warnings, floor, stale, newer):
     os.environ["XDG_CACHE_HOME"] = str(cache_home)       # the key the template itself derives
     cache = Path(sl.cache_file(str(root)))
     cache.parent.mkdir(parents=True, exist_ok=True)
-    cache.write_text(json.dumps({"errors": errors, "warnings": warnings, "audit_sha": "a1b2c3d4"}))
+    cache.write_text(json.dumps({"errors": errors, "warnings": warnings, "notices": notices,
+                                      "audit_sha": "a1b2c3d4"}))
     (root / ".claude" / "audit" / "floor.json").write_text(json.dumps(
         {"errors": floor[0], "warnings": floor[1],
          "audit_sha": "e5f6a7b8" if stale else "a1b2c3d4"}))
@@ -71,9 +74,9 @@ def spans(ansi):
 
 def main():
     rows = []
-    for label, e, w, floor, stale, newer in STATES:
+    for label, e, w, n, floor, stale, newer in STATES:
         with tempfile.TemporaryDirectory() as tmp:
-            rows.append((label, line_for(tmp, e, w, floor, stale, newer)))
+            rows.append((label, line_for(tmp, e, w, n, floor, stale, newer)))
     h, width = 34, 760
     out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{h * len(rows) + 24}" '
            f'font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15">',

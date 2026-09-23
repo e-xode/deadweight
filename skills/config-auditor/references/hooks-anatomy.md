@@ -191,7 +191,7 @@ Silent failures by type [doc]:
 `UserPromptExpansion`, `SessionStart`, `PostModelSwitch`**, plain-text stdout is **added to the
 context** Claude sees.
 
-- **`35-hooks-context`** (INFO) lists the file's hooks on those four events. Whatever they print is
+- **`35-hooks-context`** (NOTICE) lists the file's hooks on those four events. Whatever they print is
   paid in tokens on every session or every turn — a cost `/context` does not show before the hook
   runs, because it prices declarations, not output [inference].
 - [doc] Plain stdout, `additionalContext`, `systemMessage` and `initialUserMessage` are each capped

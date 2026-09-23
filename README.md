@@ -9,7 +9,7 @@ nothing reads, rules whose glob matches no file, links to files that are gone, t
 each other's requests, a skill that loads nowhere because it sits one folder off. The audit finds
 them and says why each one matters.
 
-![The status line in its six states](docs/statusline.svg)
+![The status line in its eight states](docs/statusline.svg)
 
 ## Install
 
@@ -39,6 +39,7 @@ only this one.)
 | Claude to review the configuration | ask for it — the `deadweight:config-auditor` skill loads when the task is about configuration |
 | the findings for this project | ask Claude to run `deadweight`, or run it yourself (see below) |
 | errors only | `deadweight --errors` |
+| the measurements too (INFO) | `deadweight --info` |
 | to measure again after editing | `deadweight --fresh` — measures, updates the status line, shows the result |
 | the raw report | `deadweight --json` |
 | the counts in your status line | `deadweight --setup-statusline`, then a new session |
@@ -59,6 +60,19 @@ print(sorted(rows, key=lambda r: r["version"])[-1]["installPath"])')
 }
 ```
 
+### Four severities, and which ones are counted
+
+| Severity | Means | Status line | Floor | Report |
+| --- | --- | --- | --- | --- |
+| ERROR | the harness rejects the thing, or ignores it without a word | `2E` | counted | always |
+| WARN | a probable defect | `19W` | counted | always |
+| NOTICE | names a file, is not a defect: a house convention, what the repository cannot prove | `4n` | not counted | always |
+| INFO | a measurement every run emits: layout, budget, coverage | — | not counted | on request |
+
+A notice does not move the floor, and it is never left out of a report: "0 errors, 0 warnings" is
+not the whole answer while notices exist. INFO never reaches zero, so no counter shows it; Claude
+gives its count and offers to show the lines, and `deadweight --info` prints them.
+
 ### Reading the status line
 
 `deadweight --setup-statusline` writes `.claude/statusline.py` and sets `statusLine` in the
@@ -72,7 +86,8 @@ itself, so this one command is the shortest honest path.
 | `deadweight 15W ▼ floor 0/19` green | below the floor | re-set the floor to lock the gain |
 | `deadweight 2E 19W` yellow | errors, even under the floor | `deadweight --errors` |
 | `deadweight 2E 25W ▲ floor 0/19` red | above the floor — a regression | `deadweight` |
-| `deadweight ✓` | nothing to report | nothing |
+| `deadweight 4n` dim | no error or warning, four notices | `deadweight` — each names a file |
+| `deadweight ✓` | no error, warning or notice | nothing |
 | `↻` | the number is not comparable: the configuration changed since it was measured, or the floor was set by another auditor | `deadweight` says which, and what clears it |
 | `↑0.9.0` | a newer release is known | `claude plugin update deadweight@deadweight`, then a new session |
 
@@ -139,7 +154,7 @@ One file, in **your** project, never in the plugin:
       "path": ".claude/rules/admin-api-guard.md",
       "reason": "guards a route that ships next quarter; the rule lands before the code",
       "date": "2026-09-22",
-      "severity": "INFO"          // downgrade instead of erase - the count stays visible
+      "severity": "NOTICE"        // downgrade instead of erase - the finding stays visible
     }
   ],
   "thresholds": {
@@ -150,14 +165,14 @@ One file, in **your** project, never in the plugin:
 
 **House conventions.** Some checks encode this plugin's own conventions rather than Anthropic's
 documentation — each is listed, with its source and its evidence, in
-[`evals/CONVENTIONS.md`](evals/CONVENTIONS.md). By default they report as INFO, naming what
+[`evals/CONVENTIONS.md`](evals/CONVENTIONS.md). By default they report as NOTICE, naming what
 Anthropic documents instead. `"profile": "house"` in the overlay turns them into warnings.
 
 `reason` and `date` are required: an exemption without a reason is a decision nobody can review,
 and one without a date is a decision nobody can age out. An exemption that no longer excuses anything is reported
-(`31-overlay-unused`, INFO): after an update that fixed a false positive, drop it, or it will hide
+(`31-overlay-unused`, NOTICE): after an update that fixed a false positive, drop it, or it will hide
 the next real finding of that check under that path. `severity` is optional and accepts only
-`WARN` or `INFO` — the finding stays in the report, marked `[excused by overlay]`, at a level that
+`WARN`, `NOTICE` or `INFO` — the finding stays in the report, marked `[excused by overlay]`, at a level that
 does not fail CI. Prefer it to erasing: an erased finding is one `--check-floor` can no longer
 watch grow.
 

@@ -78,12 +78,15 @@ counts = data.get("counts") or {}
 json.dump({"project": name,
            "errors": int(counts.get("ERROR", 0)),
            "warnings": int(counts.get("WARN", 0)),
+           "notices": int(counts.get("NOTICE", 0)),
            "audit_sha": data.get("audit_sha"),
            "plugin_version": version,
            "layout": data.get("layout"),
            "measured_at": datetime.datetime.now().isoformat(timespec="seconds"),
+           # INFO travels too, last: a measurement nobody can reach is not collected,
+           # it is discarded later. The counters leave it out, the detail does not.
            "findings": [f for f in (data.get("findings") or [])
-                        if f.get("severity") in ("ERROR", "WARN")]},
+                        if f.get("severity") in ("ERROR", "WARN", "NOTICE", "INFO")]},
           open(dst, "w", encoding="utf-8"), indent=1)
 PY
 exit 0

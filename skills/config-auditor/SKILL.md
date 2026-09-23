@@ -84,14 +84,15 @@ python3 ${CLAUDE_SKILL_DIR}/scripts/audit.py --set-floor     # freeze today's co
 python3 ${CLAUDE_SKILL_DIR}/scripts/audit.py --check-floor   # fail if they rose (CI)
 ```
 
-**Report every ERROR first, each one by name, before any WARN** — an ERROR is a certain defect,
-and a summary that picks the familiar findings drops exactly the surprising ones (a credential
-variable read as empty, a component the plugin never loads).
+**Report every ERROR by name, then every WARN, then every NOTICE** — each points at a file, and a
+summary that picks the familiar ones drops the surprising ones. "0 errors, 0 warnings" is never the
+whole report while notices exist. INFO lines are measurements every run emits (layout, budget,
+coverage): do not list them, give their count and ask whether to show them — they are already in
+the output, so a yes costs no second run. With no one to ask (a sub-agent, `-p`), append them.
 
 The script's `CHECKS` tuple is the authoritative inventory of what it covers — read it there rather
 than trusting a count copied into prose; a clean run prints the number it executed (`Executed N
-check groups … All checks passed.`). Most checks report only on failure; the always-loaded budget
-always prints its total as INFO. Exit code 1 on any error. A check that fires more than
+check groups`). Most checks report only on failure; the budget always prints its total as INFO. Exit code 1 on any error. A check that fires more than
 five times is rolled up in the text report - `--all` or `--json` show every finding, and the
 floor always counts every one, because the ceiling is a display decision, not a detection one.
 

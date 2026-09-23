@@ -52,7 +52,7 @@ in silence and where it becomes visible.
 Silent or near-silent failures:
 
 - **`url` without `type`** → read as stdio → **skipped**, with `MCP server "<name>" has a "url" but no "type"` (mcp, Option 1). In a headless run the only trace is `mcp_server_errors` in the `system/init` event (2.1.219+). → `43-mcp-shape` ERROR.
-- **`type: "sse"`** still works but is deprecated → `43-mcp-shape` INFO.
+- **`type: "sse"`** still works but is deprecated → `43-mcp-shape` NOTICE.
 - **Invalid JSON** in `.mcp.json` → `43-mcp-shape` ERROR.
 - **Empty `url`** on a remote entry is *not* an error: shown as `not configured`, never connected — the documented way for a plugin to ship a placeholder connector (mcp, Server status detail).
 - **Hidden whitespace** (a pasted token with a trailing newline) in `command`, `url`, `args`, `env`, `headers`: warned, **not trimmed**, used as written (mcp, Configuration warnings).
@@ -158,7 +158,7 @@ Callable name: `mcp__<server>__<tool>` (permissions, MCP; hooks, Match MCP tools
 
 | Check | Reads | Fires on |
 | --- | --- | --- |
-| `43-mcp-shape` | `.mcp.json` at the root | invalid JSON (ERROR); `url` without `type` (ERROR); `type: sse` (INFO) |
+| `43-mcp-shape` | `.mcp.json` at the root | invalid JSON (ERROR); `url` without `type` (ERROR); `type: sse` (NOTICE) |
 | `43-mcp-secret` | same, `url`/`headers`/`env`/`args` | literal-looking token without `${` (WARN) |
 | `43-mcp-credential-var` | same, `url`/`headers` | one of the five documented protected names (ERROR) |
 | `43-mcp-approval` | shared `.claude/settings.json` | `enableAllProjectMcpServers` / `enabledMcpjsonServers` committed (WARN) |

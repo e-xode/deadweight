@@ -118,8 +118,10 @@ def cache_file(root):
     return os.path.join(base, "claude-audit", key + ".json")
 
 
-def counts(err, warn):
-    return " ".join(x for x in (f"{err}E" if err else "", f"{warn}W" if warn else "") if x) or "✓"
+def counts(err, warn, notice=0):
+    # `n` is lower-case on purpose: a notice names a file, it does not move the floor.
+    return " ".join(x for x in (f"{err}E" if err else "", f"{warn}W" if warn else "",
+                                f"{notice}n" if notice else "") if x) or "✓"
 
 
 def read(path):
@@ -211,7 +213,8 @@ def main():
 
     # The plugin's name leads: next to `ctx 42%` a bare `19W` does not say what it
     # counts, and the name doubles as the command that shows the detail.
-    print(f"{col}{PLUGIN} {counts(err, warn)}{suffix}{OFF}{up}{tail}", end="")
+    notice = int(last.get("notices", 0))
+    print(f"{col}{PLUGIN} {counts(err, warn, notice)}{suffix}{OFF}{up}{tail}", end="")
 
 
 if __name__ == "__main__":

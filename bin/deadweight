@@ -13,6 +13,7 @@ declare and which fails silently where it is missing.
 
     deadweight                   cached findings for this project, errors first
     deadweight --errors          errors only
+    deadweight --info            also the measurements (INFO), which the default leaves out
     deadweight --fresh           measure now, rewrite the cache the status line reads, show it
     deadweight --json            the raw cached report
     deadweight --setup-statusline  install the status line into this project
@@ -105,7 +106,7 @@ def setup_statusline(root: Path) -> int:
     return 0
 
 
-def show(root: Path, only_errors: bool, as_json: bool) -> int:
+def show(root: Path, only_errors: bool, as_json: bool, with_info: bool = False) -> int:
     src = cache_path(root)
     if not src.is_file() or src.stat().st_size == 0:
         print(f"No cached measurement for {root}.\n"
@@ -120,9 +121,9 @@ def show(root: Path, only_errors: bool, as_json: bool) -> int:
     except (json.JSONDecodeError, UnicodeDecodeError):
         print(f"Cached report at {src} is unreadable.", file=sys.stderr)
         return 2
-    e, w = d.get("errors", 0), d.get("warnings", 0)
+    e, w, n = d.get("errors", 0), d.get("warnings", 0), d.get("notices", 0)
     col = RED if e else (YEL if w else GRN)
-    print(f"{col}{d.get('project')}  {e}E {w}W{OFF}{DIM}   audit {d.get('audit_sha')}"
+    print(f"{col}{d.get('project')}  {e}E {w}W {n}n{OFF}{DIM}   audit {d.get('audit_sha')}"
           f" ({d.get('plugin_version') or '?'})   measured {d.get('measured_at')}{OFF}")
     fix = remedy(root, d)
     if fix:
@@ -131,25 +132,31 @@ def show(root: Path, only_errors: bool, as_json: bool) -> int:
     if newer:
         print(f"{YEL}↑ {newer} is available: `claude plugin update deadweight`{OFF}")
     print()
-    found = [f for f in (d.get("findings") or [])
-             if not only_errors or f.get("severity") == "ERROR"]
+    rang = {"ERROR": 0, "WARN": 1, "NOTICE": 2, "INFO": 3}
+    every = d.get("findings") or []
+    found = [f for f in every
+             if (f.get("severity") == "ERROR" if only_errors
+                 else f.get("severity") != "INFO" or with_info)]
+    mesures = sum(f.get("severity") == "INFO" for f in every)
     if not found:
         print("  (nothing to report)")
-        return 0
-    for f in sorted(found, key=lambda x: 0 if x.get("severity") == "ERROR" else 1):
-        c = RED if f.get("severity") == "ERROR" else YEL
+    for f in sorted(found, key=lambda x: rang.get(x.get("severity"), 4)):
+        c = {"ERROR": RED, "WARN": YEL}.get(f.get("severity"), DIM)
         print(f"  {c}[{f.get('severity')}]{OFF} {f.get('check')}")
         print(f"      {f.get('message')}")
         print(f"      {DIM}{f.get('location')}{OFF}")
+    if mesures and not with_info and not only_errors:
+        print(f"\n  {DIM}{mesures} measurement(s) not shown: `deadweight --info`{OFF}")
     return 0
 
 
 def main(argv: list[str]) -> int:
     root = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path.cwd())
-    fresh = errors = as_json = setup = False
+    fresh = errors = as_json = setup = with_info = False
     for a in argv:
         if a == "--fresh":                   fresh = True
         elif a == "--errors":                errors = True
+        elif a == "--info":                  with_info = True
         elif a == "--json":                  as_json = True
         elif a == "--setup-statusline":      setup = True
         elif a == "--where":                 print(PLUGIN_ROOT); return 0
@@ -167,7 +174,7 @@ def main(argv: list[str]) -> int:
         # the `↻` it had just told the reader to clear - exactly as it was.
         env = dict(os.environ, CLAUDE_PROJECT_DIR=str(root), CLAUDE_PLUGIN_ROOT=str(PLUGIN_ROOT))
         subprocess.call(["bash", str(HOOK)], env=env)
-    return show(root, errors, as_json)
+    return show(root, errors, as_json, with_info)
 
 
 if __name__ == "__main__":

@@ -95,12 +95,12 @@ that resolves to nothing is dropped (WARN); if **no** entry resolves, the agent 
 Parameterised forms (`Bash(git diff *)`) and `mcp__*` names are accepted.
 
 **`Task` is `Agent`.** The fan-out tool was renamed `Agent` in 2.1.63; `Task(...)` in agent
-definitions and settings still works as an alias ([sub-agents]). `[23-agent-tools]` reports it as INFO.
+definitions and settings still works as an alias ([sub-agents]). `[23-agent-tools]` reports it as NOTICE.
 In the SDK the tool still appears as `"Task"` in the `system:init` list ([sdk-subagents]).
 
 **`TaskOutput` — the docs disagree.** [tools-reference] lists it as *deprecated in favor of `Read` on
 the task's output file path*; [permissions] calls it one of "the tools Claude Code has removed". Either
-way, do not grant it. `[23-agent-tools]` reports it as deprecated (INFO).
+way, do not grant it. `[23-agent-tools]` reports it as deprecated (NOTICE).
 
 **Removed from every sub-agent**, even when listed ([sub-agents]): `AskUserQuestion`, `EndConversation`,
 `EnterPlanMode`, `ScheduleWakeup`, `WaitForMcpServers`, `Workflow`; `ExitPlanMode` **unless**

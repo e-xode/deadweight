@@ -95,9 +95,9 @@ paths:
 None of these failures produces a runtime error, which is why `22-rule-glob-match` expands every
 glob, brace branches included, and reports one matching no file in the repository.
 
-**House convention** (`22-rule-glob-match`, INFO): a glob rooted in a directory the repository's
+**House convention** (`22-rule-glob-match`, NOTICE): a glob rooted in a directory the repository's
 git ignores (`dist/**`, `data-exports/**`) can only be checked on machines that hold those
-untracked files. The auditor reports it as INFO and does not count it, so the same commit gives
+untracked files. The auditor reports it as NOTICE and keeps it out of the floor, so the same commit gives
 the same result everywhere. For every git-dependent judgement the auditor uses **the
 repository's own ignore rules only**, never the user's global `core.excludesFile`.
 
@@ -168,7 +168,7 @@ frontmatter parse errors; the
 | Id | Level | What it asserts | Register |
 | --- | --- | --- | --- |
 | `14-rule-unknown-field` | WARN | No frontmatter field other than `paths` | Doc |
-| `22-rule-glob-match` | WARN / INFO | Each glob matches a file in the repository (INFO, not counted, when rooted in a git-ignored path) | Doc + House convention |
+| `22-rule-glob-match` | WARN / NOTICE | Each glob matches a file in the repository (NOTICE, not in the floor, when rooted in a git-ignored path) | Doc + House convention |
 | `14-rule-size` | WARN | ≤ 2 KB | House convention |
 | `14-rule-no-paths` | WARN | Frontmatter present ⇒ `paths:` present | House convention |
 | `14-rule-code-comments` | WARN | No `//` lines outside fences | House convention |

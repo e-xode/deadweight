@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.13.0 — 2026-09-23
+
+**This release changes `audit.py`, so a floor set with 0.12.0 stops comparing.** The floor counts
+do not move: what 0.12.0 reported as INFO and now reports as NOTICE was never counted, and still
+is not. Re-set the floor after reading both counts (see
+[Versions and your floor](README.md#versions-and-your-floor)). A status line installed before
+this release does not show notices until `deadweight --setup-statusline` is run again.
+
+### Changed
+
+- **A fourth severity, NOTICE, for findings that name a file without being a defect.** INFO used to
+  carry two things: measurements every run emits (layout, budget, coverage rates), and findings about
+  one file - a skill pair separated only by its descriptions, a vendored `SKILL.md` past the
+  compaction ceiling, an exemption that excuses nothing, a house convention in the default profile.
+  Neither was counted, and the run ended on `All checks passed.` On one repository of the fleet
+  this plugin comes from, that line sat under 19 such findings, and the agent that ran the audit
+  reported "0 errors, 0 warnings" as the whole result. Those findings are now NOTICE: listed, counted
+  as `n` in the summary and the status line, and kept out of the floor. INFO is left with the
+  measurements, which never reach zero and are no longer counted anywhere.
+- **The summary names notices, and says "passed" only when there are none.** With notices it ends on
+  `No error or warning. N notice(s) above: report them too`, then gives the number of measurements
+  and asks for them to be offered, not listed. The skill tells the agent the same: every ERROR, WARN
+  and NOTICE by name, the measurements by count, shown on request - or appended when there is no one
+  to ask.
+- **`deadweight` shows notices, and `deadweight --info` the measurements.** The session hook now
+  caches both.
+
 ## 0.12.0 — 2026-09-23
 
 **This release changes `audit.py`, so a floor set with 0.11.0 stops comparing.** One check moves:
