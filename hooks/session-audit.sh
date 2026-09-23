@@ -55,9 +55,17 @@ trap 'rm -f "$TMP"' EXIT
 timeout 25 python3 "$AUDIT" --root "$ROOT" --json >"$TMP" 2>/dev/null
 [ -s "$TMP" ] || exit 0
 
-python3 - "$TMP" "$CACHE/$KEY.json" "$(basename "$ROOT")" <<'PY' 2>/dev/null
-import datetime, json, sys
-src, dst, name = sys.argv[1], sys.argv[2], sys.argv[3]
+python3 - "$TMP" "$CACHE/$KEY.json" "$(basename "$ROOT")" "${CLAUDE_PLUGIN_ROOT:-}" <<'PY' 2>/dev/null
+import datetime, json, os, sys
+src, dst, name, plugin_root = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+# The version that MEASURED, not the one installed now: after an update the two
+# differ until the next session, and the counts belong to the former. A sha names
+# the instrument for a machine; a version names it for the person reading.
+try:
+    version = json.load(open(os.path.join(plugin_root, ".claude-plugin", "plugin.json"),
+                             encoding="utf-8")).get("version")
+except Exception:
+    version = None
 try:
     data = json.load(open(src, encoding="utf-8"))
 except Exception:
@@ -71,6 +79,7 @@ json.dump({"project": name,
            "errors": int(counts.get("ERROR", 0)),
            "warnings": int(counts.get("WARN", 0)),
            "audit_sha": data.get("audit_sha"),
+           "plugin_version": version,
            "layout": data.get("layout"),
            "measured_at": datetime.datetime.now().isoformat(timespec="seconds"),
            "findings": [f for f in (data.get("findings") or [])

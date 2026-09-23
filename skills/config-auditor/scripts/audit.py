@@ -206,6 +206,7 @@ CHECKS = (
     "flags the documentation shows must exist in the script",
     "38-unreadable",
     "39-eval-quality",
+    "40-skill-not-loaded",
 )
 # i18n-data: start — French on purpose, this is the check's own dictionary
 FRENCH_HEURISTIC_WORDS = {
@@ -511,10 +512,63 @@ PLUGIN_ONLY = ("check_plugin_cost",)
 # The only things worth saying about a marketplace repository: what it is, and
 # whether its own catalogue is coherent. Everything else has no subject here.
 MARKETPLACE_CHECKS = ("check_skills",)
+# A library is skills and nothing else: judge their content, and say where they
+# would load. A repository with no Claude configuration gets the second only.
+LIBRARY_CHECKS = ("check_skills", "check_skill_names", "check_description_overlap",
+                  "check_unloadable_skills")
+NONE_CHECKS = ("check_unloadable_skills",)
+
+
+def claude_signs(root: Path) -> list[str]:
+    """What in this repository says it is meant for Claude Code."""
+    return [n for n in ("CLAUDE.md", ".claude", ".claude-plugin") if (root / n).exists()]
+
+
+def root_level_skills(root: Path) -> list[Path]:
+    """Directories at the root that hold a SKILL.md directly.
+
+    Claude Code finds skills by LOCATION, never by content: `~/.claude/skills/`,
+    `.claude/skills/`, and `skills/` at a plugin root. Measured 2026-09-23 from the
+    session's `init` event: a `<name>/SKILL.md` at the repository root is loaded
+    neither when the repository is opened as a project nor when it is passed as
+    `--plugin-dir`, where `skills/<name>/SKILL.md` beside it is.
+    """
+    skip = {".claude", ".claude-plugin", ".git", "skills"}
+    return sorted(d for d in root.iterdir()
+                  if d.is_dir() and d.name not in skip and (d / "SKILL.md").is_file())
+
+
+def check_unloadable_skills(root: Path, report: Report) -> None:
+    """A SKILL.md at the repository root is a file, not a skill.
+
+    Severity follows intent, which the auditor can only read from the repository:
+    beside a CLAUDE.md, a `.claude/` or a plugin manifest, the author meant these to
+    load in Claude Code and they do not - ERROR. Without any such sign the repository
+    may target another tool, or installation by copy - WARN, saying where they load.
+    """
+    found = root_level_skills(root)
+    if not found:
+        return
+    signs = claude_signs(root)
+    names = ", ".join(d.name for d in found[:5]) + (f" (+{len(found) - 5})" if len(found) > 5 else "")
+    where = ("`skills/<name>/` (plugin)" if LAYOUT != "project"
+             else "`.claude/skills/<name>/`")
+    report.add(
+        "40-skill-not-loaded",
+        "ERROR" if signs else "WARN",
+        f"{len(found)} skill(s) at the repository root load nowhere as they stand: {names}. "
+        "Claude Code finds skills by location, not by content - a project loads "
+        "`.claude/skills/`, a plugin loads `skills/`. "
+        + (f"This repository carries {', '.join(signs)}, so they were meant to load: "
+           f"move them under {where}." if signs else
+           "Nothing here says the repository targets Claude Code; if it does, move them "
+           "under `skills/` and it loads as a plugin, manifest or not."),
+        str(root),
+    )
 
 
 def detect_layout(root: Path) -> str:
-    """Which container this is: `marketplace`, `plugin`, or `project`.
+    """Which container this is: `marketplace`, `plugin`, `project`, `library` or `none`.
 
     A repository whose root carries a marketplace manifest and whose plugins live in
     subdirectories is NEITHER a project NOR a plugin. Measured 2026-09-22 on 15
@@ -527,7 +581,22 @@ def detect_layout(root: Path) -> str:
         return "plugin"
     if (root / ".claude-plugin" / "marketplace.json").is_file():
         return "marketplace"
-    return "project"
+    # Everything below was measured on 15 public repositories created after
+    # 2026-09-22: 6 of the 7 errors reported there were this auditor mistaking a
+    # shape it did not know for a project missing its CLAUDE.md.
+    if (root / "CLAUDE.md").exists() or (root / ".claude").is_dir():
+        return "project"
+    # The manifest is optional: `skills/<name>/SKILL.md` at the root loads under
+    # `--plugin-dir`, named after the folder, and `claude plugin validate` passes.
+    if (root / "skills").is_dir() and any((root / "skills").glob("*/SKILL.md")):
+        return "plugin"
+    # Skills kept at the root load nowhere as they stand. Their content is still
+    # worth auditing - they are meant to be copied somewhere that does load them.
+    if root_level_skills(root):
+        return "library"
+    # A SKILL.md under `.devin/` or `tests/fixtures/` is not a Claude configuration,
+    # and "CLAUDE.md not found" there is the auditor's ignorance, not a defect.
+    return "none"
 
 
 def apply_layout(root: Path, layout: str) -> None:
@@ -547,6 +616,8 @@ def apply_layout(root: Path, layout: str) -> None:
         # no settings and no skills of its own - the plugins it lists have those.
         # Pointing the project paths at it would report every absence as a defect.
         CLAUDE_DIR, SKILLS_DIR, AGENTS_DIR = ".", "skills", "agents"
+    elif layout in ("library", "none"):
+        CLAUDE_DIR, SKILLS_DIR, AGENTS_DIR = ".", ".", "agents"
     else:
         CLAUDE_DIR, SKILLS_DIR, AGENTS_DIR = ".claude", ".claude/skills", ".claude/agents"
 
@@ -866,7 +937,13 @@ def dossiers_de_skill(base: Path, report: Report) -> list[Path]:
 
 def check_skills(root: Path, report: Report) -> dict[str, dict]:
     skills_dir = root / SKILLS_DIR
-    if not skills_dir.is_dir():
+    if LAYOUT == "none":
+        return {}
+    if LAYOUT == "library":
+        # Only the root folders that ARE skills: `src/` or `docs/` beside them are
+        # not malformed skills, and the recursive walk would call them that.
+        entries = root_level_skills(root)
+    elif not skills_dir.is_dir():
         if LAYOUT == "marketplace":
             report.add("02-skills-dir", "INFO",
                        "A marketplace repository ships no skills of its own; the plugins it "
@@ -886,9 +963,11 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
                        f"{SKILLS_DIR}/ not found, and no commands/, agents/ or hooks/ either "
                        "— nothing here declares anything.", str(skills_dir))
         return {}
+    else:
+        entries = dossiers_de_skill(skills_dir, report)
     skills: dict[str, dict] = {}
     seen_names: dict[str, str] = {}
-    for entry in sorted(dossiers_de_skill(skills_dir, report)):
+    for entry in sorted(entries):
         skill_md = entry / "SKILL.md"
         text = skill_md.read_text(encoding="utf-8")
         fm, _ = parse_frontmatter(text)
@@ -1605,17 +1684,33 @@ def check_skill_index(root: Path, report: Report, skills: dict[str, dict]) -> No
         return
     text = claude_md.read_text(encoding="utf-8")
     section = re.search(r"##\s+Skills index.*?(?=^##\s|\Z)", text, re.DOTALL | re.MULTILINE)
+    hidden = listing_hidden_skills(root, skills)
     if not section:
-        report.add(
-            "15-skill-index",
-            "ERROR",
-            "CLAUDE.md has no '## Skills index' section to validate against.",
-            str(claude_md),
-        )
+        # The section exists to point at what the listing withholds. With nothing
+        # withheld, its right content is empty, and demanding an empty heading was
+        # an error on every project outside the fleet it was calibrated on: a
+        # minimal clean project failed on first contact. The defect is not the
+        # missing heading; it is a withheld skill that nothing points at.
+        if not hidden:
+            report.add(
+                "15-skill-index",
+                "INFO",
+                "No 'Skills index' section, and no skill is withheld from the harness listing: "
+                "nothing needs one.",
+                str(claude_md),
+            )
+        for name in sorted(hidden):
+            report.add(
+                "15-skill-index",
+                "ERROR",
+                f"Skill '{name}' is withheld from the harness listing, and CLAUDE.md has no "
+                "'Skills index' section to point at it. A withheld skill that nothing points at "
+                "is unreachable.",
+                str(claude_md),
+            )
         return
     body = "\n".join(l for l in section.group(0).splitlines() if not l.lstrip().startswith("➜"))
     indexed = {m.group(1) for m in re.finditer(r"`([a-z0-9][a-z0-9-]+)`", body)}
-    hidden = listing_hidden_skills(root, skills)
 
     for name in sorted(hidden):
         if name not in indexed:
@@ -3056,7 +3151,7 @@ def main(argv: list[str]) -> int:
                              f"{ROLLUP_AFTER} times is rolled up")
     parser.add_argument(
         "--layout",
-        choices=("auto", "project", "plugin"),
+        choices=("auto", "project", "plugin", "library", "none"),
         default="auto",
         help="Container being audited (default: auto, from .claude-plugin/plugin.json)",
     )
@@ -3083,16 +3178,24 @@ def main(argv: list[str]) -> int:
     # Before any check runs: a moved threshold must move for EVERY check that
     # reads it, not only for the ones that happen to run afterwards.
     apply_thresholds(_local, report)
-    report.add(
-        "00-layout",
-        "INFO",
-        f"Layout `{layout}`{'' if args.layout != 'auto' else ' (detected)'}: "
-        f"skills at `{SKILLS_DIR}/`, agents at `{AGENTS_DIR}/`."
-        + ("" if layout == "project" else
-           f" {len(PROJECT_ONLY)} project-only check(s) skipped - a plugin has no "
-           "CLAUDE.md, settings, rules or skills index."),
-        str(root),
-    )
+    detail = {
+        "library": "skills kept at the repository root, no project and no manifest: "
+                   "their content is audited, and where they would load is said.",
+        "none": "no Claude Code configuration here - no CLAUDE.md, no .claude/, no "
+                "skills/, no manifest. Nothing to audit, and nothing is missing.",
+    }
+    if layout in detail:
+        msg = f"Layout `{layout}`{'' if args.layout != 'auto' else ' (detected)'}: {detail[layout]}"
+    else:
+        msg = (f"Layout `{layout}`{'' if args.layout != 'auto' else ' (detected)'}: "
+               f"skills at `{SKILLS_DIR}/`, agents at `{AGENTS_DIR}/`."
+               + ("" if layout == "project" else
+                  f" {len(PROJECT_ONLY)} project-only check(s) skipped - a plugin has no "
+                  "CLAUDE.md, settings, rules or skills index.")
+               + (" No manifest: the plugin is named after its folder, which the manifest "
+                  "is optional for." if layout == "plugin"
+                  and not (root / ".claude-plugin" / "plugin.json").is_file() else ""))
+    report.add("00-layout", "INFO", msg, str(root))
 
     def run(fn, *a):
         """Dispatch, skipping checks whose subject the current container lacks."""
@@ -3106,6 +3209,10 @@ def main(argv: list[str]) -> int:
         # it reports the auditor's own ignorance as the repository's defect.
         if layout == "marketplace" and name not in MARKETPLACE_CHECKS:
             return None
+        if layout == "library" and name not in LIBRARY_CHECKS:
+            return None
+        if layout == "none" and name not in NONE_CHECKS:
+            return None
         # Every check goes through here. Until 2026-09-22 half of them were called
         # directly, so PROJECT_ONLY and PLUGIN_ONLY governed only the half that
         # happened to be wrapped - a dispatch that decides for some of its subjects
@@ -3115,7 +3222,7 @@ def main(argv: list[str]) -> int:
 
     run(check_claude_md, root, report)
     skills = check_skills(root, report)
-    agents = check_agents(root, report)
+    agents = check_agents(root, report) if layout not in ("library", "none") else {}
     run(check_agent_descriptions, report, agents)
     run(check_cross_refs, root, report, skills, agents)
     run(check_english_only, root, report)
@@ -3146,6 +3253,7 @@ def main(argv: list[str]) -> int:
     run(check_project_overlay, root, report, _local)
     run(check_skill_names, root, report, skills)
     run(check_description_overlap, root, report, skills)
+    run(check_unloadable_skills, root, report)
 
     apply_overlay(report, _local, root)
     floor_rc = check_floor(root, report) if args.check_floor else 0

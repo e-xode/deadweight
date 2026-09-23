@@ -13,7 +13,7 @@ declare and which fails silently where it is missing.
 
     deadweight                   cached findings for this project, errors first
     deadweight --errors          errors only
-    deadweight --fresh           re-run the audit now instead of reading the cache
+    deadweight --fresh           measure now, rewrite the cache the status line reads, show it
     deadweight --json            the raw cached report
     deadweight --setup-statusline  install the status line into this project
     deadweight --where           print this plugin's root (to alias the command)
@@ -33,6 +33,36 @@ AUDIT = PLUGIN_ROOT / "skills" / "config-auditor" / "scripts" / "audit.py"
 TEMPLATE = PLUGIN_ROOT / "skills" / "config-auditor" / "templates" / "statusline.py"
 
 RED, YEL, GRN, DIM, OFF = "\033[31m", "\033[33m", "\033[32m", "\033[2m", "\033[0m"
+HOOK = PLUGIN_ROOT / "hooks" / "session-audit.sh"
+
+
+def statusline_module():
+    """The status line's own helpers, so the line and this command cannot disagree."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("deadweight_statusline", TEMPLATE)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def remedy(root: Path, d: dict) -> str | None:
+    """What clears the `↻`, decided here because only here is the current auditor known.
+
+    The status line compares two shas and cannot tell which side is older. When the
+    MEASUREMENT is older (the configuration moved, or the plugin was updated since),
+    measuring again fixes it. When the FLOOR is older, measuring again changes
+    nothing - the floor has to be re-set, deliberately, after reading both counts.
+    """
+    sl = statusline_module()
+    cache = cache_path(root)
+    current = hashlib.sha256(AUDIT.read_bytes()).hexdigest()[:8]
+    if sl.config_touched_since(str(root), cache.stat().st_mtime) or d.get("audit_sha") != current:
+        return "the measurement is older than the configuration or the auditor: `deadweight --fresh`"
+    floor = sl.read(str(root / ".claude" / "audit" / "floor.json"))
+    if floor and floor.get("audit_sha") != d.get("audit_sha"):
+        return (f"the floor was set by another auditor (`{floor.get('audit_sha')}`, now "
+                f"`{d.get('audit_sha')}`): read both counts, then `audit.py --set-floor`")
+    return None
 
 
 def cache_path(root: Path) -> Path:
@@ -93,7 +123,14 @@ def show(root: Path, only_errors: bool, as_json: bool) -> int:
     e, w = d.get("errors", 0), d.get("warnings", 0)
     col = RED if e else (YEL if w else GRN)
     print(f"{col}{d.get('project')}  {e}E {w}W{OFF}{DIM}   audit {d.get('audit_sha')}"
-          f"   measured {d.get('measured_at')}{OFF}\n")
+          f" ({d.get('plugin_version') or '?'})   measured {d.get('measured_at')}{OFF}")
+    fix = remedy(root, d)
+    if fix:
+        print(f"{YEL}↻ {fix}{OFF}")
+    newer = statusline_module().update_available(str(root))
+    if newer:
+        print(f"{YEL}↑ {newer} is available: `claude plugin update deadweight`{OFF}")
+    print()
     found = [f for f in (d.get("findings") or [])
              if not only_errors or f.get("severity") == "ERROR"]
     if not found:
@@ -125,8 +162,11 @@ def main(argv: list[str]) -> int:
     if setup:
         return setup_statusline(root)
     if fresh:
-        cmd = [sys.executable, str(AUDIT), "--root", str(root)] + (["--json"] if as_json else [])
-        return subprocess.call(cmd)
+        # Through the hook, so there is one writer of the cache and one format. An
+        # earlier `--fresh` ran the audit and printed it, and left the cache - and
+        # the `↻` it had just told the reader to clear - exactly as it was.
+        env = dict(os.environ, CLAUDE_PROJECT_DIR=str(root), CLAUDE_PLUGIN_ROOT=str(PLUGIN_ROOT))
+        subprocess.call(["bash", str(HOOK)], env=env)
     return show(root, errors, as_json)
 
 

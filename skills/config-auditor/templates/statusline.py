@@ -22,6 +22,25 @@ TWO DESIGN RULES, both learned the hard way.
        red     above the floor: a regression, the only urgent case
        dim     measured by a superseded auditor, or by a stale measurement
 
+   Two glyphs, one meaning each:
+
+       ↻        this number is not comparable: the configuration changed since it
+                was measured, or the floor was set by another auditor
+       ↑0.9.0   a newer release is known locally: `claude plugin update`
+
+   `↻` carries no remedy, deliberately. An earlier version printed one - "reopen
+   the session" - and it was wrong in one case of two: when the FLOOR is the older
+   side, reopening measures again with the same auditor and the mismatch stays
+   forever. This line compares two shas and cannot tell which is newer; the
+   `deadweight` command can, and says which remedy applies.
+
+3. A NUMBER IS SHOWN ONLY WHEN IT CHANGES WHAT YOU DO. Zero counts are dropped
+   (`19W`, not `0E 19W`; `✓` when both are zero). The version is shown only as a
+   DIFFERENCE - installed against available - because a version on its own names
+   the state, and a difference names an action. Both are read from files Claude
+   Code keeps on disk: no network, no subprocess, and nothing shown when the local
+   catalogue was never refreshed.
+
 2. FRESHNESS IS MEASURED, NOT GUESSED FROM AGE. The audit runs once, at session
    start; this reads a frozen number that looks live. Fix five warnings and it still
    shows the old count; add a broken rule and it still shows zero errors. An earlier
@@ -44,6 +63,63 @@ RED, YEL, GRN, DIM, OFF = "\033[31m", "\033[33m", "\033[32m", "\033[2m", "\033[0
 # configuration. Without this exclusion, setting a floor invalidates the very
 # measurement that produced it.
 SKIP_DIRS = {".git", "node_modules", "__pycache__", "audit"}
+
+
+PLUGIN = "deadweight"
+
+
+def claude_home():
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+
+
+def version_key(v):
+    try:
+        return tuple(int(x) for x in str(v).split("-")[0].split("."))
+    except ValueError:
+        return ()
+
+
+def versions(root):
+    """(installed for this project, newest the local catalogue knows), or Nones.
+
+    `installed_plugins.json` and `known_marketplaces.json` are Claude Code's own
+    bookkeeping, not a documented interface: every read is guarded, and a format
+    change shows nothing rather than something false.
+    """
+    plugins = os.path.join(claude_home(), "plugins")
+    installed = read(os.path.join(plugins, "installed_plugins.json")) or {}
+    pick, market = None, None
+    for key, entries in (installed.get("plugins") or {}).items():
+        if key.split("@")[0] != PLUGIN or not isinstance(entries, list):
+            continue
+        for e in entries:
+            if e.get("projectPath") == root or (pick is None and e.get("scope") == "user"):
+                pick, market = e, key.split("@", 1)[-1]
+    if not pick:
+        return None, None
+    known = (read(os.path.join(plugins, "known_marketplaces.json")) or {}).get(market) or {}
+    where = known.get("installLocation") or os.path.join(plugins, "marketplaces", market)
+    catalogue = read(os.path.join(where, ".claude-plugin", "marketplace.json")) or {}
+    available = next((p.get("version") for p in catalogue.get("plugins") or []
+                      if p.get("name") == PLUGIN), None)
+    return pick.get("version"), available
+
+
+def update_available(root):
+    installed, available = versions(root)
+    if installed and available and version_key(available) > version_key(installed):
+        return available
+    return None
+
+
+def cache_file(root):
+    base = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
+    key = f"{os.path.basename(root.rstrip('/'))}-{hashlib.md5(root.encode()).hexdigest()[:8]}"
+    return os.path.join(base, "claude-audit", key + ".json")
+
+
+def counts(err, warn):
+    return " ".join(x for x in (f"{err}E" if err else "", f"{warn}W" if warn else "") if x) or "✓"
 
 
 def read(path):
@@ -94,10 +170,7 @@ def main():
     root = ws.get("project_dir") or ws.get("current_dir") or data.get("cwd") or ""
     if not root:
         return
-    name = os.path.basename(root.rstrip("/"))
-    base = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
-    key = f"{name}-{hashlib.md5(root.encode()).hexdigest()[:8]}"
-    cache = os.path.join(base, "claude-audit", key + ".json")
+    cache = cache_file(root)
     last = read(cache)
     if not last:
         return
@@ -109,7 +182,7 @@ def main():
 
     if floor and not same_instrument:
         col = DIM
-        suffix = " (superseded auditor, reopen the session)"
+        suffix = " ↻"
     elif not floor:
         col = YEL if err else DIM
         suffix = " (no floor set)"
@@ -125,7 +198,7 @@ def main():
     stale = config_touched_since(root, os.path.getmtime(cache))
     if stale:
         col = DIM
-        suffix = " (config changed since, run deadweight --fresh)"
+        suffix = " ↻"
 
     # The age only shows when it adds something: dating a measurement already
     # declared stale is a second signal for one fact, and two signals for one fact
@@ -133,8 +206,13 @@ def main():
     when = "" if (stale or (floor and not same_instrument)) else age(cache)
     tail = f"{DIM} · {when}{OFF}" if when else ""
 
-    # The plugin's name leads, and doubles as the command that shows the detail.
-    print(f"{col}deadweight {err}E {warn}W{suffix}{OFF}{tail}", end="")
+    newer = update_available(root)
+    up = f" {YEL}↑{newer}{OFF}" if newer else ""
+
+    # The plugin's name leads: next to `ctx 42%` a bare `19W` does not say what it
+    # counts, and the name doubles as the command that shows the detail.
+    print(f"{col}{PLUGIN} {counts(err, warn)}{suffix}{OFF}{up}{tail}", end="")
 
 
-main()
+if __name__ == "__main__":
+    main()

@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.9.0 — 2026-09-23
+
+**This release changes `audit.py`, so a floor set with an earlier version stops comparing.**
+
+Measured on a second sample of **15 public repositories created after the first sample was
+drawn**, so none of them can have been in it. On that sample 0.8.0 reported **7 errors, and 6
+were its own**: it mistook shapes it did not know for projects missing their `CLAUDE.md`. This
+release reports **16, all checked by hand**: 11 are plain defects (a `name` that does not match
+its folder, a broken link), 4 depend on a house threshold or on whether `CLAUDE.md` is required,
+and none is the auditor's.
+
+### Claude Code finds skills by location, not by content
+
+Measured from the session's `init` event: `<name>/SKILL.md` at a repository root loads neither
+in a project nor under `--plugin-dir`; `skills/<name>/SKILL.md` loads under `--plugin-dir` with
+no manifest at all, and `claude plugin validate` passes.
+
+- **Two new layouts.** `library` — skills kept at the root, no project, no manifest: their content
+  is audited instead of being ignored. `none` — no Claude Code configuration at all (a `SKILL.md`
+  under another tool's folder, or a test fixture): one INFO, and no "CLAUDE.md not found".
+- **A plugin without a manifest is a plugin.** `skills/*/SKILL.md` at the root, with no
+  `CLAUDE.md` and no `.claude/`, is now audited as one.
+- **`40-skill-not-loaded`.** Skills at the root load nowhere as they stand. ERROR when the
+  repository carries a sign it targets Claude Code (`CLAUDE.md`, `.claude/`, `.claude-plugin/`),
+  WARN otherwise — the repository may target another tool, or installation by copy.
+
+### What it stops saying wrongly
+
+- **`15-skill-index` no longer demands an empty heading.** A missing `## Skills index` was an
+  ERROR on every project, including a minimal clean one. The section exists to point at skills
+  the listing withholds: with none withheld it is not needed (INFO), and with one withheld and no
+  section, the ERROR names that skill.
+
+### Status line
+
+- **A number is shown only when it changes what you do.** Zero counts are dropped (`19W`, not
+  `0E 19W`; `✓` when both are zero). The version appears only as a difference: `↑0.9.0` when the
+  local copy of the marketplace knows a newer release than the one installed — read from Claude
+  Code's own files, no network.
+- **`↻` alone** marks a number that is not comparable. It used to carry a remedy — "reopen the
+  session" — which was wrong whenever the floor was the older side: measuring again changes nothing
+  there. `deadweight` now says which case applies, `--fresh` or `--set-floor`.
+- **`deadweight --fresh` rewrites the cache the status line reads.** It used to run the audit and
+  print it, leaving the `↻` it had just told you to clear exactly where it was.
+- **The README opens with install and use**, and the reference comes after. The status line image
+  is generated from the real template on a fictional project (`docs/render_statusline.py`).
+
 ## 0.8.0 — 2026-09-22
 
 **This release changes `audit.py`, so a floor set with an earlier version stops comparing.**
