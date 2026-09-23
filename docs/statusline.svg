@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="296" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15">
 <rect width="100%" height="100%" rx="8" fill="#22272e"/>
-<text x="18" y="34" xml:space="preserve"><tspan fill="#768390">deadweight 19W</tspan></text>
-<text x="330" y="34" fill="#636e7b" font-size="13">at the floor - nothing to do</text>
+<text x="18" y="34" xml:space="preserve"><tspan fill="#768390">deadweight 19W 4n</tspan></text>
+<text x="330" y="34" fill="#636e7b" font-size="13">at the floor - notices do not change the colour</text>
 <text x="18" y="68" xml:space="preserve"><tspan fill="#57ab5a">deadweight 15W ▼ floor 0/19</tspan></text>
 <text x="330" y="68" fill="#636e7b" font-size="13">below the floor - the ratchet earned its keep</text>
 <text x="18" y="102" xml:space="preserve"><tspan fill="#c69026">deadweight 2E 19W</tspan></text>

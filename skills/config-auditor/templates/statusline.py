@@ -163,19 +163,17 @@ def age(path):
     return f"{s // 86400}d"
 
 
-def main():
-    try:
-        data = json.load(sys.stdin)
-    except Exception:
-        return
-    ws = data.get("workspace") or {}
-    root = ws.get("project_dir") or ws.get("current_dir") or data.get("cwd") or ""
-    if not root:
-        return
+def segment(root):
+    """The audit segment for one project, or "" where no audit has run.
+
+    Separate from main() so a status line of your own can import this file from the
+    installed plugin and call it, instead of carrying a copy: a copy stays at the
+    version it was taken from, and the plugin's next change never reaches it.
+    """
     cache = cache_file(root)
     last = read(cache)
     if not last:
-        return
+        return ""
 
     err, warn = int(last.get("errors", 0)), int(last.get("warnings", 0))
     floor = read(os.path.join(root, ".claude", "audit", "floor.json"))
@@ -214,7 +212,21 @@ def main():
     # The plugin's name leads: next to `ctx 42%` a bare `19W` does not say what it
     # counts, and the name doubles as the command that shows the detail.
     notice = int(last.get("notices", 0))
-    print(f"{col}{PLUGIN} {counts(err, warn, notice)}{suffix}{OFF}{up}{tail}", end="")
+    return f"{col}{PLUGIN} {counts(err, warn, notice)}{suffix}{OFF}{up}{tail}"
+
+
+
+
+def main():
+    try:
+        data = json.load(sys.stdin)
+    except Exception:
+        return
+    ws = data.get("workspace") or {}
+    root = ws.get("project_dir") or ws.get("current_dir") or data.get("cwd") or ""
+    if not root:
+        return
+    print(segment(root), end="")
 
 
 if __name__ == "__main__":

@@ -23,7 +23,7 @@ COLOURS = {"31": "#e5534b", "32": "#57ab5a", "33": "#c69026", "2": "#768390"}
 
 # (label, errors, warnings, notices, floor (errors, warnings) or None, stale, newer version)
 STATES = [
-    ("at the floor - nothing to do", 0, 19, 0, (0, 19), False, None),
+    ("at the floor - notices do not change the colour", 0, 19, 4, (0, 19), False, None),
     ("below the floor - the ratchet earned its keep", 0, 15, 0, (0, 19), False, None),
     ("errors - always worth seeing", 2, 19, 0, (2, 19), False, None),
     ("above the floor - a regression", 2, 25, 0, (0, 19), False, None),

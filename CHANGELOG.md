@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.13.1 — 2026-09-23
+
+`audit.py` is unchanged: a floor set with 0.13.0 keeps comparing.
+
+### Changed
+
+- **`deadweight --setup-statusline` writes a launcher instead of a copy of the template.** The
+  launcher finds the plugin installed for the project and runs its template, so a release reaches
+  the status line at the next session. A copy stays at the version it was taken from: the notices
+  0.13.0 added never reached a line set up before it. Run the setup once more to replace a copy.
+- **The template exposes `segment(project_dir)`**, which returns the audit segment as a string. A
+  status line of your own can load the template from the plugin's install path and call it, rather
+  than carry a copy of it. The README says how.
+- The status line image shows notices next to warnings, where they usually are.
+
 ## 0.13.0 — 2026-09-23
 
 **This release changes `audit.py`, so a floor set with 0.12.0 stops comparing.** The floor counts

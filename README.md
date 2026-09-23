@@ -76,9 +76,19 @@ gives its count and offers to show the lines, and `deadweight --info` prints the
 ### Reading the status line
 
 `deadweight --setup-statusline` writes `.claude/statusline.py` and sets `statusLine` in the
-project's `.claude/settings.json`. It refuses to overwrite a status line you already have, and tells
-you where the segment is so you can splice it into yours. A plugin cannot ship a `statusLine`
-itself, so this one command is the shortest honest path.
+project's `.claude/settings.json`. A plugin cannot ship a `statusLine` itself, so this one command
+is the shortest honest path.
+
+The file it writes is a launcher, not the status line: it finds the plugin installed for the
+project and runs its template, so an update reaches the line at the next session without running
+the setup again. Until 0.13.1 it was a copy, and a copy stays at the version it was taken from —
+run the setup once more to replace one.
+
+**Already have a status line?** The setup leaves it untouched. Add the audit to it instead: load
+`skills/config-auditor/templates/statusline.py` from the plugin's install path and call
+`segment(project_dir)`, which returns the segment as a string, or `""` where no audit has run. The
+install path is the `installPath` of the plugin's entry in `~/.claude/plugins/installed_plugins.json`;
+`deadweight --where` prints it. Copying the template instead works until the next release.
 
 | Shown | Means | Do |
 | --- | --- | --- |

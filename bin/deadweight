@@ -32,6 +32,7 @@ HERE = Path(__file__).resolve().parent
 PLUGIN_ROOT = HERE.parent
 AUDIT = PLUGIN_ROOT / "skills" / "config-auditor" / "scripts" / "audit.py"
 TEMPLATE = PLUGIN_ROOT / "skills" / "config-auditor" / "templates" / "statusline.py"
+LAUNCHER = PLUGIN_ROOT / "skills" / "config-auditor" / "templates" / "statusline-launcher.py"
 
 RED, YEL, GRN, DIM, OFF = "\033[31m", "\033[33m", "\033[32m", "\033[2m", "\033[0m"
 HOOK = PLUGIN_ROOT / "hooks" / "session-audit.sh"
@@ -82,7 +83,9 @@ def setup_statusline(root: Path) -> int:
     """
     dest = root / ".claude" / "statusline.py"
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
+    # The launcher, not the template: a copied template stays at the version of the
+    # day it was copied, and 0.13.0's notices never reached the lines set up before it.
+    dest.write_text(LAUNCHER.read_text(encoding="utf-8"), encoding="utf-8")
     dest.chmod(0o755)
 
     settings = root / ".claude" / "settings.json"
