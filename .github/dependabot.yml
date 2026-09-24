@@ -1,0 +1,11 @@
+version: 2
+updates:
+  # The workflows are the release gate: an action left on an old major keeps running
+  # code nobody reviews any more. Weekly, grouped, so it is one pull request to read.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

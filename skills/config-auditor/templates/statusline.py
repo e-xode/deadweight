@@ -240,6 +240,12 @@ def project_of(path):
 
 
 def main():
+    # Windows writes a piped stdout in the ANSI code page (cp1252), which has no
+    # `✓`, `↻` or `▲`: the first one raised UnicodeEncodeError and the line showed nothing. Measured on a
+    # Windows runner, 2026-09-24. Every reader of this output - the host, an agent's
+    # shell tool, a modern terminal - decodes UTF-8.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     try:
         data = json.load(sys.stdin)
     except Exception:

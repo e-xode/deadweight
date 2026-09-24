@@ -4101,15 +4101,15 @@ def check_plugin_manifest(root: Path, report: Report) -> None:
         data = json.loads(manifest.read_text(encoding="utf-8")) if manifest.is_file() else {}
     except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         return
-    for field in PLUGIN_PATH_FIELDS:
-        vals = data.get(field)
+    for key in PLUGIN_PATH_FIELDS:
+        vals = data.get(key)
         vals = vals if isinstance(vals, list) else [vals]
         for v in vals:
             if not isinstance(v, str):
                 continue
             if not v.startswith("./"):
                 report.add("44-plugin-path", "ERROR",
-                           f"plugin.json '{field}': '{v}' - every component path must be relative "
+                           f"plugin.json '{key}': '{v}' - every component path must be relative "
                            "and start with './' (plugins-reference).", str(manifest))
                 continue
             try:
@@ -4118,12 +4118,12 @@ def check_plugin_manifest(root: Path, report: Report) -> None:
                 inside = True
             if not inside:
                 report.add("44-plugin-path", "ERROR",
-                           f"plugin.json '{field}': '{v}' escapes the plugin directory, and that "
+                           f"plugin.json '{key}': '{v}' escapes the plugin directory, and that "
                            "component does not load (plugins-reference).", str(manifest))
-    for field, folder in (("agents", "agents"), ("commands", "commands"),
+    for key, folder in (("agents", "agents"), ("commands", "commands"),
                           ("outputStyles", "output-styles"), ("workflows", "workflows"),
                           ("themes", "themes")):
-        vals = data.get(field)
+        vals = data.get(key)
         if vals is None or not (root / folder).is_dir():
             continue
         listed = {(root / v).resolve() for v in (vals if isinstance(vals, list) else [vals])
@@ -4132,7 +4132,7 @@ def check_plugin_manifest(root: Path, report: Report) -> None:
                  if p.resolve() not in listed and p.parent.resolve() not in listed]
         if stray:
             report.add("44-plugin-path", "WARN",
-                       f"plugin.json declares '{field}', which REPLACES the default {folder}/ "
+                       f"plugin.json declares '{key}', which REPLACES the default {folder}/ "
                        f"directory: {len(stray)} file(s) there are not loaded ({stray[0].name}...).",
                        str(manifest))
     market = cp / "marketplace.json"
@@ -4203,6 +4203,12 @@ def check_companions(root: Path, report: Report, skills: dict[str, dict]) -> Non
 
 
 def main(argv: list[str]) -> int:
+    # Windows writes a piped stdout in the ANSI code page (cp1252), which has no
+    # `➜` a finding may quote from an audited file: the first one raised UnicodeEncodeError and the text report died on it. Measured on a
+    # Windows runner, 2026-09-24. Every reader of this output - the host, an agent's
+    # shell tool, a modern terminal - decodes UTF-8.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="Audit Claude configuration.")
     parser.add_argument("--root", default=".", help="Repository root (default: cwd)")
     parser.add_argument("--json", action="store_true", help="Output JSON instead of text")

@@ -1,5 +1,10 @@
 # Deadweight
 
+[![audit](https://github.com/e-xode/deadweight/actions/workflows/audit.yml/badge.svg?branch=main)](https://github.com/e-xode/deadweight/actions/workflows/audit.yml)
+[![portability: Linux, macOS, Windows](https://github.com/e-xode/deadweight/actions/workflows/portability.yml/badge.svg?branch=main)](https://github.com/e-xode/deadweight/actions/workflows/portability.yml)
+[![release](https://img.shields.io/github/v/tag/e-xode/deadweight?filter=deadweight--v*&label=release)](CHANGELOG.md)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 **Audit the Claude Code configuration of a project or a plugin** — `CLAUDE.md`, skills, sub-agents,
 rules, hooks, settings, and the context all of it costs on every turn. One skill, one Python script,
 no dependencies, no network.

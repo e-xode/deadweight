@@ -80,7 +80,7 @@ def main():
     h, width = 34, 760
     out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{h * len(rows) + 24}" '
            f'font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15">',
-           f'<rect width="100%" height="100%" rx="8" fill="#22272e"/>']
+           '<rect width="100%" height="100%" rx="8" fill="#22272e"/>']
     for i, (label, ansi) in enumerate(rows):
         y = 12 + h * i + 22
         tspans = "".join(f'<tspan fill="{c}">{escape(t)}</tspan>' for t, c in spans(ansi))

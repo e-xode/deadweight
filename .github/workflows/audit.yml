@@ -9,9 +9,13 @@ name: audit
 # silently move the bar: --check-floor refuses to compare across two instruments
 # and says so, and the floor has to be re-set on purpose.
 
+# It also runs on `release-candidate*`: a release is pushed there first, and main and
+# the tag move only once every workflow is green on that commit. Pushing main is
+# publishing - the marketplace serves main - so a check that runs after it is a report.
+
 on:
   push:
-    branches: [main]
+    branches: [main, "release-candidate*"]
   pull_request:
 
 jobs:
@@ -22,6 +26,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Lint (pyflakes rules only - undefined names, unused imports)
+        run: |
+          python3 -m pip install --quiet ruff==0.16.8
+          ruff check --select E9,F skills/config-auditor/scripts skills/config-auditor/templates hooks bin/deadweight docs .github/smoke
       - name: Audit this plugin against its own floor
         run: python3 skills/config-auditor/scripts/audit.py --root . --check-floor
       - name: Report as JSON

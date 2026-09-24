@@ -1,0 +1,4 @@
+# Only the pyflakes rules run in CI (`--select E9,F`): undefined names and the like,
+# the class of defect that crashes a branch of audit.py nobody exercised. The
+# security rules were measured on this code and dropped: 11 findings, none real
+# (md5 as a cache key, subprocess with an argument list).

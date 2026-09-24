@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.15.0 — 2026-09-24
+
+**This release changes `audit.py`, so a floor set with 0.14.1 stops comparing.** The counts do not
+move: the change is how the report is written, not what it finds. Re-set the floor after reading
+both counts (see [Versions and your floor](README.md#versions-and-your-floor)).
+
+### Fixed
+
+- **Windows.** Three defects, all found by running the plugin on a Windows machine for the first
+  time:
+  - the status line printed nothing: Windows writes a piped output in its ANSI code page, which has
+    no `✓`, `↻` or `▲`, and the first one raised an encoding error. `deadweight` stopped the same way
+    on `↻`, and the text report of `audit.py` on a `➜` quoted from an audited file. All three now
+    write UTF-8;
+  - the floor could not compare across machines: Git for Windows checks files out with CRLF line
+    endings, so the same `audit.py` hashed differently than on Linux or macOS, and a floor set on
+    one refused to compare on the other. Every checkout is now LF (`.gitattributes`).
+
+### Added
+
+- **Every release is checked on Linux, macOS and Windows before it reaches anyone.** A new workflow
+  runs what a user runs - the session hook through the command in `hooks.json`, `deadweight
+  --fresh`, the status line - on a throwaway project, on each OS. Replayed on 0.14.0 it fails on
+  macOS, the defect 0.14.1 fixed; a check that passes on the version with the defect proves nothing.
+- The release is pushed to a candidate branch first; `main`, which the marketplace serves, and the
+  tag move only once every workflow is green on that commit.
+- A pyflakes lint of the Python code in CI. Security lint rules were measured on this code and left
+  out: 11 findings, none real.
+- Status badges in the README, and weekly grouped updates for the workflow actions.
+
 ## 0.14.1 — 2026-09-24
 
 `audit.py` is unchanged: a floor set with 0.14.0 keeps comparing.

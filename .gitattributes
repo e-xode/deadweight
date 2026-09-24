@@ -1,0 +1,6 @@
+# Line endings are LF in every checkout, Windows included. The audit floor records the
+# sha of audit.py's BYTES: checked out with CRLF - Git for Windows' default - the same
+# auditor hashed 66812c66 instead of 4a8e3593, and a floor set on one machine refused
+# to compare on another. Measured on a Windows runner, 2026-09-24.
+* text=auto eol=lf
+*.svg text eol=lf
