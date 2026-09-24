@@ -29,7 +29,7 @@ jobs:
     if: startsWith(github.ref, 'refs/heads/')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { fetch-depth: 0 }
       - name: Manifest and marketplace entry must agree, and the version must be tagged
         run: |
@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions: { contents: write }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Cut the GitHub Release from the CHANGELOG section
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
