@@ -217,15 +217,33 @@ def segment(root):
 
 
 
+def project_of(path):
+    """The nearest folder holding .git or .claude/, or `path` itself.
+
+    The cache is keyed by the project root the hook was given. A host that only
+    says where it runs - Copilot CLI starts the command in its working directory -
+    may be in a subfolder, and a subfolder's key finds nothing.
+    """
+    here = os.path.abspath(path)
+    while True:
+        if os.path.exists(os.path.join(here, ".git")) or os.path.isdir(os.path.join(here, ".claude")):
+            return here
+        up = os.path.dirname(here)
+        if up == here:
+            return os.path.abspath(path)
+        here = up
+
+
 def main():
     try:
         data = json.load(sys.stdin)
     except Exception:
-        return
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
     ws = data.get("workspace") or {}
-    root = ws.get("project_dir") or ws.get("current_dir") or data.get("cwd") or ""
-    if not root:
-        return
+    root = (ws.get("project_dir") or ws.get("current_dir") or data.get("cwd")
+            or os.environ.get("CLAUDE_PROJECT_DIR") or project_of(os.getcwd()))
     print(segment(root), end="")
 
 

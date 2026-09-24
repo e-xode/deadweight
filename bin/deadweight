@@ -16,7 +16,7 @@ declare and which fails silently where it is missing.
     deadweight --info            also the measurements (INFO), which the default leaves out
     deadweight --fresh           measure now, rewrite the cache the status line reads, show it
     deadweight --json            the raw cached report
-    deadweight --setup-statusline  install the status line into this project
+    deadweight --setup-statusline  install the status line in Claude Code and/or Copilot CLI
     deadweight --where           print this plugin's root (to alias the command)
 """
 from __future__ import annotations
@@ -72,41 +72,111 @@ def cache_path(root: Path) -> Path:
     return base / f"{root.name}-{hashlib.md5(str(root).encode()).hexdigest()[:8]}.json"
 
 
-def setup_statusline(root: Path) -> int:
-    """Write the status line and wire it, instead of asking the reader to do it.
+def claude_home() -> Path:
+    return Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
 
-    A plugin cannot ship a `statusLine` setting: a plugin's own settings.json
-    only honours `agent` and `subagentStatusLine`. So the wiring has to happen in
-    the consuming project - which is a manual step unless something does it, and
-    a manual step described with a `<placeholder>` path is where a plugin loses
-    its user.
+
+def copilot_home() -> Path:
+    return Path(os.environ.get("COPILOT_HOME") or Path.home() / ".copilot")
+
+
+def wire(settings: Path, wanted: dict) -> int:
+    """Set `statusLine` in one settings file. 0 set, 1 another line is there, 2 unreadable.
+
+    An unparsable file is left alone rather than rewritten: Copilot's settings.json
+    accepts comments, and rewriting it through `json` would delete them.
     """
-    dest = root / ".claude" / "statusline.py"
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    # The launcher, not the template: a copied template stays at the version of the
-    # day it was copied, and 0.13.0's notices never reached the lines set up before it.
-    dest.write_text(LAUNCHER.read_text(encoding="utf-8"), encoding="utf-8")
-    dest.chmod(0o755)
-
-    settings = root / ".claude" / "settings.json"
     data = {}
     if settings.is_file():
         try:
             data = json.loads(settings.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError):
-            print(f"{settings} is not valid JSON; not touching it.", file=sys.stderr)
+            print(f"  {settings} is not plain JSON (comments?); not touching it.", file=sys.stderr)
             return 2
-    wanted = {"type": "command", "command": 'python3 "$CLAUDE_PROJECT_DIR"/.claude/statusline.py'}
     existing = data.get("statusLine")
     if existing and existing != wanted:
-        print(f"This project already has a statusLine:\n  {json.dumps(existing)}\n"
-              f"Left untouched. The audit segment is in {dest}.", file=sys.stderr)
+        print(f"  {settings} already has a statusLine:\n    {json.dumps(existing)}\n"
+              f"  Left untouched. To keep yours, add the audit to it (README, "
+              f"\"Already have a status line?\").", file=sys.stderr)
         return 1
     data["statusLine"] = wanted
+    settings.parent.mkdir(parents=True, exist_ok=True)
     settings.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"Status line installed:\n  {dest}\n  statusLine set in {settings}\n"
-          f"It shows up on the next session.")
     return 0
+
+
+def place_launcher(dest: Path) -> None:
+    # The launcher, not the template: a copied template stays at the version of the
+    # day it was copied, and 0.13.0's notices never reached the lines set up before it.
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(LAUNCHER.read_text(encoding="utf-8"), encoding="utf-8")
+    dest.chmod(0o755)
+
+
+def setup_claude(root: Path) -> int:
+    """Claude Code reads `statusLine` from the project: one line per project."""
+    if not ((root / ".git").exists() or (root / ".claude").is_dir()):
+        print(f"Claude Code: {root} is not a project (no .git, no .claude/); skipped.\n"
+              f"  Run the setup from the project's root.", file=sys.stderr)
+        return 1
+    dest = root / ".claude" / "statusline.py"
+    place_launcher(dest)
+    code = wire(root / ".claude" / "settings.json",
+                {"type": "command", "command": 'python3 "$CLAUDE_PROJECT_DIR"/.claude/statusline.py'})
+    if code == 0:
+        print(f"Claude Code: installed for this project\n  {dest}\n  statusLine set in {root / '.claude' / 'settings.json'}")
+    return code
+
+
+def setup_copilot() -> int:
+    """Copilot CLI reads `statusLine` from the user's settings only.
+
+    A repository's .github/copilot/settings.json does not honour the key - set there,
+    it is ignored without a word. So there is one line for every project, and the
+    launcher finds the project from the directory Copilot runs it in.
+    """
+    home = copilot_home()
+    dest = home / "deadweight-statusline.py"
+    place_launcher(dest)
+    code = wire(home / "settings.json",
+                {"type": "command", "command": f'python3 "{dest}" copilot'})
+    if code == 0:
+        print(f"Copilot CLI: installed for every project\n  {dest}\n  statusLine set in {home / 'settings.json'}")
+    return code
+
+
+def setup_statusline(root: Path) -> int:
+    """Wire the status line into every host found on this machine.
+
+    A plugin cannot ship a `statusLine` setting: a plugin's own settings.json only
+    honours `agent` and `subagentStatusLine`, in Claude Code as in Copilot CLI. So
+    the wiring has to happen outside the plugin - a manual step unless something does
+    it, and a manual step described with a `<placeholder>` path is where a plugin
+    loses its user. The two hosts do not keep the key at the same level, which is why
+    one command writes two different things.
+    """
+    # Without CLAUDE_PROJECT_DIR the project is the working directory, and an agent
+    # that cd's into bin/ to run this script makes the plugin its own project.
+    if root == PLUGIN_ROOT or PLUGIN_ROOT in root.parents:
+        print(f"{root} is inside the plugin itself; nothing written.\n"
+              f"  Run the setup from the root of the project to equip.", file=sys.stderr)
+        return 2
+    hosts = []
+    if claude_home().is_dir():
+        if root / ".claude" == claude_home():
+            print("Claude Code: the home directory is not a project; skipped.", file=sys.stderr)
+            hosts.append(1)
+        else:
+            hosts.append(setup_claude(root))
+    if copilot_home().is_dir():
+        hosts.append(setup_copilot())
+    if not hosts:
+        print(f"Neither Claude Code ({claude_home()}) nor Copilot CLI ({copilot_home()}) "
+              f"was found; nothing written.", file=sys.stderr)
+        return 1
+    if 0 in hosts:
+        print("It shows up on the next session.")
+    return max(hosts)
 
 
 def show(root: Path, only_errors: bool, as_json: bool, with_info: bool = False) -> int:

@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.13.2 — 2026-09-24
+
+`audit.py` is unchanged: a floor set with 0.13.1 keeps comparing.
+
+### Changed
+
+- **`deadweight --setup-statusline` installs into every host it finds: Claude Code, Copilot CLI,
+  or both.** The two do not keep the setting at the same level. Claude Code reads `statusLine` from
+  the project, so the line is set per project as before. Copilot CLI reads it from
+  `~/.copilot/settings.json` only - set in a repository's `.github/copilot/settings.json` it is
+  ignored without a word - so the setup writes one line for every project, and the line finds the
+  project from the directory Copilot runs it in. An existing `statusLine` is still left untouched,
+  and a settings file with comments is not rewritten.
+- **The setup refuses to run inside the plugin.** Without `CLAUDE_PROJECT_DIR` the project is the
+  working directory, and an agent that changed into `bin/` to run the command installed the status
+  line into the plugin's own folder, where nothing reads it.
+- The template falls back to the nearest folder holding `.git` or `.claude/` when its input names no
+  project, instead of printing nothing.
+
 ## 0.13.1 — 2026-09-23
 
 `audit.py` is unchanged: a floor set with 0.13.0 keeps comparing.

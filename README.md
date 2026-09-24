@@ -42,7 +42,7 @@ only this one.)
 | the measurements too (INFO) | `deadweight --info` |
 | to measure again after editing | `deadweight --fresh` — measures, updates the status line, shows the result |
 | the raw report | `deadweight --json` |
-| the counts in your status line | `deadweight --setup-statusline`, then a new session |
+| the counts in your status line | `deadweight --setup-statusline` from the project's root — Claude Code, Copilot CLI or both — then a new session |
 | to stop the configuration from getting worse | `--set-floor` once, `--check-floor` in CI — see [The ratchet](#the-ratchet) |
 | to turn it off in one project | `claude plugin disable deadweight --scope project` |
 
@@ -75,9 +75,16 @@ gives its count and offers to show the lines, and `deadweight --info` prints the
 
 ### Reading the status line
 
-`deadweight --setup-statusline` writes `.claude/statusline.py` and sets `statusLine` in the
-project's `.claude/settings.json`. A plugin cannot ship a `statusLine` itself, so this one command
-is the shortest honest path.
+Run `deadweight --setup-statusline` from the root of the project. It installs into every host it
+finds on the machine, because the two keep the setting at different levels:
+
+| Host | Where the line is set | Covers |
+| --- | --- | --- |
+| Claude Code | `.claude/statusline.py`, and `statusLine` in the project's `.claude/settings.json` | this project |
+| Copilot CLI | `~/.copilot/deadweight-statusline.py`, and `statusLine` in `~/.copilot/settings.json` | every project: a repository's `.github/copilot/settings.json` ignores the key |
+
+A plugin cannot ship a `statusLine` itself, in either host, so this one command is the shortest
+honest path. The line shows up on the next session.
 
 The file it writes is a launcher, not the status line: it finds the plugin installed for the
 project and runs its template, so an update reaches the line at the next session without running
