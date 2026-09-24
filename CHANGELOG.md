@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.14.1 — 2026-09-24
+
+`audit.py` is unchanged: a floor set with 0.14.0 keeps comparing.
+
+### Fixed
+
+- **The session hook works on macOS.** It was a shell script calling `timeout` and `md5sum`, two GNU
+  coreutils that stock macOS does not ship. It failed at every session start with its errors
+  discarded, so nothing was cached, the status line stayed empty, and `deadweight --fresh` - which
+  runs the same hook - reported no measurement. Adding `timeout` alone would not have been enough:
+  without `md5sum` the cache key came out as `<project>-.json`, a file nothing reads, in a cache
+  that no longer looked empty. The hook is now `hooks/session-audit.py`, standard library only, and
+  computes the key with the same call as the status line and `deadweight`.
+- The audit inside the hook is stopped at 18 s, under the 20 s the hook itself is given, so a slow
+  project ends the hook cleanly instead of having it killed.
+- The cache file is written beside its target and renamed into place, so the status line never
+  reads a half-written measurement.
+
 ## 0.14.0 — 2026-09-24
 
 **This release changes `audit.py`, so a floor set with 0.13.2 stops comparing.** Re-set it after
