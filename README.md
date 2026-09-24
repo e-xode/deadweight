@@ -20,13 +20,20 @@ them and says why each one matters.
 
 ```bash
 claude plugin marketplace add e-xode/deadweight --scope project
-claude plugin install deadweight@deadweight --scope project
+claude plugin install deadweight@e-xode --scope project
 ```
 
 `--scope project` on **both** writes the marketplace and the plugin into the project's
 `.claude/settings.json`, so anyone who clones the repository gets them too — the plugin alone would
 name a marketplace their machine does not know. Leave both out to install it for yourself only, in
 every project.
+
+**Installed before 0.16.0?** The marketplace was called `deadweight` then, and your copy keeps that
+name: a marketplace is named on your machine when you add it, and renaming it upstream renames
+nothing downstream. `deadweight@deadweight` goes on working and updating. To move to the new name,
+remove the old marketplace, add it again, and replace `deadweight@deadweight` and the
+`extraKnownMarketplaces.deadweight` key with `deadweight@e-xode` and `e-xode` in the project's
+`.claude/settings.json`.
 
 **Then open a new session in that project.** Plugins are read when a session starts: on the first
 one after installing, the skill is loaded and the audit runs silently in the background.
@@ -111,7 +118,7 @@ install path is the `installPath` of the plugin's entry in `~/.claude/plugins/in
 | `deadweight 4n` dim | no error or warning, four notices | `deadweight` — each names a file |
 | `deadweight ✓` | no error, warning or notice | nothing |
 | `↻` | the number is not comparable: the configuration changed since it was measured, or the floor was set by another auditor | `deadweight` says which, and what clears it |
-| `↑0.9.0` | a newer release is known | `claude plugin update deadweight@deadweight`, then a new session |
+| `↑0.9.0` | a newer release is known | `claude plugin update deadweight@e-xode`, then a new session |
 
 **Colour encodes what needs an action, not the size of the count.** A repository at its floor has
 nothing to do, so it is dim — a signal that is always on teaches the eye to skip it. Zero counts

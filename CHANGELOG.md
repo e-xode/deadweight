@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.16.0 — 2026-09-24
+
+`audit.py` is unchanged: a floor set with 0.15.0 keeps comparing.
+
+### Changed
+
+- **The marketplace is now called `e-xode`: install `deadweight@e-xode`.** `deadweight@deadweight`
+  named the plugin twice; the marketplace is the publisher's catalogue, and the plugin one product in
+  it. Nothing breaks for an existing install: a marketplace is named on the machine that adds it,
+  so a copy added as `deadweight` keeps that name, and `deadweight@deadweight` goes on working and
+  updating. The README says how to move to the new name.
+
 ## 0.15.0 — 2026-09-24
 
 **This release changes `audit.py`, so a floor set with 0.14.1 stops comparing.** The counts do not

@@ -50,10 +50,10 @@ def line_for(tmp, errors, warnings, notices, floor, stale, newer):
          "audit_sha": "e5f6a7b8" if stale else "a1b2c3d4"}))
     os.utime(root / ".claude", (1, 1))                     # config older than the measurement
     plugins = claude_home / "plugins"
-    (plugins / "marketplaces" / "deadweight" / ".claude-plugin").mkdir(parents=True, exist_ok=True)
-    (plugins / "installed_plugins.json").write_text(json.dumps({"plugins": {"deadweight@deadweight": [
+    (plugins / "marketplaces" / "e-xode" / ".claude-plugin").mkdir(parents=True, exist_ok=True)
+    (plugins / "installed_plugins.json").write_text(json.dumps({"plugins": {"deadweight@e-xode": [
         {"scope": "project", "projectPath": str(root), "version": "0.8.0"}]}}))
-    (plugins / "marketplaces" / "deadweight" / ".claude-plugin" / "marketplace.json").write_text(
+    (plugins / "marketplaces" / "e-xode" / ".claude-plugin" / "marketplace.json").write_text(
         json.dumps({"plugins": [{"name": "deadweight", "version": newer or "0.8.0"}]}))
     env = dict(os.environ, XDG_CACHE_HOME=str(cache_home), CLAUDE_CONFIG_DIR=str(claude_home))
     out = subprocess.run([sys.executable, str(TEMPLATE)], input=json.dumps(
