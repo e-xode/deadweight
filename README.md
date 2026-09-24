@@ -19,21 +19,38 @@ them and says why each one matters.
 ## Install
 
 ```bash
-claude plugin marketplace add e-xode/deadweight --scope project
-claude plugin install deadweight@e-xode --scope project
+claude plugin marketplace add e-xode/deadweight --scope project   # where the catalogue is: the GitHub repository
+claude plugin install deadweight@e-xode --scope project           # what to take from it: plugin @ marketplace
 ```
+
+The two identifiers read alike and are not the same thing. `e-xode/deadweight` is the
+**repository**, in the `owner/repo` shorthand that `marketplace add` reads as GitHub; the full URL
+`https://github.com/e-xode/deadweight` works too, and is recorded as a different kind of source.
+`deadweight@e-xode` is the **plugin**: `deadweight`, from the marketplace named `e-xode`.
+`plugin install e-xode/deadweight` fails - it is not a plugin name.
 
 `--scope project` on **both** writes the marketplace and the plugin into the project's
 `.claude/settings.json`, so anyone who clones the repository gets them too — the plugin alone would
 name a marketplace their machine does not know. Leave both out to install it for yourself only, in
 every project.
 
+A project that already declares the marketplace in its settings needs no `marketplace add`. If you
+run one anyway, spell the source the way the settings do: a name declared with `e-xode/deadweight`
+refuses `https://github.com/e-xode/deadweight` - *"its network source differs from the one declared
+for it in settings"* - because the two spellings are two sources to Claude Code, even though they
+reach the same repository.
+
 **Installed before 0.16.0?** The marketplace was called `deadweight` then, and your copy keeps that
 name: a marketplace is named on your machine when you add it, and renaming it upstream renames
 nothing downstream. `deadweight@deadweight` goes on working and updating. To move to the new name,
-remove the old marketplace, add it again, and replace `deadweight@deadweight` and the
-`extraKnownMarketplaces.deadweight` key with `deadweight@e-xode` and `e-xode` in the project's
-`.claude/settings.json`.
+replace `deadweight@deadweight` and the `extraKnownMarketplaces.deadweight` key with
+`deadweight@e-xode` and `e-xode` in the project's `.claude/settings.json`, then, in this order:
+
+```bash
+claude plugin marketplace remove deadweight      # first: the same source cannot be added under a second name
+claude plugin marketplace add e-xode/deadweight
+claude plugin install deadweight@e-xode --scope project
+```
 
 **Then open a new session in that project.** Plugins are read when a session starts: on the first
 one after installing, the skill is loaded and the audit runs silently in the background.

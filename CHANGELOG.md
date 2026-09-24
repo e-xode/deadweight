@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.16.1 — 2026-09-24
+
+`audit.py` is unchanged: a floor set with 0.16.0 keeps comparing.
+
+### Fixed
+
+- **The install section tells the two identifiers apart.** `e-xode/deadweight` is the repository,
+  which `marketplace add` reads as GitHub; `deadweight@e-xode` is the plugin. `plugin install
+  e-xode/deadweight` fails, and `marketplace add https://github.com/e-xode/deadweight` is refused in
+  a project whose settings declare the shorthand: two spellings of one repository are two sources.
+  The README now says both, and gives the migration from `deadweight@deadweight` as commands, in
+  the order that works - the old marketplace removed before the new one is added.
+
 ## 0.16.0 — 2026-09-24
 
 `audit.py` is unchanged: a floor set with 0.15.0 keeps comparing.
