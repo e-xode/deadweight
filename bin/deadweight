@@ -224,7 +224,12 @@ def show(root: Path, only_errors: bool, as_json: bool, with_info: bool = False) 
 
 
 def main(argv: list[str]) -> int:
-    root = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path.cwd())
+    # Outside Claude Code nothing names the project, and the working directory may
+    # be a subfolder of it: walk up the way the status line does, so the command and
+    # the line find the same cache. A path given as an argument is taken as is.
+    cwd = Path.cwd().resolve()
+    named = os.environ.get("CLAUDE_PROJECT_DIR")
+    root = Path(named) if named else Path(statusline_module().project_of(str(cwd)))
     fresh = errors = as_json = setup = with_info = False
     for a in argv:
         if a == "--fresh":                   fresh = True
@@ -240,6 +245,10 @@ def main(argv: list[str]) -> int:
     root = root.resolve()
 
     if setup:
+        # The guard looks at where the command was run too: from bin/, the walk up
+        # would leave the plugin and land on whatever encloses it.
+        if cwd == PLUGIN_ROOT or PLUGIN_ROOT in cwd.parents:
+            root = cwd
         return setup_statusline(root)
     if fresh:
         # Through the hook, so there is one writer of the cache and one format. An

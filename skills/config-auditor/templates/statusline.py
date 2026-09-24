@@ -223,15 +223,20 @@ def project_of(path):
     The cache is keyed by the project root the hook was given. A host that only
     says where it runs - Copilot CLI starts the command in its working directory -
     may be in a subfolder, and a subfolder's key finds nothing.
+
+    The home folder is never a project: its .claude/ is the user's configuration,
+    and without this stop every folder outside a project would resolve to it.
     """
     here = os.path.abspath(path)
-    while True:
+    home = os.path.abspath(os.path.expanduser("~"))
+    while here != home:
         if os.path.exists(os.path.join(here, ".git")) or os.path.isdir(os.path.join(here, ".claude")):
             return here
         up = os.path.dirname(here)
         if up == here:
-            return os.path.abspath(path)
+            break
         here = up
+    return os.path.abspath(path)
 
 
 def main():

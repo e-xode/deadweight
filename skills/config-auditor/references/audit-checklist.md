@@ -66,6 +66,9 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[AUTO 25-orphan-reference]` Every reference is linked from its own `SKILL.md` — one level deep.
 - `[AUTO 07-skill-broken-link]` / `[AUTO 20-relative-links]` Relative links resolve.
 - `[MANUAL]` One topic per file; no critical rule lives only in a reference.
+- `[AUTO 46-doctrine-copy]` A project reference named like one of this plugin's, or sharing most of
+  its code terms with them, restates the doctrine instead of recording the project's decisions.
+  Keep the decisions and their reasons; point to this skill for how the harness works.
 
 ## Evals
 
@@ -117,6 +120,9 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[AUTO 24-settings-statusline]` / `[AUTO 24-settings-output-style]` The script exists, `refreshInterval` ≥ 1; the style name matches exactly.
 - `[AUTO 42-permissions-conflict]` No rule both allowed and denied or asked.
 - `[AUTO 42-permissions-rule]` Allow rules name known tools, no unanchored glob, no `mcp__…(…)`, `:*` only at the end.
+- `[AUTO 24-settings-unknown-subkey]` Every field of a closed object (`attribution`, `permissions`…) is documented.
+- `[MANUAL]` A rule the prose states and a setting can enforce is in the setting too — commit attribution first: a
+  CLAUDE.md that forbids a co-author trailer, with no `attribution` in settings, holds only while the rule is read.
 - `[MANUAL]` A Bash deny is not a security boundary; sandboxing is.
 
 ## MCP
@@ -139,6 +145,8 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[AUTO 17-always-loaded-budget]` / `[AUTO 29-listing-budget-derived]` House ratchet and the harness-derived ceiling.
 - `[AUTO 13-no-global-scripts]` Scripts live under the skill that runs them — house convention.
 - `[AUTO 18-see-skill-target]` Every `➜ See skill:` target exists.
+- `[MANUAL]` Configuration disabled by renaming (`settings._json`, `*.disabled`, `*.bak` beside a live
+  file) loads nothing and misleads a reader: restore it or delete it; git keeps the history.
 - `[AUTO 11-english-only]` One declared language — house convention, exemptable.
 - `[AUTO 31-overlay-*]` / `[AUTO 34-*]` Exemptions carry a reason and a date, and still excuse something (`31-overlay-unused`); the floor compares one instrument only.
 

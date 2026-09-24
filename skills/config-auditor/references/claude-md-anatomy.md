@@ -51,7 +51,8 @@ and "How CLAUDE.md files load"). All files are concatenated, none overrides anot
 - A `CLAUDE.md` inside an `--add-dir` directory loads only with
   `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`.
 - Block-level HTML comments are stripped before injection (comments inside code blocks are
-  kept), so a maintainer note costs no context.
+  kept), so a maintainer note costs no context. `01-claude-md-size`, `01-claude-md-lines` and
+  `17-always-loaded-budget` measure the file as injected, comments removed.
 - A gitignored `CLAUDE.local.md` exists only in the worktree that created it; to share personal
   instructions across worktrees, import a file from home: `@~/.claude/<my-instructions>.md`.
 

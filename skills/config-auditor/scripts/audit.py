@@ -212,6 +212,7 @@ CHECKS = (
     "43-mcp",
     "44-plugin-manifest",
     "45-command-shadowed",
+    "46-doctrine-copy",
 )
 # i18n-data: start — French on purpose, this is the check's own dictionary
 FRENCH_HEURISTIC_WORDS = {
@@ -386,6 +387,30 @@ SETTINGS_KEYS_GLOBAL = frozenset({
 
 SETTINGS_KNOWN_KEYS = (SETTINGS_KEYS_ANY | SETTINGS_KEYS_USER_LOCAL_MANAGED
                        | SETTINGS_KEYS_USER_MANAGED | SETTINGS_KEYS_MANAGED | SETTINGS_KEYS_GLOBAL)
+# Objects whose fields the settings reference lists as a closed set ("Type: object
+# with ..."), 2026-09-24. A misspelt field is ignored without a word, exactly like a
+# misspelt key - `attribution.coAuthoredBy` looks like configuration and turns nothing
+# off. Objects keyed freely (`env`, `enabledPlugins`, `hooks`, `skillOverrides`) are not
+# here: every key they hold is legitimate.
+SETTINGS_OBJECT_FIELDS = {
+    "attribution": {"commit", "pr", "sessionUrl"},
+    "autoMode": {"allow", "classifyAllShell", "environment", "hard_deny", "soft_deny"},
+    "permissions": {"additionalDirectories", "allow", "ask", "blockReadsOutsideWorkingDirectories",
+                    "defaultMode", "deny", "disableAutoMode", "disableBypassPermissionsMode"},
+    "policyHelper": {"path", "refreshIntervalMs", "timeoutMs"},
+    "worktree": {"baseRef", "bgIsolation", "sparsePaths", "symlinkDirectories"},
+    "sandbox": {"allowAppleEvents", "allowUnsandboxedCommands", "autoAllowBashIfSandboxed",
+                "bwrapPath", "credentials", "enableWeakerNestedSandbox",
+                "enableWeakerNetworkIsolation", "enabled", "excludedCommands",
+                "failIfUnavailable", "filesystem", "ignoreViolations", "network", "ripgrep",
+                "socatPath"},
+    "statusLine": {"command", "hideVimModeIndicator", "padding", "refreshInterval", "type"},
+    "subagentStatusLine": {"command", "type"},
+    "fileSuggestion": {"command", "type"},
+    "spinnerVerbs": {"mode", "verbs"},
+    "modelSettings": {"effortLevel", "maxEffortLevel"},
+    "voice": {"autoSubmit", "enabled", "mode"},
+}
 # "a `false` in .claude/settings.json is ignored" for these opt-outs (settings).
 SETTINGS_PROJECT_IGNORED_FALSE = {"useAutoModeDuringPlan", "syncClaudeAiSkills",
                                   "syncClaudeAiPlugins"}
@@ -913,6 +938,26 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str] | None, int]:
     return data, end + 1
 
 
+def injected_memory(text: str) -> str:
+    """A CLAUDE.md as the model receives it: block-level HTML comments removed.
+
+    "Block-level HTML comments are stripped before injection; comments inside code
+    blocks are preserved" (memory). Counting them charged the budget for a maintainer
+    note that costs nothing - the very place this plugin's references recommend for one.
+    """
+    out, fenced = [], False
+    parts = re.split(r"(^[ \t]*```[^\n]*\n?)", text, flags=re.MULTILINE)
+    for part in parts:
+        if re.match(r"^[ \t]*```", part):
+            fenced = not fenced
+            out.append(part)
+        elif fenced:
+            out.append(part)
+        else:
+            out.append(re.sub(r"(?ms)^[ \t]*<!--.*?-->[ \t]*\n?", "", part))
+    return "".join(out)
+
+
 def strip_code_fences(text: str) -> str:
     text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
     text = re.sub(r"`[^`\n]+`", "", text)
@@ -1101,7 +1146,9 @@ def check_claude_md(root: Path, report: Report) -> None:
                    "No CLAUDE.md: it is optional, and nothing here is read every session.",
                    str(path))
         return
-    size = path.stat().st_size
+    raw = path.read_text(encoding="utf-8")
+    size = len(injected_memory(raw).encode("utf-8"))
+    comments = path.stat().st_size - size
     if size > CLAUDE_MD_MAX_BYTES:
         report.add(
             "01-claude-md-size",
@@ -1112,10 +1159,12 @@ def check_claude_md(root: Path, report: Report) -> None:
             str(path),
         )
     else:
-        report.add("01-claude-md-size", "OK", f"CLAUDE.md size {size} bytes <= {CLAUDE_MD_MAX_BYTES}.", str(path))
+        report.add("01-claude-md-size", "OK", f"CLAUDE.md size {size} bytes <= {CLAUDE_MD_MAX_BYTES}"
+                   + (f" ({comments} bytes of HTML comments not injected)." if comments else "."), str(path))
 
-    text = path.read_text(encoding="utf-8")
-    lines = text.count("\n") + (0 if text.endswith("\n") else 1)
+    text = raw
+    injected = injected_memory(raw)
+    lines = injected.count("\n") + (0 if injected.endswith("\n") or not injected else 1)
     if lines > CLAUDE_MD_MAX_LINES:
         report.add("01-claude-md-lines", "WARN",
                    f"CLAUDE.md is {lines} lines (> {CLAUDE_MD_MAX_LINES}). \"Files over 200 lines "
@@ -1541,7 +1590,8 @@ def check_always_loaded_budget(
     root: Path, report: Report, skills: dict[str, dict], agents: dict[str, dict]
 ) -> None:
     claude_md = claude_md_path(root)
-    claude_md_bytes = claude_md.stat().st_size if claude_md.exists() else 0
+    claude_md_bytes = (len(injected_memory(claude_md.read_text(encoding="utf-8")).encode("utf-8"))
+                       if claude_md.exists() else 0)
     hidden = listing_hidden_skills(root, skills)
     raw_skill_chars = sum(len(s.get("description", "")) for s in skills.values())
     skill_chars = sum(
@@ -2704,12 +2754,55 @@ JUDGED_FACT_RE = re.compile(
 
 
 def _cas_deval(root: Path) -> list[Path]:
-    """Case directories `claude plugin eval` would run."""
+    """Case directories `claude plugin eval` would run: `evals/**/case.yaml or prompt.md`.
+
+    At any depth, as the harness globs. Until 0.14.0 only `evals/<case>/` was read, so a
+    suite grouped as `evals/<skill>/<case>/` - a layout the harness runs - was invisible
+    to both this check and the coverage figure. `results/` holds run transcripts, not
+    cases, and a folder inside a case (its fixture, its graders) is not another case.
+    """
     base = root / "evals"
     if not base.is_dir():
         return []
-    return [p for p in sorted(base.iterdir())
-            if p.is_dir() and ((p / "case.yaml").is_file() or (p / "prompt.md").is_file())]
+    found: list[Path] = []
+    for marker in sorted(list(base.rglob("case.yaml")) + list(base.rglob("prompt.md"))):
+        case = marker.parent
+        rel = case.relative_to(base).parts
+        if not rel or rel[0] == "results" or any(x.startswith(".") for x in rel):
+            continue
+        if case not in found:
+            found.append(case)
+    return [c for c in found if not any(o != c and o in c.parents for o in found)]
+
+
+def _skills_of_case(case: Path, base: Path, names: list[str]) -> set[str]:
+    """The skills a case exercises, read from the case rather than guessed from the layout.
+
+    First the `tool_used` graders on `Skill`: their `input_match` names the skill the run
+    must (or must not) load, which is what a coverage figure is about. Then, for a case
+    with no such grader, a path segment under `evals/` equal to a skill name. A case
+    that names none is attributed to nobody - it proves nothing about any one skill.
+    """
+    named: set[str] = set()
+    gdir = case / "graders"
+    for g in sorted(gdir.glob("*.md")) if gdir.is_dir() else []:
+        try:
+            fm, _ = parse_frontmatter(g.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError):
+            continue
+        fm = fm or {}
+        if fm.get("type") != "tool_used" or fm.get("tool") != "Skill" or not fm.get("input_match"):
+            continue
+        try:
+            rx = re.compile(str(fm["input_match"]))
+        except re.error:
+            continue
+        named |= {n for n in names
+                  if rx.search(f'"skill": "{n}"') or rx.search(f'"skill":"{n}"')
+                  or rx.search(f'"skill": "plugin:{n}"')}
+    if not named:
+        named = {part for part in case.relative_to(base).parts if part in names}
+    return named
 
 
 def check_eval_quality(root: Path, report: Report) -> None:
@@ -2793,6 +2886,51 @@ def check_eval_quality(root: Path, report: Report) -> None:
         )
 
 
+# A reference copied into a project from this plugin, or rewritten from the same
+# documentation, overlaps it far more than a record of the project's own decisions.
+# Measured on 814 reference files, 2026-09-24: copies 75-88% of their code terms found
+# in these references, decision records 19-60%.
+DOCTRINE_COPY_OVERLAP = 0.75
+DOCTRINE_COPY_MIN_TERMS = 15
+
+
+def check_doctrine_copy(root: Path, report: Report) -> None:
+    """A project skill that carries this plugin's doctrine instead of pointing to it.
+
+    The plugin's references are checked against the documentation at each release; a
+    copy in a project is checked by nothing, and diverges without a sign. Worse, the
+    model reads whichever of the two the listing leads it to. What a project keeps is
+    its decisions and their reasons - the method stays here. Two signals, both cheap:
+    a file named like one of these references, or a file whose code terms are mostly
+    found in them. Neither proves a copy: a file ABOUT Claude Code configuration shares
+    the vocabulary by nature, so this is a notice, and an overlay exemption answers it.
+    """
+    if LAYOUT != "project":
+        return
+    ours = Path(__file__).resolve().parent.parent / "references"
+    skills_dir = root / SKILLS_DIR
+    if not ours.is_dir() or not skills_dir.is_dir():
+        return
+    names = {f.name for f in ours.glob("*.md")}
+    corpus = " ".join(f.read_text(encoding="utf-8", errors="replace") for f in ours.glob("*.md"))
+    for f in sorted(skills_dir.glob("*/references/**/*.md")):
+        try:
+            terms = set(re.findall(r"`([^`\n]{2,60})`", f.read_text(encoding="utf-8")))
+        except (OSError, UnicodeDecodeError):
+            continue
+        share = sum(1 for t in terms if t in corpus) / len(terms) if terms else 0.0
+        same_name = f.name in names
+        if not (same_name or (len(terms) >= DOCTRINE_COPY_MIN_TERMS and share >= DOCTRINE_COPY_OVERLAP)):
+            continue
+        why = (f"is named like this plugin's references/{f.name}" if same_name else
+               f"shares {share:.0%} of its {len(terms)} code terms with this plugin's references")
+        report.add("46-doctrine-copy", "NOTICE",
+                   f"'{f.relative_to(root)}' {why}. If it restates how Claude Code works, it "
+                   "is a second copy that nothing keeps current: keep only this project's "
+                   "decisions and their reasons, and point to deadweight:config-auditor for "
+                   "the rest.", str(f))
+
+
 def check_evals(root: Path, report: Report) -> None:
     """Schema and coverage of each skill's eval suite.
 
@@ -2808,17 +2946,25 @@ def check_evals(root: Path, report: Report) -> None:
         return
     dirs = [d for d in sorted(skills_dir.iterdir()) if d.is_dir()]
     # Two layouts count as a suite. The house one, `<skill>/evals/evals.json`, and the
-    # one `claude plugin eval` actually runs: case directories under the container's
+    # one `claude plugin eval` actually runs: case directories anywhere under the root's
     # `evals/`, each holding `case.yaml` or `prompt.md`. Until 2026-09-22 this check
     # knew only the first, so it reported 0% coverage on a plugin whose suite had just
     # been made executable - it punished the migration it had itself provoked.
+    #
+    # Until 0.14.0 the second counted only in plugin layout, only one level deep, and
+    # all-or-nothing: three cases anywhere marked EVERY skill covered. A project whose
+    # suite runs through `claude plugin eval` read 0%, and a plugin with three cases on
+    # one skill of forty-five read 100% - the silent error, the one nobody reports.
+    # Coverage is now per skill, from what each case names.
+    names = [d.name for d in dirs]
     official = root / "evals"
-    official_cases = ([p for p in sorted(official.iterdir())
-                      if p.is_dir() and ((p / "case.yaml").is_file() or (p / "prompt.md").is_file())]
-                     if official.is_dir() else [])
+    covered: set[str] = set()
+    for case in _cas_deval(root):
+        covered |= _skills_of_case(case, official, names)
+    if not covered and len(dirs) == 1 and _cas_deval(root):
+        covered = set(names)          # one skill: every case is about it
     withed = [d for d in dirs
-              if (d / "evals" / "evals.json").is_file()
-              or (LAYOUT == "plugin" and len(official_cases) >= EVALS_MIN_COUNT)]
+              if (d / "evals" / "evals.json").is_file() or d.name in covered]
     if dirs:
         pct = len(withed) / len(dirs)
         missing = [d.name for d in dirs if d not in withed]
@@ -3755,6 +3901,14 @@ def check_settings_semantics(root: Path, report: Report) -> None:
                            f"'{key}' in '{name}' is not in the settings reference (231 keys, "
                            "2026-09-23): a typo, or a key newer than this auditor.", str(path))
                 continue
+            fields = SETTINGS_OBJECT_FIELDS.get(key)
+            if fields and isinstance(data[key], dict):
+                for sub in sorted(set(data[key]) - fields):
+                    report.add("24-settings-unknown-subkey", "NOTICE",
+                               f"'{key}.{sub}' in '{name}' is not a field of `{key}` in the "
+                               f"settings reference ({', '.join(sorted(fields))}): it is ignored "
+                               "without a word, so whatever it was meant to turn off stays on.",
+                               str(path))
             barred = (SETTINGS_KEYS_MANAGED | SETTINGS_KEYS_USER_MANAGED | SETTINGS_KEYS_GLOBAL
                       | (SETTINGS_KEYS_USER_LOCAL_MANAGED if shared else frozenset()))
             if key in barred:
@@ -4150,6 +4304,7 @@ def main(argv: list[str]) -> int:
     run(check_hooks, root, report)
     run(check_orphan_references, root, report)
     run(check_evals, root, report)
+    run(check_doctrine_copy, root, report)
     run(check_eval_quality, root, report)
     run(check_twin_division_tables, root, report, skills)
 

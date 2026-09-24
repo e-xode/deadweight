@@ -58,6 +58,16 @@ A key outside its scope is ignored; the table is not reproduced here, audit.py c
 
 - **`24-settings-unknown-key`** (NOTICE) — a key absent from the reference: a typo, or a key newer
   than the auditor.
+- **`24-settings-unknown-subkey`** (NOTICE) — a field absent from an object whose fields the
+  reference lists as a closed set (`attribution`, `permissions`, `autoMode`, `sandbox`,
+  `statusLine`, `worktree`…). A misspelt field is ignored like a misspelt key, one level down,
+  where a top-level check does not look. Objects keyed freely (`env`, `enabledPlugins`, `hooks`)
+  are not checked.
+- [doc] Hiding commit and PR attribution takes all three fields: `"attribution": {"commit": "",
+  "pr": "", "sessionUrl": false}` (`settings-reference § attribution`). `includeCoAuthoredBy` is
+  deprecated and ignored once `commit` or `pr` is set. A CLAUDE.md or memory rule about
+  attribution also wins over these lines, except in managed settings — but through the model,
+  which reads the rule, not through the harness: the setting holds when the rule is not read.
 - **`24-settings-scope`** (ERROR) — a key ignored in the file it sits in. Examples [doc]:
   - `modelPicker` — *User or managed*: a cloned repository cannot relabel the picker.
   - `skipDangerousModePermissionPrompt` — *User, local, or managed*: a repository cannot skip the
@@ -94,6 +104,13 @@ first match decides, and specificity does not reorder them. `Bash(aws *)` in den
   context; a scoped deny leaves it visible and blocks matching calls.
 - [doc] Deny rules hold in every mode, `bypassPermissions` included (`settings-reference §
   permissions.defaultMode`).
+- [doc] What `bypassPermissions` still stops (`permission-modes § Skip all checks with
+  bypassPermissions mode`): a critical-path removal (`rm -rf ~`, an unguarded `rm -rf "$DIR"/*`)
+  prompts, and nesting it in `( … )`, `$( … )` or `{ …; }` does not hide it; with
+  `permissions.blockReadsOutsideWorkingDirectories` on, reads outside the working directories
+  prompt. The mode cannot be entered from a session started without it, and cloud sessions ignore
+  it from settings files, silently. It is not a safety mode: it offers no protection against
+  prompt injection.
 
 ## Rule syntax per tool
 

@@ -1,5 +1,61 @@
 # Changelog
 
+## 0.14.0 — 2026-09-24
+
+**This release changes `audit.py`, so a floor set with 0.13.2 stops comparing.** Re-set it after
+reading both counts (see [Versions and your floor](README.md#versions-and-your-floor)). Counts can
+move in both directions: a project whose suite runs through `claude plugin eval` loses the coverage
+warning, and a plugin whose cases cover only some of its skills gains it.
+
+### Added
+
+- **`46-doctrine-copy`** (NOTICE): a project skill reference named like one of this plugin's
+  references, or sharing at least 75% of its code terms with them, restates the doctrine instead of
+  recording the project's decisions. The copy is checked against the documentation by nothing and
+  diverges without a sign. Measured on 814 reference files: copies 75-88%, decision records
+  19-60%. A file about Claude Code configuration shares the vocabulary by nature - an overlay
+  exemption answers it.
+- **`24-settings-unknown-subkey`** (NOTICE): a field absent from an object whose fields the settings
+  reference lists as a closed set - `attribution`, `permissions`, `autoMode`, `sandbox`,
+  `statusLine`, `worktree` and others. `attribution.coAuthoredBy: false` looks like it removes the
+  co-author trailer and does nothing; hiding attribution takes `commit`, `pr` and `sessionUrl`.
+- References: what `bypassPermissions` still stops, how to hide commit attribution and why the
+  setting holds where a prose rule is not read, and configuration disabled by renaming.
+
+### Changed
+
+- **The skill's description says it is also the reference for how the mechanisms work**, to read
+  before a project writes its own notes on them. It stays under the 1,024-character spec limit
+  (995, from 897). Measured with two new trigger cases, five runs each: a project about to write
+  its own copy of the reference loaded the skill 0/5 times before, 5/5 after; a question on how
+  settings layers combine, 0/8 before, 5/8 after.
+- **`CLAUDE.md` is measured as injected**: block-level HTML comments, which Claude Code strips before
+  injection, no longer count toward `01-claude-md-size`, `01-claude-md-lines` or
+  `17-always-loaded-budget`. They were charged for a maintainer note that costs nothing - the place
+  these references recommend for one.
+
+### Fixed
+
+- **Eval coverage is counted per skill, from what each case names, in every layout.** Until now a
+  `claude plugin eval` suite counted only in plugin layout, only one folder deep under `evals/`, and
+  all or nothing: three cases anywhere marked every skill covered. A project whose cases sit in
+  `evals/<skill>/<case>/` read 0%, and a plugin with three cases on one skill of forty-five read
+  100%. Cases are now found at any depth, as the harness globs `evals/**`, and a case covers the
+  skill its `tool_used` grader on `Skill` names in `input_match` - or, without one, the skill a
+  folder of its path is named after. A case that names no skill covers none; in a plugin with a
+  single skill, every case covers it.
+- **The eval quality checks (`39-eval-*`) read nested cases too.** They shared the one-level scan,
+  so a suite grouped by skill was never checked.
+
+- **`deadweight` run from a subfolder finds the project.** Outside Claude Code nothing names the
+  project, so the command took the working directory for it: from `<project>/src/` it answered "No
+  cached measurement". It now walks up to the nearest folder holding `.git` or `.claude/`, as the
+  status line does, so the two read the same cache. A path given as an argument is still taken as
+  is, and `--setup-statusline` run from a subfolder installs at the project's root.
+- **The home folder is no longer taken for a project.** Its `.claude/` is the user's configuration;
+  since 0.13.2 the walk up stopped there, so every folder outside a project resolved to the home
+  folder.
+
 ## 0.13.2 — 2026-09-24
 
 `audit.py` is unchanged: a floor set with 0.13.1 keeps comparing.
