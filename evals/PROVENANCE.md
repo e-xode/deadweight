@@ -228,3 +228,72 @@ per case and per variant, Haiku. Relayed: 62/90 (69 %) with a closing "ERRORS TO
 pre-registered +10. Not adopted: changing the auditor's output would have cost every consumer a
 floor re-set for no shown effect. The model reads the finding and judges it minor; formatting does
 not change a judgement.
+
+## Six cases added on 2026-09-27 — sampled from real repositories, not from the skill
+
+`allow-rules-shared`, `skills-folder-shared-with-other-tools`, `agent-guard-hook-never-runs`,
+`deny-rule-ignored`, `instruction-names-missing-script` and `mcp-server-from-npx` cover the checks
+added in 0.19.0. Each one restates a situation **found in public repositories** during the
+measurement of those checks - a committed `Bash(*)`, skills kept in `.agents/skills/`, a lowercase
+`bash` matcher, a `Write(...)` deny rule, a CLAUDE.md naming a script `package.json` does not
+define, an MCP server run through `npx` with no version - rewritten in the fictional shop, and
+phrased by the **symptom** a user sees, never with a check id or the checks' own words.
+
+They were still written by the session that wrote the checks. That lowers the echo risk described
+above; it does not remove it. A case that passes on its first run proves less than one that failed
+and was fixed by changing the skill.
+
+### Measured on three models, 20 runs per arm (2026-09-27)
+
+With plugin / without, out of 20; "loaded" is the with-arm's `Skill` grader.
+
+| Case | Haiku | Sonnet | Opus |
+| --- | --- | --- | --- |
+| `allow-rules-shared` | 15/15, loaded 4/20 (60 runs: 50/43, loaded 7/60) | 20/19, loaded 20/20 | 20/20, loaded 15/20 |
+| `skills-folder-shared-with-other-tools` | 12/13, loaded 12/20 | 19/19, loaded 20/20 | 20/19, loaded 2/20 |
+
+Neither case discriminates on Sonnet or Opus: both models answer without the plugin. On Haiku the
+permission case fails on **routing**: when the skill loaded, 18/19 answers were right; it loaded in
+12-20 % of runs, and moving the settings trigger to the front of the description moved that from
+7/60 to 12/60 (Fisher p = 0.32) - not adopted. How often a skill loads does not grow with the
+model: on the `.agents` case, 60 % (Haiku), 100 % (Sonnet), 10 % (Opus, which answers right without
+it). A low load rate means a gap only when the no-plugin arm fails too.
+
+Two arms run under identical conditions - both without the plugin, same case, same model -
+scored 43/60 and 49/60: ten points by chance, the size of the effect being looked for. Compare a
+with/without delta against that before reading it.
+
+## Three cases whose answer comes from this plugin's own measurements - 2026-09-27
+
+Written because the cases above test what the documentation already says, and the larger models
+know it. Sonnet, 20 runs per arm:
+
+| Case | With | Without | Source of the expected answer |
+| --- | --- | --- | --- |
+| `plugin-skill-cannot-be-trimmed` | 19/20 | **0/20** | `skillOverrides` measured without effect on plugin skills, prefix or not |
+| `division-table-for-twin-skills` (retired) | 20/20 | 20/20 | the routing-table A/B in `CONVENTIONS.md` |
+| `antitrigger-on-a-lone-skill` | 19/20 | 18/20 | the lone-skill anti-trigger measurement in `CONVENTIONS.md` |
+
+Without the plugin, all 20 answers to the first case said the key was correct and the cause lay
+elsewhere. The third case was predicted to go the other way - `skill-anatomy.md` then prescribed the
+clause on every skill - and did not: the rule stated its reason ("a near-miss request is where two
+skills collide"), and the model checked that reason against a repository with one skill. The rule
+has since been aligned with the measurement anyway.
+
+### `division-table-for-twin-skills`, retired the same day - and what its grader taught
+
+On Haiku it first scored 16/20 with the plugin, 14/20 without. The failing no-plugin answers read
+right ("the selection happens on metadata before the body is loaded") and had been marked down for
+hedging. The 40 answers were re-graded without re-running the model, after two checks:
+
+- **calibration**: a second Haiku judge, given the **original** criteria, had to find the harness's
+  verdicts. It agreed on 28/40, and scored the no-plugin arm 7/20 instead of 14/20 - a delta of
+  +0.40 instead of +0.10, from the judge alone. The criteria were loose enough for the verdict to
+  depend on who read them;
+- **negative control**: under criteria that grade the substance and accept a hedge, three
+  fabricated wrong answers (endorsing the table, "Claude reads the bodies", deferring to an audit
+  without answering) failed 9 votes out of 9.
+
+Re-graded on substance: 20/20 with, 20/20 without. The case separated no model, and was removed; the
+finding it carried stays in `CONVENTIONS.md` and antipattern B6. An LLM-graded case measures the
+model, the plugin **and** the grader: before reading a delta, check that a failure is a failure.

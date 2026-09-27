@@ -170,6 +170,11 @@ CHARS_PER_TOKEN = 4                   # optimistic on purpose: token figures are
 
 CHECKS = (
     "dangling symbolic links",
+    "instructions against the repository: stale commands, dead anchors, file trees, verification",
+    "security: broad allows, secrets, remote execution, MCP pinning and transport, hidden unicode",
+    "hooks in skill and agent frontmatter",
+    "skills in .agents/ that Claude Code never loads",
+    "plugin variables in project skills",
     "claude-md size + code-comments",
     "skill SKILL.md exists + frontmatter",
     "skill name matches folder",
@@ -269,7 +274,7 @@ AGENT_KNOWN_KEYS = {
 AGENT_PERMISSION_MODES = {"default", "manual", "acceptEdits", "auto", "dontAsk",
                           "bypassPermissions", "plan"}
 # Fields Claude Code ignores on an agent shipped BY A PLUGIN (plugins-reference).
-PLUGIN_AGENT_IGNORED_KEYS = {"hooks", "mcpServers", "permissionMode"}
+PLUGIN_AGENT_IGNORED_KEYS = {"hooks", "mcpServers", "permissionMode", "initialPrompt"}  # plugins/components, 2026-09-27
 # Source: code.claude.com/docs/en/skills, frontmatter reference (20 fields).
 SKILL_KNOWN_KEYS = {
     "name", "description", "when_to_use", "argument-hint", "arguments",
@@ -322,7 +327,7 @@ SETTINGS_KEYS_ANY = frozenset({
     "disableWorkflows", "disabledMcpjsonServers", "editorMode", "effortLevel",
     "emojiCompletionEnabled", "enableAllProjectMcpServers", "enableArtifact", "enableWorkflows",
     "enabledMcpjsonServers", "enabledPlugins", "enforceAvailableModels", "env",
-    "extraKnownMarketplaces", "fallbackModel", "fastMode", "fastModePerSessionOptIn",
+    "extraKnownMarketplaces", "additionalMarketplaces", "fallbackModel", "fastMode", "fastModePerSessionOptIn",
     "feedbackSurveyRate", "fileCheckpointingEnabled", "fileSuggestion", "forceLoginMethod",
     "forceLoginOrgUUID", "gcpAuthRefresh", "hooks", "httpHookAllowedEnvVars",
     "includeCoAuthoredBy", "includeGitInstructions", "inputNeededNotifEnabled",
@@ -381,7 +386,7 @@ SETTINGS_KEYS_MANAGED = frozenset({
     "policyHelper.refreshIntervalMs", "policyHelper.timeoutMs", "requiredMaximumVersion",
     "requiredMinimumVersion", "sandbox.bwrapPath",
     "sandbox.filesystem.allowManagedReadPathsOnly", "sandbox.network.allowManagedDomainsOnly",
-    "sandbox.socatPath", "sshHostAllowlist", "strictKnownMarketplaces",
+    "sandbox.socatPath", "sshHostAllowlist", "strictKnownMarketplaces", "allowedMarketplaces",
     "strictPluginOnlyCustomization", "strictPluginOnlyCustomization.agents",
     "strictPluginOnlyCustomization.hooks", "strictPluginOnlyCustomization.mcp",
     "strictPluginOnlyCustomization.skills", "wslInheritsWindowsSettings"
@@ -430,8 +435,16 @@ MCP_EMPTY_CREDENTIAL_VARS = re.compile(
     r"|NPM_TOKEN)(:-[^}]*)?\}")
 # A literal credential, not a ${VAR} reference. Prefixes of widely used token formats.
 SECRET_LITERAL_RE = re.compile(r"(Bearer\s+[A-Za-z0-9._~+/-]{16,}|sk-[A-Za-z0-9_-]{16,}"
-                               r"|gh[pousr]_[A-Za-z0-9]{20,}|xox[abpr]-[A-Za-z0-9-]{10,}"
-                               r"|AKIA[0-9A-Z]{16})")
+                               r"|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}"
+                               r"|xox[abpr]-[A-Za-z0-9-]{10,}|(?:AKIA|ASIA)[0-9A-Z]{16}"
+                               r"|AIza[0-9A-Za-z_-]{35}|glpat-[0-9A-Za-z_-]{20,}|npm_[A-Za-z0-9]{36}"
+                               r"|hf_[A-Za-z0-9]{30,}|(?:sk|rk|pk)_live_[0-9A-Za-z]{20,}"
+                               r"|xai-[A-Za-z0-9]{20,}|SG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}"
+                               r"|-----BEGIN [A-Z ]*PRIVATE KEY-----)")
+# The security family has its own grade, independent of the profile: a risk is not a
+# house convention, and a documented pitfall of this kind is not a mere NOTICE.
+SECURITY_GRADE = {"high": "ERROR", "medium": "WARN", "low": "NOTICE"}
+SECURITY_CHECKS_EXTRA = ("43-mcp-secret", "43-mcp-approval")   # older ids of the same family
 BUILTIN_OUTPUT_STYLES = {"Default", "Explanatory", "Learning", "Proactive", "Concise"}
 
 # Hook vocabulary. Source: code.claude.com/docs/en/hooks, read 2026-09-22.
@@ -477,6 +490,18 @@ HOOK_TYPE_FIELDS = {"command": ("command",), "http": ("url",), "mcp_tool": ("ser
 # "Only evaluated on tool events ... On other events, a hook with `if` set never runs."
 HOOK_TOOL_EVENTS = {"PreToolUse", "PostToolUse", "PostToolUseFailure", "PermissionRequest",
                     "PermissionDenied"}
+# Handler types each event runs; an unsupported one "Claude Code skips" (hooks, § prompt-
+# based hooks, read 2026-09-27). Events not listed here take all five types.
+_CMD_HTTP_MCP = frozenset({"command", "http", "mcp_tool"})
+HOOK_EVENT_TYPES = {
+    "PermissionRequest": frozenset({"command", "http", "mcp_tool", "prompt"}),
+    "SessionStart": frozenset({"command", "mcp_tool"}), "Setup": frozenset({"command", "mcp_tool"}),
+    **{e: _CMD_HTTP_MCP for e in (
+        "ConfigChange", "CwdChanged", "DirectoryAdded", "Elicitation", "ElicitationResult",
+        "FileChanged", "InstructionsLoaded", "MessageDisplay", "Notification", "PostCompact",
+        "PostModelSwitch", "PreCompact", "PreModelSwitch", "SessionEnd", "StopFailure",
+        "SubagentStart", "WorktreeCreate", "WorktreeRemove")},
+}
 HOOK_PLUGIN_ROOT_VARS = ("${CLAUDE_PLUGIN_ROOT}", "$CLAUDE_PLUGIN_ROOT")
 HOOK_PROJECT_DIR_VARS = ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR")
 AGENT_VALIDATED_KEYS = AGENT_KNOWN_KEYS
@@ -531,7 +556,7 @@ def load_local_config(root: Path) -> dict:
     if not path.is_file():
         return {}
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
         return data if isinstance(data, dict) else {}
     except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         return {"__error__": str(path)}
@@ -722,6 +747,9 @@ LIBRARY_MIN_SKILLS = 3   # 1 or 2 root skills beside a CLAUDE.md were strays on 
 # dispatch in main() reads this tuple: a project-only check added later and not
 # listed here runs against a plugin and reports a missing file that cannot exist.
 PROJECT_ONLY = (
+    "check_repository_reality",
+    "check_agents_dir_skills",
+    "check_plugin_vars_in_project",
     "check_claude_md",
     "check_cross_refs",
     "check_no_global_scripts",
@@ -850,7 +878,7 @@ def apply_layout(root: Path, layout: str) -> None:
         CLAUDE_DIR, SKILLS_DIR, AGENTS_DIR = ".", "skills", "agents"
         manifest = root / ".claude-plugin" / "plugin.json"
         try:
-            declared = json.loads(manifest.read_text(encoding="utf-8")).get("skills")
+            declared = json.loads(manifest.read_text(encoding="utf-8-sig")).get("skills")
             if isinstance(declared, list) and declared and isinstance(declared[0], str):
                 declared = declared[0]          # "string|array": the first path is the home
             if isinstance(declared, str):
@@ -1052,7 +1080,10 @@ def _inline_code_spans(text: str) -> list[tuple[int, int]]:
     # Paragraph by paragraph, as CommonMark does: a span never crosses a blank line,
     # and a failed pairing must not swallow the backtick that opens the next one.
     for para in re.finditer(r"(?:[^\n]|\n(?![ \t]*\n))+", prose):
-        for m in re.finditer(r"(`+)(?!`)(.+?)(?<!`)\1(?!`)", para.group(0), re.S):
+        # `(?<!`)`: a run opens only at its first backtick. Without it the last
+        # backtick of "``" opened a span that closed on the next line's first backtick,
+        # and every later span shifted by one (sixth public sample, 2026-09-27).
+        for m in re.finditer(r"(?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`)", para.group(0), re.S):
             spans.append((para.start() + m.start(), para.start() + m.end()))
     return spans
 
@@ -1070,6 +1101,9 @@ def iter_relative_links(text: str) -> Iterable[tuple[str, int]]:
     # and for an elided target (`](...issues/M)`): 6 of the 14 link ERRORs on a
     # 150-repository sample, 2026-09-27, were one or the other.
     spans = _fenced_spans(text) + _inline_code_spans(text)
+    # An HTML comment is not rendered: a usage note in `<!-- … -->` showing what to write
+    # in CLAUDE.md, link included, was checked as a link (seventh public sample, 2026-09-27).
+    spans += [m.span() for m in re.finditer(r"<!--.*?-->", text, re.S)]
     # `](rules/x.md)` is as relative as `](./rules/x.md)`: only the `./` form was
     # checked, so the same dead link was reported or not by its spelling (2026-09-27).
     # Not a URL (`scheme:`), an anchor (`#`), an absolute path or a `<...>` placeholder.
@@ -1377,6 +1411,7 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
         entries = dossiers_de_skill(skills_dir, report)
     skills: dict[str, dict] = {}
     seen_names: dict[str, str] = {}
+    ignored = git_ignored(root)
     for entry in sorted(entries):
         skill_md = entry / "SKILL.md"
         if not skill_md.exists():
@@ -1533,10 +1568,18 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
             )
 
         if name and name in seen_names:
+            # In a project the typed command comes from the folder, not from `name`
+            # (skills, 2026-09-23): two folders sharing a `name` stay two commands, and
+            # nothing collides. Reported as an ERROR in a project until 2026-09-27 - 4
+            # false ERRORs in one fresh public repository. In a plugin `name` is the
+            # command, so a duplicate is a real collision.
+            project = LAYOUT == "project"
             report.add(
                 "06-skill-duplicate-name",
-                "ERROR",
-                f"Duplicate skill name '{name}' (also in '{seen_names[name]}')",
+                "NOTICE" if project else "ERROR",
+                f"Duplicate skill name '{name}' (also in '{seen_names[name]}')"
+                + (": in a project each folder is its own command, so both load; only the "
+                   "displayed name is shared." if project else ""),
                 str(skill_md),
             )
         elif name:
@@ -1551,6 +1594,15 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
             except ValueError:
                 continue
             if not target.exists():
+                # Same machine-dependence as 20: a target git ignores was installed, not
+                # committed.
+                rel_target = os.path.relpath(target, root.resolve()).replace(os.sep, "/")
+                if ignored(rel_target):
+                    report.add("07-skill-broken-link", "NOTICE",
+                               f"SKILL.md in '{entry.name}' links to '{link}', under a path git "
+                               "ignores: present only where it was installed. Not counted.",
+                               str(skill_md))
+                    continue
                 report.add(
                     "07-skill-broken-link",
                     "ERROR",
@@ -1613,7 +1665,15 @@ def check_agents(root: Path, report: Report) -> dict[str, dict]:
         # An audit that is wrong is a nuisance; an audit that is wrong while citing a
         # spec teaches a false rule, with the authority of an error.
         missing = [k for k in ("name", "description") if not fm.get(k)]
-        if missing:
+        if missing and LAYOUT == "plugin":
+            # "A plugin subagent whose frontmatter has no name or doesn't parse still loads,
+            # under its filename" (sub-agents): an ERROR "does not load" was false there.
+            if "description" in missing:
+                report.add("08-agent-frontmatter", "WARN",
+                           f"Plugin agent '{entry.stem}' has no description: it loads under its "
+                           "filename, with nothing for Claude to decide when to delegate to it "
+                           "(sub-agents).", str(entry))
+        elif missing:
             report.add(
                 "08-agent-frontmatter",
                 "ERROR",
@@ -1709,7 +1769,7 @@ def listing_hidden_skills(root: Path, skills: dict[str, dict]) -> set[str]:
     settings = root / CLAUDE_DIR / "settings.json"
     if settings.is_file():
         try:
-            overrides = json.loads(settings.read_text(encoding="utf-8")).get("skillOverrides", {})
+            overrides = json.loads(settings.read_text(encoding="utf-8-sig")).get("skillOverrides", {})
         except (json.JSONDecodeError, UnicodeDecodeError):
             overrides = {}
         for name, state in overrides.items():
@@ -2310,9 +2370,32 @@ def check_reference_sizes(root: Path, report: Report) -> None:
         if lines <= REFERENCE_TOC_LINES:
             continue
         head = "\n".join(text.splitlines()[:REFERENCE_TOC_SCAN_LINES]).lower()
-        has_toc = ("contents:" in head or "## contents" in head or "# contents" in head
-                   or "table of contents" in head
-                   or len(re.findall(r"^\s*[-*]\s*\[[^\]]+\]\(#", head, re.M)) >= 3)
+        # Any language, any typography: `Contents :` (French spacing), `Sommaire`,
+        # `Table des matières`, or a line or list of 3+ anchor links. `contents:` alone
+        # missed 7 of 7 French references that had one (2026-09-27).
+        # ... with 3 entries or more: a keyword alone (`Contents : see below`) is not one.
+        # 3 entries, or as many as the file has sections: a 2-section file lists 2.
+        sections = [h for h in re.findall(r"^## (.+)$", text, re.M)
+                    if not re.match(r"(?i)\W*(?:table of contents|contents|sommaire|table des mati)", h)]
+        needed = min(3, max(1, len(sections)))
+        has_toc = len(re.findall(r"\]\(#", head)) >= 3
+        head_lines = head.splitlines()
+        all_lines = text.lower().splitlines()
+        for k, ln in enumerate(head_lines):
+            m = re.match(r"^\W*(?:table of contents|contents|sommaire|table des mati[eè]res)\b\W*(.*)$", ln)
+            if not m:
+                continue
+            inline = [e for e in re.split(r"\s*[·,;|]\s*", m.group(1)) if e.strip()]
+            listed = 0
+            # The list may run past the scanned head: read it from the whole file.
+            for nxt in all_lines[k + 1:]:
+                if re.match(r"^\s*(?:[-*]|\d+\.)\s+\S", nxt):
+                    listed += 1
+                elif nxt.strip():
+                    break
+            if len(inline) >= needed or listed >= needed:
+                has_toc = True
+                break
         rel_name = ref.relative_to(skills_dir).as_posix()
         if not has_toc:
             report.add(
@@ -2396,7 +2479,9 @@ def check_all_relative_links(root: Path, report: Report) -> None:
              if LAYOUT == "plugin" else [base])
     fichiers = existants({md for h in homes if h.is_dir() for md in h.rglob("*.md")})
     vus: set[tuple[Path, str]] = set()
+    ignored = git_ignored(root)
     for md in fichiers:
+        into_ignored: list[str] = []
         # A template's links point at what the reader will create.
         if "template" in md.name.lower() or "templates" in md.parent.parts:
             continue
@@ -2417,12 +2502,30 @@ def check_all_relative_links(root: Path, report: Report) -> None:
                 continue
             if not (md.parent / link).exists() and cle not in vus:
                 vus.add(cle)            # one dead link, one finding - not one per mention or spelling
+                # A target under a path git ignores exists where a script installed it and
+                # nowhere in a clone: the verdict depends on the machine, not the commit -
+                # the class 22 already reads through git (100 false ERRORs in one fresh
+                # public repository, 2026-09-27, `.claude/skills/ext/` filled by a script).
+                rel_target = os.path.relpath(os.path.normpath(md.parent / link.split("#")[0]),
+                                             root).replace(os.sep, "/")
+                if not rel_target.startswith("..") and ignored(rel_target):
+                    into_ignored.append(link)
+                    continue
                 report.add(
                     "20-relative-links",
                     "ERROR",
                     f"'{md.relative_to(base)}' links to non-existent '{link}'",
                     str(md),
                 )
+        if into_ignored:
+            report.add(
+                "20-relative-links",
+                "NOTICE",
+                f"'{md.relative_to(base)}' has {len(into_ignored)} link(s) into paths git ignores "
+                f"(e.g. '{into_ignored[0]}'): they resolve only where those untracked files were "
+                "installed, so whether they are dead depends on the machine. Not counted.",
+                str(md),
+            )
 
 
 def check_rule_globs(root: Path, report: Report) -> None:
@@ -2619,7 +2722,7 @@ def check_settings_scope(root: Path, report: Report) -> None:
         if not path.is_file():
             continue
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             report.add("24-settings-parse", "ERROR", f"'{name}' is not valid JSON: {exc}", str(path))
             continue
@@ -2723,154 +2826,582 @@ def check_hooks(root: Path, report: Report) -> None:
     """
     for path, rel in _hook_declarations(root):
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             # A settings file that does not parse is 24-settings-parse's to report: said
             # here too, one empty file was two ERRORs (third public sample, 2026-09-27).
             if path.name == "hooks.json":
                 report.add("35-hooks-parse", "ERROR", f"'{rel}' is not valid JSON: {exc}", str(path))
             continue
-        hooks = data.get("hooks") if isinstance(data, dict) else None
+        _audit_hooks(root, report, data.get("hooks") if isinstance(data, dict) else None, rel, path)
+
+
+
+
+class _YamlOutOfSubset(Exception):
+    """A shape beyond the block subset hooks use: give up rather than guess."""
+
+
+def yaml_block(lines: list[str]):
+    """The block YAML subset hook frontmatter uses: maps, lists of maps, plain scalars.
+
+    Standard library only, like the rest of this script. Flow collections (`{...}`),
+    anchors and multi-line scalars raise _YamlOutOfSubset: an auditor that half-parses a
+    hook reports hooks that are not there.
+    """
+    items = [(len(l) - len(l.lstrip(" ")), l.strip()) for l in lines
+             if l.strip() and not l.lstrip().startswith("#")]
+    def scalar(v: str):
+        v = v.strip()
+        if v[:1] in "{&*|>" or v.startswith("[") and not v.endswith("]"):
+            raise _YamlOutOfSubset(v)
+        if v.startswith("[") and v.endswith("]"):
+            return [scalar(x) for x in v[1:-1].split(",") if x.strip()]
+        if len(v) >= 2 and v[0] == v[-1] and v[0] in "'\"":
+            return v[1:-1]
+        return v
+    def block(i: int, ind: int):
+        if i >= len(items):
+            return None, i
+        if items[i][1].startswith("- "):
+            out = []
+            while i < len(items) and items[i][0] == ind and items[i][1].startswith("- "):
+                rest = items[i][1][2:]
+                sub_ind = ind + 2
+                if re.match(r"^[\w.-]+:(\s|$)", rest):
+                    items[i] = (sub_ind, rest)
+                    val, i = mapping(i, sub_ind)
+                else:
+                    val, i = scalar(rest), i + 1
+                out.append(val)
+            return out, i
+        return mapping(i, ind)
+    def mapping(i: int, ind: int):
+        out = {}
+        while i < len(items) and items[i][0] == ind and not items[i][1].startswith("- "):
+            m = re.match(r"^([\w.-]+):(?:\s+(.*))?$", items[i][1])
+            if not m:
+                raise _YamlOutOfSubset(items[i][1])
+            cle, val = m.group(1), m.group(2)
+            i += 1
+            if val not in (None, ""):
+                out[cle] = scalar(val)
+            elif i < len(items) and items[i][0] > ind:
+                out[cle], i = block(i, items[i][0])
+            elif i < len(items) and items[i][0] == ind and items[i][1].startswith("- "):
+                out[cle], i = block(i, ind)
+            else:
+                out[cle] = None
+        return out, i
+    if not items:
+        return {}
+    val, i = block(0, items[0][0])
+    if i != len(items):
+        raise _YamlOutOfSubset(items[i][1])
+    return val
+
+
+def frontmatter_hooks(text: str):
+    """The `hooks:` block of a frontmatter, parsed; None when there is none or it is out of subset."""
+    if not text.startswith("---"):
+        return None
+    lines = text.splitlines()
+    end_ = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
+    if end_ is None:
+        return None
+    fm = lines[1:end_]
+    debut = next((i for i, l in enumerate(fm) if re.match(r"^hooks:\s*$", l)), None)
+    if debut is None:
+        return None
+    body = []
+    for l in fm[debut + 1:]:
+        if l.strip() and not l.startswith((" ", "\t")):
+            break
+        body.append(l)
+    try:
+        return yaml_block(body)
+    except (_YamlOutOfSubset, IndexError):
+        return None
+
+
+def check_frontmatter_hooks(root: Path, report: Report) -> None:
+    """Hooks declared in a skill's or an agent's frontmatter: the same checks as settings hooks."""
+    partial: list[Path] = []
+    foreign: list[Path] = []
+    sources = [(p, "skill") for p in existants((root / SKILLS_DIR).glob("*/SKILL.md"))] + \
+              [(p, "agent") for p in existants((root / AGENTS_DIR).rglob("*.md"))]
+    for p, kind_ in sources:
+        try:
+            text = p.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if not re.search(r"^hooks:", text.split("\n---", 2)[0] if text.startswith("---") else "", re.M):
+            continue
+        hooks = frontmatter_hooks(text)
+        fm_block = text.split("\n---", 2)[0]
+        keys = re.findall(r"^  ([A-Za-z]+):", fm_block.split("\nhooks:", 1)[-1], re.M) \
+            if "\nhooks:" in fm_block else []
+        if keys and all(c[0].islower() and c not in KNOWN_HOOK_EVENTS for c in keys):
+            # `pre:` / `post:`: another orchestrator's hook format in an agent Claude Code
+            # also loads. None of it runs here - one cause, said once per repository, not
+            # 218 ERRORs across 2 repositories (600 public repositories, 2026-09-27).
+            foreign.append(p)
+            continue
         if hooks is None:
+            # Out of the block subset (`pre: |`, flow mappings): the event names are still
+            # readable at the first level - and an unknown one never fires, however written.
+            partial.append(p)
+            fm_block = text.split("\n---", 2)[0]
+            block = re.split(r"^hooks:\s*$", fm_block, maxsplit=1, flags=re.M)
+            if len(block) == 2:
+                lines = [l for l in block[1].splitlines() if l.strip()]
+                ind = min((len(l) - len(l.lstrip()) for l in lines if l.startswith(" ")), default=0)
+                for l in lines:
+                    if not l.startswith(" "):
+                        break
+                    mm = re.match(r"^ {%d}([A-Za-z]+):" % ind, l)
+                    if mm and mm.group(1) not in KNOWN_HOOK_EVENTS:
+                        report.add("35-hooks-event", "ERROR",
+                                   f"'{mm.group(1)}' in the frontmatter hooks of '{p.relative_to(root)}' "
+                                   "is not a hook event: it never fires (hooks).", str(p))
             continue
-        if not isinstance(hooks, dict):
+        if kind_ == "agent" and isinstance(hooks, dict) and "Stop" in hooks:
+            # "Claude Code converts a Stop hook here to SubagentStop" (hooks).
+            hooks = {("SubagentStop" if e == "Stop" else e): v for e, v in hooks.items()}
+        _audit_hooks(root, report, hooks, str(p.relative_to(root)), p)
+    if foreign:
+        shown = ", ".join(str(x.relative_to(root)) for x in foreign[:3])
+        report.add("35-hooks-event", "WARN",
+                   f"{len(foreign)} file(s) declare frontmatter hooks whose events are all "
+                   "unknown to Claude Code (lowercase keys such as pre/post: another tool's format). "
+                   f"Claude Code runs none of them ({shown}{'...' if len(foreign) > 3 else ''}).",
+                   str(root))
+    if partial:
+        shown = ", ".join(str(x.relative_to(root)) for x in partial[:3])
+        report.add("35-hooks-shape", "NOTICE",
+                   f"{len(partial)} file(s) declare frontmatter hooks in a form this script reads "
+                   f"only in part (multi-line scalars, flow mappings): event names checked, the "
+                   f"rest not ({shown}{'...' if len(partial) > 3 else ''}).", str(root))
+
+
+def check_agents_dir_skills(root: Path, report: Report) -> None:
+    """Skills kept in `.agents/skills/` that Claude Code never loads.
+
+    The docs list where skills live - managed, `~/.claude/skills/`, `.claude/skills/`,
+    nested `.claude/skills/`, `--add-dir`, a plugin's `skills/` (skills, § where skills
+    live) - and `.agents/` is none of them. A repository shared with other agents keeps
+    its skills there and Claude sees none of them unless each is linked into
+    `.claude/skills/`: 28 of 600 public repositories, often every skill they have.
+    """
+    found = existants((root / ".agents" / "skills").glob("*/SKILL.md"))
+    if not found:
+        return
+    visible = {p.name for p in (root / SKILLS_DIR).iterdir()} if (root / SKILLS_DIR).is_dir() else set()
+    missing_skills = sorted(p.parent.name for p in found if p.parent.name not in visible)
+    if not missing_skills:
+        return
+    shown = ", ".join(missing_skills[:6]) + (f" (+{len(missing_skills) - 6})" if len(missing_skills) > 6 else "")
+    report.add("48-agents-dir-skills", "WARN",
+               f"{len(missing_skills)} of {len(found)} skill(s) in .agents/skills/ have no "
+               f"counterpart in {SKILLS_DIR}/: Claude Code does not load skills from .agents/, "
+               f"so it never sees them ({shown}). Link each one into {SKILLS_DIR}/ to share it "
+               "between tools (skills, where skills live).", str(root / ".agents" / "skills"))
+
+
+def check_plugin_vars_in_project(root: Path, report: Report) -> None:
+    """`${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_PLUGIN_DATA}` in a project skill: never substituted.
+
+    "Substituted only in plugin skills" (skills, § available string substitutions): in a
+    project skill the model reads the variable literally, and a command built on it runs
+    against an empty path. 8 of 600 public repositories, 2026-09-27.
+    """
+    for skill_md in existants((root / SKILLS_DIR).glob("*/SKILL.md")):
+        try:
+            text = skill_md.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        # Uses only: in `allowed-tools`, or a `${CLAUDE_PLUGIN_ROOT}/<path>` whose file exists
+        # beside the skill or in the repository. A skill that TEACHES plugins quotes the
+        # variable as an example: 5 of 8 findings were that (600 public repositories).
+        fm_text = text.split("\n---", 2)[0] if text.startswith("---") else ""
+        vus = set()
+        for mm in re.finditer(r"\$\{?(CLAUDE_PLUGIN_(?:ROOT|DATA))\}?(/[\w./-]+)?", text):
+            in_tools = re.search(r"^allowed-tools:.*" + re.escape(mm.group(0)), fm_text, re.M)
+            rest = (mm.group(2) or "").strip("/")
+            exists_here = rest and ((skill_md.parent / rest).exists() or (root / rest).exists())
+            if in_tools or exists_here:
+                vus.add(mm.group(1))
+        vus = sorted(vus)
+        if vus:
+            report.add("49-plugin-var-in-project", "ERROR",
+                       f"Skill '{skill_md.parent.name}' uses {', '.join('${' + v + '}' for v in vus)}, "
+                       "which Claude Code substitutes only in plugin skills: here it stays literal. "
+                       "Use ${CLAUDE_SKILL_DIR} or ${CLAUDE_PROJECT_DIR} (skills).", str(skill_md))
+
+
+# --- Security -----------------------------------------------------------------
+_SEC_BLANKET = re.compile(r"^(Bash|PowerShell)(\(\s*\*?\s*\))?$")
+# The interpreter directly followed by the wildcard (`python*`, `python:*`, `node *`), as in
+# the docs' "Bash(python*)". `pwsh scripts/*` names a folder of scripts: narrower, not this.
+_SEC_INTERP = re.compile(r"^(Bash|PowerShell)\(\s*(?:python\d?(?:\.\d+)?|node|deno|bun|ruby|perl|php|sh|bash|zsh|pwsh)"
+                         r"\s*[:\s]?\s*\*\s*\)$")
+_SEC_PKG_RUN = re.compile(r"^Bash\(\s*(?:npm|pnpm|yarn|bun)\s+(?:run|exec|dlx|x)?\s*[:\s]?\*\s*\)$"
+                          r"|^Bash\(\s*(?:npx|bunx|pnpx|uvx|pipx\s+run)[:\s]\*\s*\)$")
+_SEC_REMOTE_EXEC = re.compile(r"(?:curl|wget)\b[^|;&]*\|\s*(?:sudo\s+)?(?:ba|z)?sh\b|(?:ba|z)?sh\s+<\(\s*(?:curl|wget)"
+                              r"|base64\s+(?:-d|--decode)[^|]*\|\s*(?:ba|z)?sh\b|\biex\s*\(\s*(?:irm|iwr|Invoke-WebRequest)")
+_SEC_BIDI = re.compile("[\u202a-\u202e\u2066-\u2069\U000e0000-\U000e007f]")
+_SEC_ZW = re.compile("[\u200b\u2060]|(?<!^)\ufeff")
+_SEC_KEY_NAME = re.compile(r"(?:^|_)(?:API_?KEY|TOKEN|SECRET|PASSWORD|PASSWD|PRIVATE_KEY)$", re.I)
+
+
+def _sec(report: Report, level: str, check: str, message: str, where: Path) -> None:
+    report.add(check, SECURITY_GRADE[level], f"Security ({level}): {message}", str(where))
+
+
+def check_security(root: Path, report: Report) -> None:
+    """What the configuration lets run, reach or leak - not whether it parses.
+
+    The other checks read the shape of permissions, hooks and MCP servers; this one reads
+    what a valid shape allows. The lists come from the docs (permission-modes: the "broad
+    allow rules that grant arbitrary code execution" auto mode drops) and from the MCP and
+    hooks security sections. Grades: high = ERROR, medium = WARN, whatever the profile.
+    """
+    # 1. Settings: allow rules, additional directories, env secrets, hook and status commands.
+    for rel in (f"{CLAUDE_DIR}/settings.json", f"{CLAUDE_DIR}/settings.local.json"):
+        path = root / rel
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        perms = data.get("permissions") if isinstance(data.get("permissions"), dict) else {}
+        for rule in [r for r in (perms.get("allow") or []) if isinstance(r, str)]:
+            r = rule.strip()
+            if _SEC_BLANKET.match(r):
+                _sec(report, "high", "50-security-broad-allow",
+                     f"allow rule '{rule}' in '{rel}' approves every shell command without a "
+                     "prompt, for everyone this file reaches. Auto mode drops it as a rule that "
+                     "grants arbitrary code execution (permission-modes).", path)
+            # A NAMED subagent (`Agent(Explore)`) is as narrow as that agent: only the bare
+            # rule and `Agent(*)` open every subagent (5 findings of 98 were named ones).
+            elif _SEC_INTERP.match(r) or _SEC_PKG_RUN.match(r) or r in ("Agent", "Agent(*)", "Monitor", "Monitor(*)"):
+                _sec(report, "medium", "50-security-broad-allow",
+                     f"allow rule '{rule}' in '{rel}' runs arbitrary code without a prompt (an "
+                     "interpreter, a package-manager run, Agent or Monitor): auto mode drops it "
+                     "for that reason. Narrow it to the exact commands (permission-modes).", path)
+            elif r in ("WebFetch", "WebFetch(domain:*)"):
+                _sec(report, "medium", "50-security-broad-allow",
+                     f"allow rule '{rule}' in '{rel}' fetches any URL without a prompt: every "
+                     "host is reachable. Allow the domains you need (permissions).", path)
+        for d in [x for x in (perms.get("additionalDirectories") or []) if isinstance(x, str)]:
+            if d.strip() in ("~", "~/", "/", "$HOME", "${HOME}") or d.strip().startswith(".."):
+                _sec(report, "medium", "50-security-directories",
+                     f"additionalDirectories '{d}' in '{rel}' extends Claude's working boundary "
+                     "to a whole home, the filesystem root or outside the project (security).", path)
+        env = data.get("env") if isinstance(data.get("env"), dict) else {}
+        for key, val in env.items():
+            if not isinstance(val, str) or "${" in val:
+                continue
+            if SECRET_LITERAL_RE.search(val):
+                _sec(report, "high", "50-security-secret",
+                     f"env.{key} in '{rel}' holds what looks like a literal credential, in a "
+                     "settings file. Keep it in the environment, not in the file - and rotate "
+                     "it if the file was ever committed.", path)
+            elif _SEC_KEY_NAME.search(key) and len(val) >= 16 and re.search(r"\d", val) \
+                    and not re.search(r"(?i)your|example|xxx|changeme|placeholder|<|dummy|test", val):
+                _sec(report, "medium", "50-security-secret",
+                     f"env.{key} in '{rel}' is named like a credential and holds a literal value. "
+                     "If it is one, move it out of the file.", path)
+        # Only what executes: the `command` of command hooks. The whole hooks object was
+        # searched, and a `prompt` hook telling the model to block `curl … | bash` read as
+        # one that runs it (seventh public sample, 2026-09-27).
+        hooks = data.get("hooks") if isinstance(data.get("hooks"), dict) else {}
+        blobs = [str(h.get("command", "")) for groups in hooks.values() if isinstance(groups, list)
+                 for g in groups if isinstance(g, dict) and isinstance(g.get("hooks"), list)
+                 for h in g["hooks"] if isinstance(h, dict) and h.get("type", "command") == "command"]
+        blobs.append(str((data.get("statusLine") or {}).get("command", ""))
+                     if isinstance(data.get("statusLine"), dict) else "")
+        if any(_SEC_REMOTE_EXEC.search(b) for b in blobs):
+            _sec(report, "high", "50-security-remote-exec",
+                 f"a hook or the status line in '{rel}' downloads code and runs it (a `curl | sh` "
+                 "shape): it executes with your full user permissions on every event, and what "
+                 "it runs is whatever the server returns that day (hooks, security).", path)
+    # 2. MCP servers: unpinned packages, plain http, download-and-run.
+    for path in (root / ".mcp.json",):
+        if not path.is_file():
+            continue
+        try:
+            servers = (json.loads(path.read_text(encoding="utf-8-sig")) or {}).get("mcpServers") or {}
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError, AttributeError):
+            continue
+        for srv, conf in sorted(servers.items()) if isinstance(servers, dict) else []:
+            if not isinstance(conf, dict):
+                continue
+            cmd = str(conf.get("command", ""))
+            args = [str(a) for a in (conf.get("args") or []) if isinstance(a, (str, int))]
+            pkgs = [a for a in args if not a.startswith("-")]
+            runner = os.path.basename(cmd)
+            if runner in ("npx", "bunx", "pnpx") or (runner in ("pnpm", "yarn") and args[:1] == ["dlx"]):
+                cand = [a for a in pkgs if a != "dlx"][:1]
+                if cand and not cand[0].startswith((".", "/")) and (
+                        "@" not in cand[0][1:] or cand[0].endswith("@latest")):
+                    _sec(report, "medium", "50-security-mcp-unpinned",
+                         f"MCP server '{srv}' runs '{cand[0]}' through {runner} with no pinned "
+                         "version: each start may fetch different code than the one you "
+                         "reviewed. Pin a version (package@x.y.z).", path)
+            elif runner in ("uvx",) and pkgs and "==" not in pkgs[0] and not pkgs[0].startswith((".", "/")):
+                _sec(report, "medium", "50-security-mcp-unpinned",
+                     f"MCP server '{srv}' runs '{pkgs[0]}' through uvx with no pinned version "
+                     "(package==x.y.z).", path)
+            elif runner == "docker" and "run" in args:
+                img = next((a for a in args[args.index("run") + 1:] if not a.startswith("-")
+                            and "=" not in a and "/" not in a[:1]), "")
+                if img and (":" not in img.split("/")[-1] or img.endswith(":latest")) and "@sha256" not in img:
+                    _sec(report, "medium", "50-security-mcp-unpinned",
+                         f"MCP server '{srv}' runs the image '{img}' with no pinned tag.", path)
+            url = str(conf.get("url", ""))
+            if url.startswith("http://") and not re.match(r"http://(localhost|127\.0\.0\.1|\[::1\])(:|/|$)", url):
+                _sec(report, "medium", "50-security-mcp-http",
+                     f"MCP server '{srv}' is reached over plain http ({url.split('?')[0]}): "
+                     "requests, tokens and tool results travel unencrypted.", path)
+            if _SEC_REMOTE_EXEC.search(" ".join([cmd] + args)):
+                _sec(report, "high", "50-security-remote-exec",
+                     f"MCP server '{srv}' downloads code and runs it at start.", path)
+    # 3. `claude -p` runs that believe they are sandboxed. `--allowedTools` "Tools that execute
+    # without prompting ... To restrict which tools are available, use --tools instead", and a
+    # scoped `--disallowedTools` rule "leaves the tool available" (cli-reference). A harness
+    # that isolates with those alone leaves every other tool reachable - measured by a
+    # colleague session on 2.1.283: 147 of 257 runs called a tool outside the list.
+    # `.claude/` by name, not CLAUDE_DIR: in a plugin that is the whole repository, and the
+    # check read its own message in audit.py.
+    scripts = [p for d in (root / ".github" / "workflows", root / "scripts", root / "bin", root / ".claude")
+               if d.is_dir() for p in existants(d.rglob("*"))
+               if p.is_file() and p.suffix in (".yml", ".yaml", ".sh", ".py", ".js", ".ts", ".mjs", "")]
+    for p in scripts:
+        try:
+            t = p.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for ligne in re.findall(r"^.*\bclaude\b[^\n]*\s(?:-p|--print)\b[^\n]*$", t, re.M):
+            if re.search(r"--(?:allowedTools|allowed-tools|disallowedTools|disallowed-tools)\b", ligne) \
+                    and not re.search(r"--(?:tools|restricted)\b", ligne):   # --bare skips discovery, keeps the tools
+                _sec(report, "medium", "50-security-headless-isolation",
+                     f"'{p.relative_to(root)}' runs `claude -p` with --allowedTools/--disallowedTools "
+                     "and no --tools: that approves or denies calls, it does not remove tools - "
+                     "\"to restrict which tools are available, use --tools\", or --restricted for an "
+                     "evaluation harness (cli-reference).", p)
+                break
+    # 4. Hidden characters in what the model reads.
+    lus = [root / n for n in ("CLAUDE.md", "CLAUDE.local.md", "AGENTS.md") if (root / n).is_file()]
+    for d in ((root / CLAUDE_DIR) if LAYOUT == "project" else root / SKILLS_DIR, root / AGENTS_DIR,
+              root / "commands", root / "hooks"):
+        if d.is_dir():
+            lus += [p for p in existants(d.rglob("*"))
+                    if p.suffix in (".md", ".sh", ".py", ".js", ".json", ".mdc")]
+    for p in sorted(set(lus)):
+        try:
+            t = p.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        m = _SEC_BIDI.search(t)
+        if m:
+            _sec(report, "high", "50-security-hidden-unicode",
+                 f"'{p.relative_to(root)}' contains U+{ord(m.group(0)):04X}, a bidirectional or tag "
+                 "character: invisible in an editor, read by the model. It is how instructions "
+                 "are hidden in rules files.", p)
+        elif _SEC_ZW.search(t):
+            m = _SEC_ZW.search(t)
+            # low: 9 findings in 5 of 600 repositories, some of them a reference that
+            # documents the byte-order mark - below the 90% bar set before measuring.
+            _sec(report, "low", "50-security-hidden-unicode",
+                 f"'{p.relative_to(root)}' contains U+{ord(m.group(0)):04X}, a zero-width character: "
+                 "usually a copy-paste artefact, sometimes a hiding place.", p)
+
+def _audit_hooks(root: Path, report: Report, hooks, rel: str, path: Path, in_agent: bool = False) -> None:
+    """Every check on one hooks object, wherever it was declared.
+
+    Settings files, a plugin's hooks/hooks.json, `plugin.json` `hooks`, and the
+    frontmatter of skills and agents share one format (hooks). Until 2026-09-27 only
+    the first two were read: 156 agent files with frontmatter hooks in a sample of
+    600 public repositories were never checked.
+    """
+    if hooks is None:
+        return
+    if not isinstance(hooks, dict):
+        report.add("35-hooks-shape", "ERROR",
+                   f"'hooks' in '{rel}' is not an object of event -> entries.", str(path))
+        return
+
+    injecting = []
+    for event in sorted(hooks):
+        if event not in KNOWN_HOOK_EVENTS:
+            report.add("35-hooks-event", "ERROR",
+                       f"'{event}' is not a hook event: it never fires. An interactive session "
+                       "warns once at startup; `claude -p` and CI say nothing. Known events: "
+                       f"{len(KNOWN_HOOK_EVENTS)} (hooks).", str(path))
+            continue
+        entries = hooks[event]
+        if not isinstance(entries, list):
             report.add("35-hooks-shape", "ERROR",
-                       f"'hooks' in '{rel}' is not an object of event -> entries.", str(path))
+                       f"'{event}' in '{rel}' must hold a list of matcher groups.", str(path))
             continue
-
-        injecting = []
-        for event in sorted(hooks):
-            if event not in KNOWN_HOOK_EVENTS:
-                report.add("35-hooks-event", "ERROR",
-                           f"'{event}' is not a hook event: it never fires. An interactive session "
-                           "warns once at startup; `claude -p` and CI say nothing. Known events: "
-                           f"{len(KNOWN_HOOK_EVENTS)} (hooks).", str(path))
-                continue
-            entries = hooks[event]
-            if not isinstance(entries, list):
+        for i, entry in enumerate(entries):
+            where = f"{event}[{i}]"
+            if not isinstance(entry, dict):
                 report.add("35-hooks-shape", "ERROR",
-                           f"'{event}' in '{rel}' must hold a list of matcher groups.", str(path))
+                           f"{where} in '{rel}' is not an object.", str(path))
                 continue
-            for i, entry in enumerate(entries):
-                where = f"{event}[{i}]"
-                if not isinstance(entry, dict):
-                    report.add("35-hooks-shape", "ERROR",
-                               f"{where} in '{rel}' is not an object.", str(path))
-                    continue
-                m = entry.get("matcher")
-                if (isinstance(m, str) and re.fullmatch(r"mcp__[A-Za-z0-9_-]+", m)
-                        and "__" not in m[5:]):
+            m = entry.get("matcher")
+            if (isinstance(m, str) and re.fullmatch(r"mcp__[A-Za-z0-9_-]+", m)
+                    and "__" not in m[5:]):
+                report.add("35-hooks-matcher", "ERROR",
+                           f"{where} matches '{m}', a bare MCP server prefix: it is compared "
+                           f"as an exact string and matches no tool. Use '{m}__.*' (hooks).",
+                           str(path))
+            # "Matchers are case-sensitive" (hooks-guide), and a matcher made only of
+            # letters, digits, `_ - , |` and spaces is compared as exact names (hooks):
+            # `bash`, `Create` or `MCP` on a tool event matches no tool, ever.
+            if (event in HOOK_TOOL_EVENTS and isinstance(m, str) and m.strip()
+                    and re.fullmatch(r"[A-Za-z0-9_\-, |]+", m)):
+                dead = [a for a in (x.strip() for x in re.split(r"[|,]", m)) if a
+                        and a not in KNOWN_TOOLS and a not in TOOL_ALIASES
+                        and not a.startswith("mcp__")]
+                alts = [x for x in (y.strip() for y in re.split(r"[|,]", m)) if x]
+                if dead and len(dead) == len(alts):
                     report.add("35-hooks-matcher", "ERROR",
-                               f"{where} matches '{m}', a bare MCP server prefix: it is compared "
-                               f"as an exact string and matches no tool. Use '{m}__.*' (hooks).",
-                               str(path))
-                if entry.get("matcher") and event in MATCHERLESS_HOOK_EVENTS:
-                    report.add("35-hooks-matcher", "WARN",
-                               f"{where} declares matcher '{entry['matcher']}' on '{event}', which "
-                               "always fires. The matcher filters nothing and reads as if it did.",
-                               str(path))
-                inner = entry.get("hooks")
-                if not isinstance(inner, list) or not inner:
+                               f"{where} in '{rel}' matches {', '.join(repr(x) for x in dead)}, "
+                               "which names no tool: matchers are exact and case-sensitive, so "
+                               f"this group never fires on '{event}' (hooks).", str(path))
+                elif dead:
+                    # `Edit|MultiEdit|Write` still fires for Edit and Write: only the dead
+                    # alternative is noise (57 of 60 findings on 600 public repositories).
+                    report.add("35-hooks-matcher", "NOTICE",
+                               f"{where} in '{rel}' lists {', '.join(repr(x) for x in dead)}, which "
+                               "names no current tool (a retired one, or a typo): that alternative "
+                               "matches nothing, the others still fire (hooks).", str(path))
+            if entry.get("matcher") and event in MATCHERLESS_HOOK_EVENTS:
+                report.add("35-hooks-matcher", "WARN",
+                           f"{where} declares matcher '{entry['matcher']}' on '{event}', which "
+                           "always fires. The matcher filters nothing and reads as if it did.",
+                           str(path))
+            inner = entry.get("hooks")
+            if isinstance(inner, list) and not inner:
+                # `"hooks": []` is a list, and an empty one runs nothing: a placeholder, not a
+                # malformed group. It read "has no 'hooks' list" as an ERROR until 2026-09-27
+                # (5 in one fresh public repository).
+                report.add("35-hooks-shape", "NOTICE",
+                           f"{where} in '{rel}' has an empty 'hooks' list: the group runs "
+                           "nothing.", str(path))
+                continue
+            if not isinstance(inner, list):
+                report.add("35-hooks-shape", "ERROR",
+                           f"{where} in '{rel}' has no 'hooks' list.", str(path))
+                continue
+            for j, hook in enumerate(inner):
+                spot = f"{where}.hooks[{j}]"
+                if not isinstance(hook, dict):
                     report.add("35-hooks-shape", "ERROR",
-                               f"{where} in '{rel}' has no 'hooks' list.", str(path))
+                               f"{spot} in '{rel}' is not an object.", str(path))
                     continue
-                for j, hook in enumerate(inner):
-                    spot = f"{where}.hooks[{j}]"
-                    if not isinstance(hook, dict):
-                        report.add("35-hooks-shape", "ERROR",
-                                   f"{spot} in '{rel}' is not an object.", str(path))
-                        continue
-                    if "type" not in hook:
-                        report.add("35-hooks-shape", "WARN",
-                                   f"{spot} in '{rel}' has no 'type': the handler field is "
-                                   "required (hooks).", str(path))
-                    kind = hook.get("type", "command")
-                    if kind not in HOOK_TYPE_FIELDS:
-                        report.add("35-hooks-shape", "ERROR",
-                                   f"{spot} in '{rel}' has type '{kind}', which is not a hook type "
-                                   f"({', '.join(sorted(HOOK_TYPE_FIELDS))}).", str(path))
-                        continue
-                    cond = hook.get("if")
-                    if cond is not None:
-                        if event not in HOOK_TOOL_EVENTS:
-                            report.add("35-hooks-if", "ERROR",
-                                       f"{spot} in '{rel}' sets 'if' on '{event}': 'if' is evaluated "
-                                       "on tool events only, and elsewhere the hook never runs "
-                                       "(hooks).", str(path))
-                        elif not isinstance(cond, str) or re.search(r"&&|\|\|", cond):
-                            report.add("35-hooks-if", "ERROR",
-                                       f"{spot} in '{rel}' combines rules in 'if': it holds exactly "
-                                       "one permission rule, with no &&, || or list (hooks).",
-                                       str(path))
-                    missing = [f for f in HOOK_TYPE_FIELDS[kind] if not hook.get(f)]
-                    if missing and kind != "command":
-                        report.add("35-hooks-shape", "ERROR",
-                                   f"{spot} in '{rel}' is a '{kind}' hook with no "
-                                   f"{', '.join(repr(f) for f in missing)}.", str(path))
-                    if kind != "command":
-                        continue
-                    command = hook.get("command")
-                    if isinstance(command, str) and isinstance(hook.get("args"), list):
-                        # Exec form: the script can be any element, not just the command.
-                        command = " ".join([command] + [str(a) for a in hook["args"]])
-                    if isinstance(command, str) and re.search(r'(?<!")\$\{?CLAUDE_PLUGIN_ROOT\}?/', command) \
-                            and "args" not in hook:
-                        report.add("35-hooks-command", "WARN",
-                                   f"{spot} in '{rel}' uses ${{CLAUDE_PLUGIN_ROOT}} unquoted in a "
-                                   "shell-form command: a plugin root with a space splits the "
-                                   "path. Wrap it in double quotes (plugins-reference).", str(path))
-                    if not isinstance(command, str) or not command.strip():
-                        report.add("35-hooks-shape", "ERROR",
-                                   f"{spot} in '{rel}' is a command hook with no 'command'.",
+                if "type" not in hook:
+                    report.add("35-hooks-shape", "WARN",
+                               f"{spot} in '{rel}' has no 'type': the handler field is "
+                               "required (hooks).", str(path))
+                kind = hook.get("type", "command")
+                if kind not in HOOK_TYPE_FIELDS:
+                    report.add("35-hooks-shape", "ERROR",
+                               f"{spot} in '{rel}' has type '{kind}', which is not a hook type "
+                               f"({', '.join(sorted(HOOK_TYPE_FIELDS))}).", str(path))
+                    continue
+                if kind not in HOOK_EVENT_TYPES.get(event, HOOK_TYPE_FIELDS):
+                    report.add("35-hooks-shape", "ERROR",
+                               f"{spot} in '{rel}' is a '{kind}' hook on '{event}', which runs "
+                               f"only {', '.join(sorted(HOOK_EVENT_TYPES[event]))} hooks: Claude "
+                               "Code skips it (hooks).", str(path))
+                    continue
+                cond = hook.get("if")
+                if cond is not None:
+                    if event not in HOOK_TOOL_EVENTS:
+                        report.add("35-hooks-if", "ERROR",
+                                   f"{spot} in '{rel}' sets 'if' on '{event}': 'if' is evaluated "
+                                   "on tool events only, and elsewhere the hook never runs "
+                                   "(hooks).", str(path))
+                    elif not isinstance(cond, str) or re.search(r"&&|\|\|", cond):
+                        report.add("35-hooks-if", "ERROR",
+                                   f"{spot} in '{rel}' combines rules in 'if': it holds exactly "
+                                   "one permission rule, with no &&, || or list (hooks).",
                                    str(path))
+                missing = [f for f in HOOK_TYPE_FIELDS[kind] if not hook.get(f)]
+                if missing and kind != "command":
+                    report.add("35-hooks-shape", "ERROR",
+                               f"{spot} in '{rel}' is a '{kind}' hook with no "
+                               f"{', '.join(repr(f) for f in missing)}.", str(path))
+                if kind != "command":
+                    continue
+                command = hook.get("command")
+                if isinstance(command, str) and isinstance(hook.get("args"), list):
+                    # Exec form: the script can be any element, not just the command.
+                    command = " ".join([command] + [str(a) for a in hook["args"]])
+                if isinstance(command, str) and re.search(r'(?<!")\$\{?CLAUDE_PLUGIN_ROOT\}?/', command) \
+                        and "args" not in hook:
+                    report.add("35-hooks-command", "WARN",
+                               f"{spot} in '{rel}' uses ${{CLAUDE_PLUGIN_ROOT}} unquoted in a "
+                               "shell-form command: a plugin root with a space splits the "
+                               "path. Wrap it in double quotes (plugins-reference).", str(path))
+                if not isinstance(command, str) or not command.strip():
+                    report.add("35-hooks-shape", "ERROR",
+                               f"{spot} in '{rel}' is a command hook with no 'command'.",
+                               str(path))
+                    continue
+                if "timeout" not in hook:
+                    default = HOOK_EVENT_TIMEOUT.get(event, HOOK_DEFAULT_TIMEOUT)
+                    report.add("35-hooks-timeout",
+                               "WARN" if default >= 60 else "NOTICE",
+                               f"{spot} in '{rel}' sets no 'timeout': the default on '{event}' "
+                               f"is {default}s"
+                               + (" (a budget shared by every SessionEnd hook)."
+                                  if event == "SessionEnd" else ".")
+                               + (" A hook that hangs holds the event it was meant to observe."
+                                  if default >= 60 else ""), str(path))
+                for token in _hook_paths(command):
+                    if token.startswith(HOOK_PLUGIN_ROOT_VARS) and LAYOUT != "plugin":
+                        report.add("35-hooks-command", "ERROR",
+                                   f"{spot} in '{rel}' uses CLAUDE_PLUGIN_ROOT, which a project "
+                                   "hook cannot resolve: one variable cannot designate one "
+                                   "plugin among those installed. A hook that needs a plugin's "
+                                   "files has to be shipped BY that plugin.", str(path))
                         continue
-                    if "timeout" not in hook:
-                        default = HOOK_EVENT_TIMEOUT.get(event, HOOK_DEFAULT_TIMEOUT)
-                        report.add("35-hooks-timeout",
-                                   "WARN" if default >= 60 else "NOTICE",
-                                   f"{spot} in '{rel}' sets no 'timeout': the default on '{event}' "
-                                   f"is {default}s"
-                                   + (" (a budget shared by every SessionEnd hook)."
-                                      if event == "SessionEnd" else ".")
-                                   + (" A hook that hangs holds the event it was meant to observe."
-                                      if default >= 60 else ""), str(path))
-                    for token in _hook_paths(command):
-                        if token.startswith(HOOK_PLUGIN_ROOT_VARS) and LAYOUT != "plugin":
-                            report.add("35-hooks-command", "ERROR",
-                                       f"{spot} in '{rel}' uses CLAUDE_PLUGIN_ROOT, which a project "
-                                       "hook cannot resolve: one variable cannot designate one "
-                                       "plugin among those installed. A hook that needs a plugin's "
-                                       "files has to be shipped BY that plugin.", str(path))
-                            continue
-                        resolved = token
-                        for var in HOOK_PLUGIN_ROOT_VARS + HOOK_PROJECT_DIR_VARS:
-                            resolved = resolved.replace(var, str(root))
-                        # removeprefix, not lstrip: lstrip strips a SET of
-                        # characters, so "./.claude/x" lost its dot-directory and
-                        # a live script was reported dead. Caught by the negative
-                        # control, never by reading the line.
-                        rel_tok = resolved[2:] if resolved.startswith("./") else resolved
-                        target = Path(rel_tok) if rel_tok.startswith("/") else root / rel_tok
-                        if not target.exists():
-                            report.add("35-hooks-command", "ERROR",
-                                       f"{spot} in '{rel}' runs '{token}', which does not exist. A "
-                                       "dead anchor that executes is worse than one that is read.",
-                                       str(path))
-                        elif target.is_file() and not os.access(target, os.X_OK) \
-                                and not any(c in command for c in ("python", "node", "bash", "sh ")):
-                            report.add("35-hooks-command", "WARN",
-                                       f"{spot} in '{rel}' runs '{token}' directly, but it is not "
-                                       "executable (chmod +x).", str(path))
-            if event in CONTEXT_INJECTING_HOOK_EVENTS:
-                injecting.append(event)
+                    resolved = token
+                    for var in HOOK_PLUGIN_ROOT_VARS + HOOK_PROJECT_DIR_VARS:
+                        resolved = resolved.replace(var, str(root))
+                    # removeprefix, not lstrip: lstrip strips a SET of
+                    # characters, so "./.claude/x" lost its dot-directory and
+                    # a live script was reported dead. Caught by the negative
+                    # control, never by reading the line.
+                    rel_tok = resolved[2:] if resolved.startswith("./") else resolved
+                    target = Path(rel_tok) if rel_tok.startswith("/") else root / rel_tok
+                    if not target.exists():
+                        report.add("35-hooks-command", "ERROR",
+                                   f"{spot} in '{rel}' runs '{token}', which does not exist. A "
+                                   "dead anchor that executes is worse than one that is read.",
+                                   str(path))
+                    elif target.is_file() and not os.access(target, os.X_OK) \
+                            and not any(c in command for c in ("python", "node", "bash", "sh ")):
+                        report.add("35-hooks-command", "WARN",
+                                   f"{spot} in '{rel}' runs '{token}' directly, but it is not "
+                                   "executable (chmod +x).", str(path))
+        if event in CONTEXT_INJECTING_HOOK_EVENTS:
+            injecting.append(event)
 
-        if injecting:
-            report.add("35-hooks-context", "NOTICE",
-                       f"'{rel}' declares hooks on {', '.join(injecting)}: for these events Claude "
-                       "Code adds plain-text stdout to the context. Whatever they print is paid in "
-                       "tokens on every session - a cost the harness's own estimate leaves out, "
-                       "because it prices the declaration and not the output.", str(path))
-
+    if injecting:
+        report.add("35-hooks-context", "NOTICE",
+                   f"'{rel}' declares hooks on {', '.join(injecting)}: for these events Claude "
+                   "Code adds plain-text stdout to the context. Whatever they print is paid in "
+                   "tokens on every session - a cost the harness's own estimate leaves out, "
+                   "because it prices the declaration and not the output.", str(path))
 
 def check_orphan_references(root: Path, report: Report) -> None:
     """Every reference must be reachable from its own SKILL.md.
@@ -3200,15 +3731,21 @@ def check_evals(root: Path, report: Report) -> None:
             continue
         name = skill_dir.name
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             report.add("26-evals-schema", "ERROR", f"evals.json in '{name}' does not parse: {exc}", str(path))
             continue
         if not isinstance(data, dict) or "skill_name" not in data or "evals" not in data:
+            # Another format than skill-creator's (a list of {query, should_trigger}, an
+            # object of `cases`) is a suite some other runner reads: nothing in Claude Code
+            # consumes evals.json, so nothing fails. 6 ERRORs on two fresh public samples
+            # (2026-09-27), all such suites. A parse failure stays an ERROR.
             report.add(
                 "26-evals-schema",
-                "ERROR",
-                f"evals.json in '{name}' must be an object carrying 'skill_name' and 'evals'.",
+                "NOTICE",
+                f"evals.json in '{name}' is not skill-creator's schema (an object carrying "
+                "'skill_name' and 'evals'): its runner will not read it, if that is the one "
+                "meant. Another runner's format is fine.",
                 str(path),
             )
             continue
@@ -3485,7 +4022,18 @@ def print_text_report(report: Report, tout: bool = False) -> None:
     # for one clause alone. Shown as one line; --all and --json keep every finding,
     # and the counts - which floors compare - are unchanged.
     maison: dict[str, int] = {}
+    # The security family first, whatever its grade: a leaked key reads before a missing
+    # description. Display only - the counts a floor compares are unchanged.
+    securite = [f for f in report.findings if f.check.startswith("50-security")
+                or f.check in SECURITY_CHECKS_EXTRA]
+    if securite:
+        print(f"\n=== SECURITY ({len(securite)}) ===")
+        for f in sorted(securite, key=lambda x: -SEVERITY_ORDER.get(x.severity, 0)):
+            loc = f" [{f.location}]" if f.location else ""
+            print(f"  {f.severity} [{f.check}] {f.message}{loc}")
     for f in report.findings:
+        if f in securite:
+            continue
         if (PROFILE == "doc" and not tout and f.severity == "NOTICE"
                 and HOUSE_MARKER in f.message):
             maison[f.check] = maison.get(f.check, 0) + 1
@@ -3563,7 +4111,7 @@ ANCHOR_PATH_RE = re.compile(
 ANCHOR_TEMPLATE_RE = re.compile(
     # `/.../` is an author eliding the middle of a path (`core/src/.../Rule.kt`): 7 dead
     # anchors on a second public sample were that, 2026-09-27.
-    r"(MyPage|Feature|Example|Foo|Bar|YourThing|<[^>]+>|placeholder|xxx|/\.\.\./)", re.IGNORECASE
+    r"(MyPage|Feature|Example|Foo|Bar|YourThing|your(?=[A-Z_-])|<[^>]+>|placeholder|xxx|/\.\.\./)", re.IGNORECASE
 )
 
 
@@ -3625,6 +4173,193 @@ def git_ignored(root: Path):
     return ignored
 
 
+
+def anchor_verdict(root: Path, ref: str, body: str, fences: list, bases: tuple, ignored, tracked_cache: list):
+    """What one path named in a configuration file resolves to: alive, dead, unverifiable or skip.
+
+    One chain for skills, CLAUDE.md, rules and agents. `bases` are the extra directories a
+    relative path may be written from (a skill's folder, the skills directory).
+    """
+    rel = ref[2:] if ref.startswith("./") else ref
+    # A path outside the repository, or one git ignores (`dist/`, `node_modules/`), is
+    # alive on a machine that built the project and dead on a fresh clone. An absolute
+    # path names the machine it runs on. Neither can be checked from here.
+    if rel.startswith(("../", "/", "~/")) or ignored(rel):
+        return "unverifiable", ""
+    if (root / rel).exists() or any((b / rel).exists() for b in bases):
+        return "alive", ""
+    if ANCHOR_TEMPLATE_RE.search(ref):
+        return "skip", ""             # template / illustrative path
+    at = body.find(ref)
+    if re.search(r"(?:e\.g\.|\bexample\b|such as|for instance)[^.\n]{0,30}$",
+                 body[max(0, at - 48):at], re.I):
+        # `**Example**: `x``, `Example: when `x` changes` - the phrase need not touch the
+        # path. 2 of 23 dead anchors on a public sample, 2026-09-27.
+        return "unverifiable", " (given as an example)"
+    if not tracked_cache:
+        tracked_cache.append(tracked_paths(root))
+    sous = sous_paquet(rel, tracked_cache[0])
+    if sous:
+        # A monorepo names paths from its package: `src/x.ts` is `packages/api/src/x.ts`.
+        # Found, so not dead; not where it says, so not alive (10 of 23 on a public sample).
+        return "unverifiable", f" (only under {sous})"
+    if any(a <= at < b for a, b in fences):
+        # A dead path inside a code block: an illustration of another codebase, or a stale
+        # command. 42 of 45 dead anchors on a calibration sample (2026-09-23) sat in the
+        # example blocks of a kit describing the projects it is installed into.
+        return "unverifiable", " (in an example block)"
+    return "dead", ""
+
+
+# --- The repository as it is ------------------------------------------------------
+_RUN_RE = re.compile(r"(?<![\w/-])(npm|pnpm|yarn|bun)\s+run\s+([A-Za-z0-9_:.@/-]+)")
+_MAKE_RE = re.compile(r"(?<![\w/.-])make\b([^\n\x00;&|]*)")
+_JUST_RE = re.compile(r"(?<![\w/.-])just\s+([A-Za-z0-9_-]+)")
+_VERIFY_RE = re.compile(r"\b(?:test|tests|lint|check|typecheck|type-check|build|verify|ci|fmt|format)\b", re.I)
+
+
+def _repo_commands(root: Path) -> dict:
+    """npm scripts, make targets and just recipes the repository defines - None where it has no such file."""
+    tracked = [t for t in tracked_paths(root) if "node_modules/" not in t]
+    out: dict = {"npm": None, "make": None, "just": None, "make_pattern": False}
+    for t in tracked:
+        base = t.rsplit("/", 1)[-1]
+        try:
+            if base == "package.json":
+                sc = json.loads((root / t).read_text(encoding="utf-8-sig")).get("scripts") or {}
+                out["npm"] = (out["npm"] or set()) | set(sc)
+            elif base in ("Makefile", "makefile", "GNUmakefile") or base.endswith(".mk"):
+                txt = (root / t).read_text(encoding="utf-8", errors="replace")
+                out["make"] = (out["make"] or set()) | set(re.findall(r"^([A-Za-z0-9_./-]+)\s*:(?!=)", txt, re.M))
+                # A pattern rule, or an `include`, defines targets this reading cannot list
+                # (3 false findings on openshift-style boilerplate among 600 repositories).
+                out["make_pattern"] |= bool(re.search(r"^%[^:\n]*:|^-?include\s", txt, re.M))
+            elif base.lower() in ("justfile", ".justfile"):
+                txt = (root / t).read_text(encoding="utf-8", errors="replace")
+                out["just"] = (out["just"] or set()) | set(re.findall(r"^@?([A-Za-z0-9_-]+)(?:\s[^:=\n]*)?:(?!=)", txt, re.M))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, AttributeError):
+            continue
+    return out
+
+
+def _instruction_files(root: Path) -> list[Path]:
+    """What the model is told to follow in every session or on demand: CLAUDE.md, rules, commands, agents."""
+    files = [root / n for n in ("CLAUDE.md", ".claude/CLAUDE.md") if (root / n).is_file()]
+    for d in ("rules", "commands", "agents"):
+        base = root / ".claude" / d
+        if base.is_dir():
+            files += existants(base.rglob("*.md"))
+    return files
+
+
+def check_repository_reality(root: Path, report: Report) -> None:
+    """Instructions that name what the repository no longer has.
+
+    "Treat CLAUDE.md like code: review it when things go wrong, prune it regularly", and
+    include "Bash commands Claude can't guess" (best-practices): a command the file names
+    and the repository does not define sends the model down a failing path it was told to
+    take. Only npm/pnpm/yarn/bun `run`, `make` and `just` are resolved, and only where the
+    repository has the file that defines them - a script run by path is an anchor (28).
+    """
+    cmds = _repo_commands(root)
+    tracked_cache: list = []
+    ignored = git_ignored(root)
+    for f in _instruction_files(root):
+        try:
+            text = f.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        fences = _fenced_spans(text)
+        rel = f.relative_to(root)
+        # Commands are read in code only - inline spans and fenced blocks. In prose, `make`
+        # and `just` are English: "make the change" gave `make the` (600 public repositories).
+        # Joined on NUL, not a newline: `make` and `when` in two spans are not `make when`.
+        # Fenced blocks only when they hold shell: in Go, `make` is a builtin (a rule's Go
+        # snippet gave `make when`). Spans after "e.g." / "for example" are examples.
+        shell_fences = [(a, b) for a, b in fences
+                        if re.match(r"\s*(?:`{3,}|~{3,})\s*(?:bash|sh|shell|zsh|console|terminal|text)?\s*$",
+                                    text[a:text.find("\n", a)] if "\n" in text[a:b] else text[a:b])]
+        spans = [(a, b) for a, b in _inline_code_spans(text)
+                 if not re.search(r"(?:e\.g\.|\bexample\b|such as|for instance)[^.\n]{0,20}$",
+                                  text[max(0, a - 40):a], re.I)]
+        code = "\x00".join(text[a:b] for a, b in shell_fences + spans)
+        dead = []
+        if cmds["npm"] is not None:
+            for tool, name in _RUN_RE.findall(code):
+                # `npm run build/lint` means "build or lint", not a script of that name.
+                if not name.startswith(("-", "<", "$", "{")) and "/" not in name and name not in cmds["npm"]:
+                    dead.append(f"{tool} run {name}")
+        if cmds["make"] is not None and not cmds["make_pattern"]:
+            for reste in _MAKE_RE.findall(code):
+                # Read make's arguments: `-C dir` and `-f file` take a value, `VAR=x` is a
+                # variable, the first bare word is the target. `make -C src` names none.
+                mots, cible = reste.replace("`", " ").split(), None
+                i = 0
+                while i < len(mots):
+                    w = mots[i]
+                    if w in ("-C", "-f", "--directory", "--file", "-I", "-o", "-W"):
+                        i += 2
+                        continue
+                    if w.startswith("-") or "=" in w:
+                        i += 1
+                        continue
+                    cible = w if re.fullmatch(r"[A-Za-z0-9_./-]+", w) else None
+                    break
+                if cible and cible not in cmds["make"]:
+                    dead.append(f"make {cible}")
+        if cmds["just"] is not None:
+            for name in _JUST_RE.findall(code):
+                if name not in cmds["just"] and not name.endswith("-"):
+                    dead.append(f"just {name}")
+        # A template is not a command: `npm run db:generate:<name>`, `bun run ...`, `make do-`,
+        # `just --list` (a flag). 4 of 20 findings in a sample of the first pass.
+        dead = sorted({x for x in dead if re.search(r"[A-Za-z0-9]$", x.split()[-1])
+                       and not x.split()[-1].startswith("-") and "..." not in x})
+        # WARN where the instructions are this project's own (CLAUDE.md, rules); NOTICE in
+        # agents and commands, which are often kits describing the project they are
+        # installed into - `npm run complexity-check` in a generic reviewer agent.
+        grade = "WARN" if f.name == "CLAUDE.md" or ".claude/rules" in str(rel) else "NOTICE"
+        if dead:
+            report.add("51-stale-command", grade,
+                       f"'{rel}' tells the model to run {', '.join(dead[:5])}"
+                       f"{' (+' + str(len(dead) - 5) + ')' if len(dead) > 5 else ''}, which the "
+                       "repository does not define (package.json scripts, Makefile targets, "
+                       "justfile recipes). The model will try it and fail.", str(f))
+        # Paths named in CLAUDE.md, rules and agents: the chain skills already use.
+        if f.name == "CLAUDE.md" or ".claude/rules" in str(rel) or ".claude/agents" in str(rel):
+            morts = []
+            for ref in sorted(set(ANCHOR_PATH_RE.findall(text))):
+                verdict, _ = anchor_verdict(root, ref, text, fences, (f.parent,), ignored, tracked_cache)
+                if verdict == "dead":
+                    morts.append(ref)
+            if morts:
+                # NOTICE: expected ~75% before measuring, and the first pass on 600 public
+                # repositories confirmed it - templates, build outputs, files to create.
+                report.add("28-config-anchors", "NOTICE",
+                           f"'{rel}' names {', '.join(morts[:4])}{'...' if len(morts) > 4 else ''}, "
+                           "which does not exist. A dead anchor in an instruction file sends the "
+                           "model exploring for a file that is gone.", str(f))
+        if f.name == "CLAUDE.md":
+            arbre = len(re.findall(r"^[\s│]*[├└]──", text, re.M))
+            if arbre >= 5:
+                report.add("52-claude-md-tree", "NOTICE",
+                           f"'{rel}' carries a file tree ({arbre} lines). The docs list "
+                           "\"file-by-file descriptions of the codebase\" among what to leave out: "
+                           "the model reads the tree itself, and the lines are paid every "
+                           "session (best-practices).", str(f))
+    # A repository that defines a verification command and never tells Claude about it.
+    defines = sorted({n for n in (cmds["npm"] or set()) | (cmds["make"] or set()) | (cmds["just"] or set())
+                      if _VERIFY_RE.fullmatch(n.split(":")[0])})
+    claude_md = next((root / n for n in ("CLAUDE.md", ".claude/CLAUDE.md") if (root / n).is_file()), None)
+    if defines and claude_md is not None:
+        told = " ".join(p.read_text(encoding="utf-8", errors="replace") for p in _instruction_files(root))
+        if not re.search(r"\b(?:test|lint|typecheck|type-check|build|check|verify|pytest|cargo|go test|tsc|eslint|ruff|mypy|vitest|jest)\b",
+                         told, re.I):
+            report.add("53-no-verification-command", "NOTICE",
+                       f"The repository defines {', '.join(defines[:4])}, and no instruction file "
+                       "names a test, lint or build command. \"Give Claude a check it can run\" "
+                       "(best-practices): without one it cannot verify its own work.", str(claude_md))
+
 def check_skill_anchors(root: Path, report: Report) -> None:
     """Every path a SKILL.md names in its body must resolve to a real file.
 
@@ -3641,7 +4376,7 @@ def check_skill_anchors(root: Path, report: Report) -> None:
     total = anchored = alive = dead = 0
     unverifiable: list[str] = []
     ignored = git_ignored(root)
-    tracked: list[str] | None = None
+    tracked_cache: list = []
     for skill_md in existants(skills_dir.glob("*/SKILL.md")):
         total += 1
         name = skill_md.parent.name
@@ -3661,41 +4396,14 @@ def check_skill_anchors(root: Path, report: Report) -> None:
             continue
         anchored += 1
         for ref in refs:
-            rel = ref[2:] if ref.startswith("./") else ref
-            # A path outside the repository, or one git ignores (`dist/`,
-            # `node_modules/`), is alive on a machine that built the project and dead
-            # on a fresh clone. Counting it either way makes the same commit give two
-            # counts - and a floor that moves with the machine is not a floor.
-            # An absolute path (`/home/<app>/infra/x.sh`) names the machine it runs on,
-            # not the repository: it cannot be checked from here either way.
-            if rel.startswith(("../", "/", "~/")) or ignored(rel):
-                unverifiable.append(f"{name}: {ref}")
-            elif (root / rel).exists():
+            verdict, note = anchor_verdict(root, ref, body, fences,
+                                           (skill_md.parent, skills_dir), ignored, tracked_cache)
+            if verdict == "alive":
                 alive += 1
-            elif (skill_md.parent / rel).exists():
-                alive += 1          # ${CLAUDE_SKILL_DIR}/... written relative in the body
-            elif (skills_dir / rel).exists():
-                alive += 1          # a sibling skill's file, the base the overlay resolves against too
-            elif ANCHOR_TEMPLATE_RE.search(ref):
-                continue            # template / illustrative path
-            elif re.search(r"(?:e\.g\.|\bexample\b|such as|for instance)[^.\n]{0,30}$",
-                           body[max(0, body.find(ref) - 48):body.find(ref)], re.I):
-                # `**Example**: `x``, `Example: when `x` changes` - the phrase need not
-                # touch the path. 2 of 23 dead anchors on a public sample, 2026-09-27.
-                unverifiable.append(f"{name}: {ref} (given as an example)")
-            elif (sous := sous_paquet(rel, tracked := tracked if tracked is not None
-                                      else tracked_paths(root))):
-                # A monorepo skill names paths from its package, not from the root:
-                # `src/x.ts` is `packages/api/src/x.ts`. Found, so not dead; not where
-                # it says, so not alive. 10 of 23 dead anchors on a public sample.
-                unverifiable.append(f"{name}: {ref} (only under {sous})")
-            elif any(a <= body.find(ref) < b for a, b in fences):
-                # A dead path inside a code block is ambiguous: an illustration of some
-                # other codebase, or a stale command. Measured on a calibration sample
-                # (2026-09-23): 42 of 45 dead anchors sat in example blocks of a kit
-                # whose skills describe the projects it is installed into. A live path
-                # there still counts; a dead one is not claimed either way.
-                unverifiable.append(f"{name}: {ref} (in an example block)")
+            elif verdict == "skip":
+                continue
+            elif verdict == "unverifiable":
+                unverifiable.append(f"{name}: {ref}{note}")
             else:
                 dead += 1
                 report.add(
@@ -3742,7 +4450,7 @@ def check_listing_budget_derived(root: Path, report: Report, skills: dict) -> No
     settings = root / CLAUDE_DIR / "settings.json"
     if settings.is_file():
         try:
-            value = json.loads(settings.read_text(encoding="utf-8")).get("skillListingBudgetFraction")
+            value = json.loads(settings.read_text(encoding="utf-8-sig")).get("skillListingBudgetFraction")
             if isinstance(value, (int, float)) and value > 0:
                 fraction, source = float(value), "skillListingBudgetFraction"
         except (json.JSONDecodeError, UnicodeDecodeError, OSError):
@@ -3782,7 +4490,7 @@ def check_plugin_cost(
     """
     manifest = root / ".claude-plugin" / "plugin.json"
     try:
-        plugin_name = str(json.loads(manifest.read_text(encoding="utf-8")).get("name") or root.name)
+        plugin_name = str(json.loads(manifest.read_text(encoding="utf-8-sig")).get("name") or root.name)
     except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         plugin_name = root.name
 
@@ -4149,7 +4857,7 @@ def check_floor(root: Path, report: Report) -> int:
                    "nothing stops the configuration from drifting upward.", str(path))
         return 0
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
     except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         report.add("34-floor", "ERROR", "floor.json is unreadable or not valid JSON.", str(path))
         return 1
@@ -4201,7 +4909,7 @@ def check_settings_semantics(root: Path, report: Report) -> None:
         if not path.is_file():
             continue
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
         except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             continue                      # 24-settings-parse already reports it
         if not isinstance(data, dict):
@@ -4300,6 +5008,18 @@ def check_settings_semantics(root: Path, report: Report) -> None:
                                "warning - it just approves nothing (permissions).", str(path))
             for kind, rules in lists.items():
                 for rule in rules:
+                    # "Claude Code checks file permissions against Edit(path) and Read(path)
+                    # rules only. If you write a path rule for Write, NotebookEdit, Glob, or
+                    # the legacy MultiEdit tool instead, Claude Code accepts the rule but never
+                    # consults it" (permissions). 19 of 600 public repositories, 2026-09-27.
+                    m_path = re.match(r"^(Write|NotebookEdit|Glob|MultiEdit)\((.+)\)$", rule.strip())
+                    if m_path:
+                        tool_name = "Read" if m_path.group(1) == "Glob" else "Edit"
+                        report.add("42-permissions-rule", "ERROR",
+                                   f"{kind} rule '{rule}' in '{name}' is never consulted: file "
+                                   f"permissions are checked against Edit(...) and Read(...) only. "
+                                   f"Write it {tool_name}({m_path.group(2)}) (permissions).", str(path))
+                        continue
                     if rule.startswith("mcp__") and "(" in rule:
                         report.add("42-permissions-rule", "ERROR",
                                    f"{kind} rule '{rule}' in '{name}': Claude Code skips any "
@@ -4361,7 +5081,12 @@ def check_mcp(root: Path, report: Report) -> None:
     if not path.is_file():
         return
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        # utf-8-sig, like every JSON file this script reads: Claude Code reads a .mcp.json
+        # that opens on a UTF-8 BOM and lists its servers (`claude mcp list`), and applies
+        # a BOM-prefixed settings.json (its `env` reached a Bash call), 2026-09-27. Fixed
+        # first for .mcp.json alone - the one file measured - and the next fresh sample
+        # found the same BOM in a settings.json: the defect was the reader, not the file.
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         report.add("43-mcp-shape", "ERROR", f"'.mcp.json' is not valid JSON: {exc}", str(path))
         return
@@ -4419,7 +5144,7 @@ def check_plugin_manifest(root: Path, report: Report) -> None:
                        str(cp / d))
     manifest = cp / "plugin.json"
     try:
-        data = json.loads(manifest.read_text(encoding="utf-8")) if manifest.is_file() else {}
+        data = json.loads(manifest.read_text(encoding="utf-8-sig")) if manifest.is_file() else {}
     except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         return
     for key in PLUGIN_PATH_FIELDS:
@@ -4427,6 +5152,15 @@ def check_plugin_manifest(root: Path, report: Report) -> None:
         vals = vals if isinstance(vals, list) else [vals]
         for v in vals:
             if not isinstance(v, str):
+                continue
+            # "skills: also accepts '.'", and mcpServers "also accepts MCP bundle paths and
+            # URLs" (plugins-reference, path rules): both were false ERRORs until 0.19.0.
+            if (key == "skills" and v in (".", "./")) or (key == "mcpServers" and v.startswith("https://")):
+                continue
+            if key == "agents" and not v.endswith(".md"):
+                report.add("44-plugin-path", "ERROR",
+                           f"plugin.json 'agents': '{v}' - agents entries must be .md files; "
+                           "\"Directories aren't accepted\" (plugins-reference).", str(manifest))
                 continue
             if not v.startswith("./"):
                 report.add("44-plugin-path", "ERROR",
@@ -4443,8 +5177,12 @@ def check_plugin_manifest(root: Path, report: Report) -> None:
                            "component does not load (plugins-reference).", str(manifest))
     for key, folder in (("agents", "agents"), ("commands", "commands"),
                           ("outputStyles", "output-styles"), ("workflows", "workflows"),
-                          ("themes", "themes")):
-        vals = data.get(key)
+                          ("themes", "themes"), ("experimental.themes", "themes")):
+        vals = (data.get("experimental") or {}).get("themes") if key == "experimental.themes" \
+            else data.get(key)
+        if isinstance(vals, dict):
+            # `commands` "also accepts an object map" (plugins-reference): its sources count.
+            vals = [x.get("source") if isinstance(x, dict) else x for x in vals.values()]
         if vals is None or not (root / folder).is_dir():
             continue
         listed = {(root / v).resolve() for v in (vals if isinstance(vals, list) else [vals])
@@ -4459,7 +5197,7 @@ def check_plugin_manifest(root: Path, report: Report) -> None:
     market = cp / "marketplace.json"
     if market.is_file() and data.get("version"):
         try:
-            entries = json.loads(market.read_text(encoding="utf-8")).get("plugins") or []
+            entries = json.loads(market.read_text(encoding="utf-8-sig")).get("plugins") or []
         except (json.JSONDecodeError, UnicodeDecodeError, OSError, AttributeError):
             entries = []
         for e in entries:
@@ -4612,6 +5350,11 @@ def run_checks(root: Path, report: Report, layout: str, _local: dict) -> None:
     run(check_agent_frontmatter_validity, root, report, skills)
     run(check_settings_scope, root, report)
     run(check_hooks, root, report)
+    run(check_frontmatter_hooks, root, report)
+    run(check_security, root, report)
+    run(check_repository_reality, root, report)
+    run(check_agents_dir_skills, root, report)
+    run(check_plugin_vars_in_project, root, report)
     run(check_orphan_references, root, report)
     run(check_evals, root, report)
     run(check_doctrine_copy, root, report)

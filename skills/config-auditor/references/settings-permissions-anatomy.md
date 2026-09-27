@@ -192,6 +192,19 @@ folder`; `settings § A committed key doesn't reach teammates`.
   Code itself writes these keys to `settings.local.json`. [house] An approval shipped with the code
   is how CVE-2025-59536 worked (external source); approvals stay local.
 - [doc] Keys a repository cannot set for you at all are the `24-settings-scope` findings above.
+- **`50-security-broad-allow`** — allow rules that grant arbitrary code execution. [doc] Entering auto
+  mode, Claude Code drops "broad allow rules that grant arbitrary code execution": blanket
+  `Bash(*)` or `PowerShell(*)`, wildcarded interpreters like `Bash(python*)`, package-manager run
+  commands, `Agent` allow rules, `Monitor` allow rules; "narrow rules like `Bash(npm test)` stay in
+  effect" ([permission-modes](https://code.claude.com/docs/en/permission-modes)). Committed in the
+  shared file, each approves that code for everyone who clones and trusts the repository, with no
+  prompt. Same for a bare `WebFetch` or `WebFetch(domain:*)`: every host is reachable
+  ([permissions](https://code.claude.com/docs/en/permissions)). High when every command passes
+  (`Bash`, `Bash(*)`), medium for the rest. The fix is narrowing, not deleting: name the exact
+  commands the team runs (`Bash(npm test)`, `Bash(npm run lint)`) and the domains it fetches
+  (`WebFetch(domain:docs.shop.example)`); a person who wants broader approvals keeps them in their
+  own `settings.local.json` or user settings. A named subagent (`Agent(Explore)`) or a folder of
+  scripts (`Bash(pwsh scripts/*)`) is narrower and not reported.
 
 ## `settings.local.json` and git
 

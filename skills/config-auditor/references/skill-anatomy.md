@@ -33,6 +33,14 @@ Consequences:
 
 - A `<name>/SKILL.md` folder at the **root** of a repository loads nowhere — not as a project skill,
   not as a plugin skill. `40-skill-not-loaded` reports it.
+- **Doc.** `.agents/skills/<name>/SKILL.md` is **not** one of those locations. A repository that keeps
+  one copy of its skills there for several coding agents gives Claude Code none of them: no listing,
+  no `/name`, nothing reported at startup. Keep the shared copy and link each skill folder into
+  `.claude/skills/` (one symbolic link per skill, relative, committed), so both tools read the same
+  files. Rewriting a skill's description does not help: the skill is never seen. The docs also say
+  Claude Code reads nothing under a `.agents/` directory when it looks for `AGENTS.md`
+  ([memory § AGENTS.md](https://code.claude.com/docs/en/memory)). `48-agents-dir-skills` reports it —
+  measured 2026-09-27 on 28 of 600 public repositories, often every skill they had.
 - **Measured** (2026-09-23, 2.1.280): a `skills/<name>/SKILL.md` tree loads under
   `claude --plugin-dir <repo>` even with no `.claude-plugin/plugin.json`. Protocol: a repository
   holding only `skills/shop-probe/SKILL.md`, started with `--plugin-dir`, then the probe looked up
@@ -130,10 +138,16 @@ The description is the trigger surface: Claude decides whether to load a skill f
 4. **Doc — no XML, no angle brackets.** The spec forbids XML tags in `description`; skill-creator's
    `quick_validate.py` rejects any `<` or `>`. Claude Code loads it anyway, which is why
    `04-skill-description-brackets` warns rather than errors.
-5. **House convention — anti-triggered.** End with a `Don't use for:` clause naming the right
-   alternative. Reason: a near-miss request is where two skills collide, and the clause is the only
-   text that separates them. `04-skill-description-antitrigger` (NOTICE; WARN under `profile: house`); `33-description-overlap`
-   flags pairs of descriptions that compete.
+5. **House convention — anti-triggered where two skills compete.** When a skill has a confusable
+   twin, or has been seen loading on requests that are not its own, end with a `Don't use for:`
+   clause naming the right alternative. Reason: a near-miss request is where two skills collide,
+   and the clause is the only text that separates them. Anthropic documents it the same way, as a
+   remedy for over-triggering. On a skill with no twin and no observed wrong load it corrects
+   nothing: measured on Haiku, 60/60 true triggers and 0/40 false triggers on near misses naming the
+   excluded topics, **with and without** the clause — and it lengthens a description paid on every
+   turn. Add it when the collision is observed, not by default. `04-skill-description-antitrigger`
+   (NOTICE; WARN under `profile: house`); `33-description-overlap` flags pairs of descriptions that
+   compete, which is where the clause is worth a WARN.
 6. **House convention — 80 to ~500 characters.** Under 80 carries no discriminating term
    (`04-skill-description-length` also enforces the floor); over ~500 is usually knowledge that
    belongs in the body. Every listed description is paid on every turn: `17-always-loaded-budget`

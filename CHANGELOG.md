@@ -1,5 +1,126 @@
 # Changelog
 
+## 0.19.0 — 2026-09-27
+
+`audit.py` changes: a floor set with 0.18.0 no longer compares - re-set it after upgrading.
+**A CI step may now fail**: the new security family has its own grade - high is an ERROR, and an
+ERROR makes `audit.py` exit 1. A committed `Bash(*)` allow rule, a hook that pipes a download
+into a shell, a hidden bidirectional character or a literal secret in `settings.json` now fails
+where 0.18.0 passed. Grant an overlay exemption, with its reason, where the choice is deliberate.
+
+### Added
+
+- **Hooks declared in skill and agent frontmatter are audited** like those in settings: event
+  names, handler shapes, matchers, commands, timeouts. They were never read - 156 agent files in
+  600 public repositories. A frontmatter whose events are all another tool's (`pre:`/`post:`) is
+  said once per repository: Claude Code runs none of them.
+- **A hook handler type the event does not run is an ERROR**: `SessionStart` and `Setup` run only
+  `command` and `mcp_tool`, 18 events do not run `prompt` or `agent`, `PermissionRequest` does not
+  run `agent` - Claude Code skips the rest.
+- **A tool-event matcher that names no tool**: matchers are exact and case-sensitive, so `bash`,
+  `Create` or `MCP` never fire (ERROR); a retired name beside live ones (`Edit|MultiEdit|Write`)
+  is a NOTICE.
+- **`Write(...)`, `Glob(...)`, `NotebookEdit(...)` and `MultiEdit(...)` path rules are never
+  consulted**: file permissions are checked against `Edit(...)` and `Read(...)` only (ERROR, with
+  the rule to write instead). 19 of 600 public repositories.
+- **`48-agents-dir-skills`**: skills kept in `.agents/skills/` with no counterpart in
+  `.claude/skills/`, which Claude Code never loads (WARN). 28 of 600 repositories, often every
+  skill they have.
+- **`49-plugin-var-in-project`**: `${CLAUDE_PLUGIN_ROOT}` or `${CLAUDE_PLUGIN_DATA}` used in a
+  project skill - in `allowed-tools` or on a path that exists - where Claude Code never
+  substitutes it (ERROR). A skill that only explains the variable is left alone.
+
+- **A security family, with its own grade** (high = ERROR, medium = WARN, low = NOTICE, whatever
+  the profile), shown first in the text report. It reads what a valid configuration lets run,
+  reach or leak, where the other checks read its shape:
+  - `50-security-broad-allow`: allow rules auto mode drops as granting arbitrary code execution
+    (docs, permission-modes) - `Bash`/`Bash(*)` (high); an interpreter or a package-manager run
+    with a wildcard, `Agent`, `Monitor`, an unrestricted `WebFetch` (medium). A named subagent or a
+    folder of scripts is narrower and not reported.
+  - `50-security-mcp-unpinned`: stdio MCP servers started by `npx`, `bunx`, `pnpm dlx`, `uvx` or
+    `docker run` with no pinned version - each start may run different code.
+  - `50-security-remote-exec`: a hook, the status line or an MCP command that downloads code and
+    pipes it to a shell.
+  - `50-security-hidden-unicode`: bidirectional or tag characters in what the model reads (high),
+    zero-width ones (low).
+  - `50-security-secret`: a literal credential in a settings file's `env`; `43-mcp-secret`
+    recognises more formats (Google, GitLab, npm, Hugging Face, Stripe, private-key blocks...).
+  - `50-security-mcp-http`, `50-security-directories`, and `50-security-headless-isolation`: a
+    `claude -p` that isolates with `--allowedTools`/`--disallowedTools` only - "to restrict which
+    tools are available, use --tools" (cli-reference).
+  On 600 public repositories: 5 blanket allows, 2 literal secrets, 93 broad allows in 42
+  repositories, 47 unpinned MCP servers in 26. Each rule's expected precision was written down
+  before that measurement; two were revised by it (named subagents, folders of scripts).
+
+- **Instructions checked against the repository as it is** ("prune it regularly", best-practices):
+  - `51-stale-command`: `npm`/`pnpm`/`yarn`/`bun run X`, `make X` or `just X` named in code in
+    CLAUDE.md, rules, commands or agents, and defined by no `package.json`, Makefile or justfile of
+    the repository. WARN in CLAUDE.md and rules; NOTICE in agents and commands, which are often
+    kits describing the project they are installed into. `make` arguments are read (`-C dir` is
+    not a target), a Makefile with `include` or pattern rules is not second-guessed, shell blocks
+    only (in Go, `make` is a builtin), and examples ("e.g.") are skipped. On 600 public
+    repositories: 12 WARNs, 11 real.
+  - `28-config-anchors` (NOTICE): paths named in CLAUDE.md, rules and agents that do not exist,
+    with the same resolution as skill anchors.
+  - `52-claude-md-tree` (NOTICE): a file tree in CLAUDE.md - "file-by-file descriptions of the
+    codebase" are among what the docs say to leave out. 66 of 600 repositories.
+  - `53-no-verification-command` (NOTICE): the repository defines test, lint or build commands and
+    no instruction file names one - "give Claude a check it can run". Silent where there is no
+    manifest to compare with.
+
+### Fixed
+
+- **Five checks lagged behind the docs.** A plugin agent with no `name` loads under its filename
+  (no longer an ERROR); `"skills": "."` and an `https://` MCP bundle are valid plugin paths; an
+  `agents` entry that is a directory is an ERROR; `experimental.themes` and a `commands` object
+  map are read; `initialPrompt` is ignored on a plugin agent; `additionalMarketplaces` and
+  `allowedMarketplaces` are documented aliases.
+- **`16-reference-size` missed tables of contents that were not written `contents:`.** A French
+  reference opening on `Contents : …` (a space before the colon), `Sommaire` or `Table des
+  matières`, or a line of anchor links, was reported as having none - 7 of 7 in one repository.
+  The heading is now read in any of those forms, and 3 anchor links anywhere in the head count.
+  A keyword alone is not a table of contents: it needs 3 entries - or as many as the file has
+  sections - on its line or in the list below it, however long. On 600 public repositories this
+  changes 1 finding: a line documenting a `toc` option, no longer taken for a table of contents.
+- **Four false ERRORs found on 150 fresh public repositories**, audited with the candidate frozen:
+  - `20-relative-links` / `07-skill-broken-link`: a link into a path git ignores (a folder a script
+    fills, such as vendored skills) is a NOTICE, one per file - it resolves on the machines where
+    the files were installed and nowhere in a clone, the class `22` already read through git. 100
+    ERRORs in one repository.
+  - `35-hooks-shape`: `"hooks": []` was reported as "has no 'hooks' list". An empty list runs
+    nothing; it is now a NOTICE saying so.
+  - Every JSON file is read past a UTF-8 BOM, as Claude Code reads it: a `.mcp.json` opening on
+    one lists its servers (`claude mcp list`), a `settings.json` opening on one applies its `env`.
+    `43-mcp-shape` and `24-settings-parse` reported both as "not valid JSON".
+  - Inline code opened in the middle of a run of backticks: after "``", every later span shifted
+    by one, and links quoted as counter-examples in backticks were checked as links.
+  - `26-evals-schema`: an `evals.json` in another runner's format (a list of queries, an object
+    of `cases`) is a NOTICE - nothing in Claude Code reads it. A file that does not parse stays
+    an ERROR.
+  - A link inside an HTML comment is not checked: the comment is not rendered.
+  - `50-security-remote-exec` reads only what executes - the `command` of command hooks and of
+    the status line. A `prompt` hook telling the model to block `curl … | bash` was read as one
+    that runs it.
+
+  Measured before release on three fresh samples of 150 public repositories, each audited with
+  the candidate frozen: ERROR precision 51.6 % → 99.4 % → 87.5 % (95.8 % counting plausible
+  ones); the checks added in this release were right 70 times out of 71.
+  - `06-skill-duplicate-name` is a NOTICE in a project: the command comes from the folder, so two
+    folders sharing a `name` do not collide. It stays an ERROR in a plugin, where `name` is the
+    command.
+
+### Changed
+
+- **Anti-triggers are asked for where two skills compete, not on every skill.** The core rule and
+  `skill-anatomy.md` prescribed a `Don't use for:` clause on every description; the plugin's own
+  measurement found it inert on a skill with no twin (60/60 true triggers, 0/40 false, with and
+  without). The clause now goes where a confusable twin exists or a wrong load was observed.
+- **Doctrine for two new checks in the references**: `.agents/skills/` is not a skill location
+  (`skill-anatomy.md`), and what `50-security-broad-allow` grades and why
+  (`settings-permissions-anatomy.md`).
+- **Eight eval cases added**, two of them answered from this plugin's measurements rather than
+  from the docs; results on Haiku, Sonnet and Opus in `evals/PROVENANCE.md`.
+
 ## 0.18.0 — 2026-09-27
 
 `audit.py` changes: a floor set with 0.17.0 no longer compares - re-set it after upgrading.

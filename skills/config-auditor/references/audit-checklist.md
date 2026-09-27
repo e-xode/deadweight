@@ -55,6 +55,10 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[AUTO 32-skill-name-shape]` / `[AUTO 32-skill-name-reserved]` Lowercase, digits, single hyphens, ≤ 64; no `anthropic` / `claude`.
 - `[AUTO 33-description-overlap]` Close descriptions exclude each other; a one-way exclusion names the missing side.
 - `[AUTO 40-skill-not-loaded]` No `SKILL.md` outside a location Claude Code loads.
+- `[AUTO 48-agents-dir-skills]` No skill kept only in `.agents/skills/`: Claude Code does not load it. Link it into `.claude/skills/` to share it between tools.
+- `[AUTO 49-plugin-var-in-project]` No `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_PLUGIN_DATA}` used in a project skill: substituted only in plugin skills.
+- `[AUTO 50-security-*]` Security family, own grade (high ERROR, medium WARN, low NOTICE): no allow rule granting arbitrary code execution, no unpinned stdio MCP server, no download-and-run command, no hidden bidi/tag character, no literal secret in settings `env`, no plain-http remote MCP server, no `additionalDirectories` wider than the project, no `claude -p` isolated by allow/deny lists alone.
+- `[AUTO 51-stale-command]` / `[AUTO 28-config-anchors]` / `[AUTO 52-claude-md-tree]` / `[AUTO 53-no-verification-command]` Instructions match the repository: named commands are defined, named paths exist, no file tree in CLAUDE.md, a verification command is named where the repository has one.
 - `[AUTO 27-twin-division-*]` Twin skills carry matching "Division of responsibilities" rows — house convention, NOTICE: measured without effect on routing (antipattern B6). The routing lever is the crossed anti-trigger in the descriptions.
 - `[MANUAL]` Description says what and when, in the third person, without shouted imperatives.
 - `[MANUAL]` `SKILL.md` is method + index; `allowed-tools` of a committed skill reviewed (not gated by workspace trust).
