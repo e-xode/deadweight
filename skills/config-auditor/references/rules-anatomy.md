@@ -141,12 +141,13 @@ Keep the rule short enough that duplicating the skill is impossible.
 
 Each is this plugin's choice. A project can decline it; the auditor says which checks are doctrine.
 
-- **Size ≤ 2 KB** (`14-rule-size`, WARN). Reason: a rule loads whole on every matching read with
+- **Size ≤ 2 KB** (`14-rule-size`, NOTICE; WARN under `profile: house`). Reason: a rule loads whole on every matching read with
   no description to decide by; past ~2 KB it is usually a skill's body wearing a rule's clothes.
-- **A frontmatter block carries `paths:`** (`14-rule-no-paths`, WARN). Reason: a rule with
-  frontmatter but no `paths:` is almost always a scoping attempt that failed (wrong field name,
-  empty value); a rule meant to be global needs no frontmatter at all.
-- **No `//` comment lines outside code fences** (`14-rule-code-comments`, WARN). Reason: same as
+- **A misnamed scope is a defect; no scope is not** (`14-rule-unknown-field`, WARN on `globs:`,
+  `glob:`, `path:`). A rule "without a paths field is loaded unconditionally" (memory) - valid, so
+  `14-rule-no-paths` is an INFO that says so. It is silent when a misnamed key is there: one
+  defect, one finding.
+- **No `//` comment lines outside code fences** (`14-rule-code-comments`, NOTICE; WARN under `profile: house`). Reason: same as
   `12-no-code-comments` for `CLAUDE.md`.
 - **Language** (`14-rule-english-only`, WARN, heuristic). Reason: a rule is read by a model and by
   every contributor; the check detects one language only and a project writing in another
@@ -170,8 +171,8 @@ frontmatter parse errors; the
 | `14-rule-unknown-field` | WARN | No frontmatter field other than `paths` | Doc |
 | `22-rule-glob-match` | WARN / NOTICE | Each glob matches a file in the repository (NOTICE, not in the floor, when rooted in a git-ignored path) | Doc + House convention |
 | `14-rule-size` | WARN | ≤ 2 KB | House convention |
-| `14-rule-no-paths` | WARN | Frontmatter present ⇒ `paths:` present | House convention |
-| `14-rule-code-comments` | WARN | No `//` lines outside fences | House convention |
+| `14-rule-no-paths` | INFO | Frontmatter without `paths:` loads every session | Doc |
+| `14-rule-code-comments` | NOTICE; WARN under `profile: house` | No `//` lines outside fences | House convention |
 | `14-rule-english-only` | WARN | No French-language content (heuristic) | House convention |
 
 Anti-patterns for rules: [antipatterns.md § F](./antipatterns.md#f-rules-clauderules).

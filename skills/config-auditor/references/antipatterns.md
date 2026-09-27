@@ -100,12 +100,24 @@ Contents: [A. `CLAUDE.md`](#a-claudemd) · [B. Skills](#b-skills) · [C. Sub-age
   line), withhold it (`disable-model-invocation`, `skillOverrides`, or `paths:`) instead of
   trimming. Trim what competes for selection; withhold what does not.
 
-### B6. Twin skills without a division of responsibilities — House convention (`27-twin-division-*`)
+### B6. Twin skills that do not name each other — House convention (`27-twin-division-*`, NOTICE)
 
-- **Symptom.** Two skills cover related topics; neither says which owns what.
-- **Why bad.** The agent picks one and ignores the other.
-- **Fix.** A `Division of responsibilities` table on both sides, each with a row naming the twin,
-  that row's text identical in both files.
+- **Symptom.** Two skills cover related topics; neither description says which requests belong to
+  the other.
+- **Why bad.** Selection compares the listed descriptions; two that read alike split the requests
+  between them, and neither owner can see it from their own file (`33-description-overlap`).
+- **Fix.** Crossed anti-triggers in the **descriptions**: each names the other with `→ <twin>`.
+  Their effect depends on how alike the pair is: 1/10 → 10/10 on a synthetic pair built to collide
+  (`two-skills-compete`), but only +1.7 pts (Opus 5.5) and +2.7 pts (Haiku 4.5), intervals
+  containing zero, on the 8 real pairs below — whose positive clauses already told them apart.
+- **Not a fix.** A `Division of responsibilities` table in the body. The body is loaded only after
+  a skill is chosen, so the table can at best repair a wrong first pick by sending the model to the
+  twin. Measured 2026-09-27 on 8 real twin pairs, 1,152 runs per model: the table moved "the right
+  skill was loaded" by −0.3 pts on Opus 5.5 and +0.4 pts on Haiku 4.5, both 95% intervals
+  containing zero. The model handed off to the twin as often without the table as with it. Keep
+  one if humans read it; `27-*` reports its absence as a NOTICE and will retire after a second null
+  measurement. The larger loss on the same runs was elsewhere: 14–22 % of boundary requests loaded
+  **neither** skill, which nothing in a body can repair.
 
 ### B7. `SKILL.md` past the compaction slice — Universal
 

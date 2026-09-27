@@ -138,7 +138,8 @@ Doc, [sub-agents]:
 - `manual` is an alias of `default` (2.1.200+).
 
 `[23-agent-permission-mode]` warns on an unknown value and on `bypassPermissions` (it no longer does
-what it says).
+what it says). On a plugin agent the key is ignored whatever its value, which
+`23-agent-frontmatter-keys` reports; the value is not judged a second time.
 
 ## Model resolution
 

@@ -77,8 +77,10 @@ description: '<single string, no line breaks>'
 | Claude Code | nothing: every field is optional. `name` defaults to the folder name; a missing `description` falls back to "the first non-empty line of the markdown content" | [skills § Frontmatter reference](https://code.claude.com/docs/en/skills) |
 | Agent Skills spec (claude.ai upload, Skills API, `package_skill.py`) | `name` **and** `description` | [agentskills.io specification](https://agentskills.io/specification) |
 
-`02-skill-frontmatter` demands both, because a skill that loads in Claude Code but fails on upload is
-a latent defect (house convention, aligned on the stricter target).
+`02-skill-frontmatter` follows the target: a missing `name` is nothing in a project (the folder
+names the skill) and a WARN in a `library`, which is packaged under the spec. `03-skill-name-matches-folder`
+likewise: a WARN in a project or plugin (the `/command` is the folder, the listing shows `name` -
+two names), an ERROR in a library.
 
 **`name` rules** — **doc**: at most 64 characters, lowercase letters, digits and hyphens, no leading,
 trailing or doubled hyphen, must match the parent folder
@@ -130,7 +132,7 @@ The description is the trigger surface: Claude decides whether to load a skill f
    `04-skill-description-brackets` warns rather than errors.
 5. **House convention — anti-triggered.** End with a `Don't use for:` clause naming the right
    alternative. Reason: a near-miss request is where two skills collide, and the clause is the only
-   text that separates them. `04-skill-description-antitrigger` (WARN); `33-description-overlap`
+   text that separates them. `04-skill-description-antitrigger` (NOTICE; WARN under `profile: house`); `33-description-overlap`
    flags pairs of descriptions that compete.
 6. **House convention — 80 to ~500 characters.** Under 80 carries no discriminating term
    (`04-skill-description-length` also enforces the floor); over ~500 is usually knowledge that
@@ -172,12 +174,11 @@ Why it fails: no trigger terms, no file surface, no anti-trigger, nothing that s
 - **Doc-derived — ideally under ~20 KB.** After auto-compaction Claude Code re-attaches only the
   first 5,000 tokens of each invoked skill ([skills § Skill content lifecycle](https://code.claude.com/docs/en/skills));
   past that point the text silently stops applying. `21-skill-md-compaction` warns;
-  `05-skill-md-size` errors at 50 KB (house ceiling).
+  `05-skill-md-size` reports 50 KB (house ceiling: NOTICE; WARN under `profile: house`).
 - **Doc — method plus index.** `SKILL.md` "serves as an overview that points Claude to detailed
   materials as needed" (platform best practices). Critical rules stay in the body: a reference may
   never be opened on a cheap task.
-- **House convention — sections.** Lead paragraph (what the skill owns); in/out scope table; a
-  division-of-responsibilities table for twin skills; core rules; one numbered workflow per task
+- **House convention — sections.** Lead paragraph (what the skill owns); in/out scope table; core rules; one numbered workflow per task
   with `➜ See skill: <name>` handoffs; a routing table to `references/`. Reason: the same shape in
   every skill makes a missing section visible. `15-skill-index` reconciles the `CLAUDE.md` skills
   index; `28-skill-anchors` checks that paths the body names still exist.

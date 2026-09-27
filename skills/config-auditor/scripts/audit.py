@@ -49,6 +49,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 from datetime import date as _date
@@ -168,6 +169,7 @@ CHARS_PER_TOKEN = 4                   # optimistic on purpose: token figures are
 # ---------------------------------------------------------------------------
 
 CHECKS = (
+    "dangling symbolic links",
     "claude-md size + code-comments",
     "skill SKILL.md exists + frontmatter",
     "skill name matches folder",
@@ -296,11 +298,14 @@ def house() -> str:
     return "WARN" if PROFILE == "house" else "NOTICE"
 
 
+HOUSE_MARKER = " House convention of this plugin: "
+
+
 def house_note(convention: str, anthropic: str) -> str:
-    return f" House convention of this plugin: {convention}. Anthropic documents: {anthropic}."
+    return f"{HOUSE_MARKER}{convention}. Anthropic documents: {anthropic}."
 
 # Settings keys by the files that may set them. Source: the Scope column of
-# code.claude.com/docs/en/settings-reference, read 2026-09-23 (231 keys). "Claude
+# code.claude.com/docs/en/settings-reference, read 2026-09-27 (234 keys). "Claude
 # Code ignores the key in a repository file" - silently - when its scope excludes
 # the project file (settings, 'Why a setting doesn't apply').
 SETTINGS_KEYS_ANY = frozenset({
@@ -321,7 +326,7 @@ SETTINGS_KEYS_ANY = frozenset({
     "feedbackSurveyRate", "fileCheckpointingEnabled", "fileSuggestion", "forceLoginMethod",
     "forceLoginOrgUUID", "gcpAuthRefresh", "hooks", "httpHookAllowedEnvVars",
     "includeCoAuthoredBy", "includeGitInstructions", "inputNeededNotifEnabled",
-    "isolatePeerMachines", "keybindingFlavor", "language", "maxEffortLevel", "minimumVersion",
+    "isolatePeerMachines", "keybindingFlavor", "language", "maxEffortLevel", "maxProseWidth", "minimumVersion",
     "model", "modelOverrides", "modelSettings", "otelHeadersHelper", "outputStyle",
     "permissions", "permissions.additionalDirectories", "permissions.allow", "permissions.ask",
     "permissions.blockReadsOutsideWorkingDirectories", "permissions.defaultMode",
@@ -365,8 +370,9 @@ SETTINGS_KEYS_USER_MANAGED = frozenset({
 })
 SETTINGS_KEYS_MANAGED = frozenset({
     "allowAllClaudeAiMcps", "allowManagedHooksOnly", "allowManagedMcpServersOnly",
-    "allowManagedPermissionRulesOnly", "allowedChannelPlugins", "blockedMarketplaces",
-    "browserExternalPageTools", "channelsEnabled", "claudeMd",
+    "allowManagedPermissionRulesOnly", "allowedChannelPlugins", "availableModelsMatch",
+    "blockedMarketplaces", "browserExternalPageTools", "channelsEnabled", "claudeMd",
+    "deniedModels",
     "disableBrowserExternalNavigation", "disableCommandPluginSources",
     "disableDesktopLocalSessions", "disableMobileSimulatorTools", "disableSideloadFlags",
     "forceLoginGatewayUrl", "forceRemoteSettingsRefresh", "gatewayInternalNetworks",
@@ -481,7 +487,10 @@ WALK_PRUNE_DIRS = {
     "__pycache__", ".cache", ".output", ".next", ".nuxt", "out",
 }
 
-EVALS_REQUIRED_KEYS = ("id", "prompt", "expected_output", "expectations")
+# Not `expectations`: skill-creator saves evals.json with "just the prompts" and drafts
+# the assertions while the first runs go (skill-creator SKILL.md, "Don't write assertions
+# yet"). Requiring them gave 20 ERRORs to a suite at that step (public sample, 2026-09-27).
+EVALS_REQUIRED_KEYS = ("id", "prompt", "expected_output")
 EVALS_ANTI_NAME_TOKENS = ("anti-trigger", "not-trigger", "should-not", "defer", "negative", "near-miss")
 EVALS_ANTI_EXPECTATION_TOKENS = ("defer", "does not trigger", "should not")
 
@@ -705,6 +714,10 @@ STATE_DIR = ".claude"
 SKILLS_DIR = ".claude/skills"
 AGENTS_DIR = ".claude/agents"
 LAYOUT = "project"
+# A project that is also a skills library - N skills at its root, meant to be copied.
+# Set by main(); read by check_unloadable_skills.
+DUAL_LIBRARY = False
+LIBRARY_MIN_SKILLS = 3   # 1 or 2 root skills beside a CLAUDE.md were strays on two samples; 30 and 72 were libraries
 # Checks whose subject exists only in a project. Named by function, because the
 # dispatch in main() reads this tuple: a project-only check added later and not
 # listed here runs against a plugin and reports a missing file that cannot exist.
@@ -724,7 +737,7 @@ PROJECT_ONLY = (
 PLUGIN_ONLY = ("check_plugin_cost", "check_plugin_manifest")
 # The only things worth saying about a marketplace repository: what it is, and
 # whether its own catalogue is coherent. Everything else has no subject here.
-MARKETPLACE_CHECKS = ("check_skills",)
+MARKETPLACE_CHECKS = ("check_skills", "check_agents")   # both were called outside the dispatch until 0.17.0
 # A library is skills and nothing else: judge their content, and say where they
 # would load. A repository with no Claude configuration gets the second only.
 LIBRARY_CHECKS = ("check_skills", "check_skill_names", "check_description_overlap",
@@ -760,7 +773,16 @@ def check_unloadable_skills(root: Path, report: Report) -> None:
     may target another tool, or installation by copy - WARN, saying where they load.
     """
     found = root_level_skills(root)
-    if not found:
+    if not found or (DUAL_LIBRARY and LAYOUT == "library"):
+        return
+    if DUAL_LIBRARY:
+        # A skills library that is also worked on with Claude Code: its root skills are
+        # there to be copied, and "load nowhere" read as a defect (2 false ERRORs, third
+        # public sample, 2026-09-27). Their content is audited in the library pass.
+        report.add("40-skill-not-loaded", "INFO",
+                   f"{len(found)} skill(s) at the repository root: a library to copy, audited "
+                   "as one. They do not load in this project itself - put the ones it uses "
+                   "under `.claude/skills/`.", str(root))
         return
     signs = claude_signs(root)
     names = ", ".join(d.name for d in found[:5]) + (f" (+{len(found) - 5})" if len(found) > 5 else "")
@@ -810,6 +832,15 @@ def detect_layout(root: Path) -> str:
     # A SKILL.md under `.devin/` or `tests/fixtures/` is not a Claude configuration,
     # and "CLAUDE.md not found" there is the auditor's ignorance, not a defect.
     return "none"
+
+
+def has_project_config(root: Path) -> bool:
+    """A project configuration beside a manifest - not an `.claude/audit/` floor alone."""
+    claude = root / ".claude"
+    return ((root / "CLAUDE.md").is_file() or (claude / "CLAUDE.md").is_file()
+            or any((claude / d).exists() for d in ("skills", "agents", "commands", "rules",
+                                                    "hooks", "settings.json",
+                                                    "settings.local.json")))
 
 
 def apply_layout(root: Path, layout: str) -> None:
@@ -945,41 +976,89 @@ def injected_memory(text: str) -> str:
     blocks are preserved" (memory). Counting them charged the budget for a maintainer
     note that costs nothing - the very place this plugin's references recommend for one.
     """
-    out, fenced = [], False
-    parts = re.split(r"(^[ \t]*```[^\n]*\n?)", text, flags=re.MULTILINE)
-    for part in parts:
-        if re.match(r"^[ \t]*```", part):
-            fenced = not fenced
-            out.append(part)
-        elif fenced:
-            out.append(part)
-        else:
-            out.append(re.sub(r"(?ms)^[ \t]*<!--.*?-->[ \t]*\n?", "", part))
+    out, pos = [], 0
+    for a, b in _fenced_spans(text):
+        out.append(re.sub(r"(?ms)^[ \t]*<!--.*?-->[ \t]*\n?", "", text[pos:a]))
+        out.append(text[a:b])
+        pos = b
+    out.append(re.sub(r"(?ms)^[ \t]*<!--.*?-->[ \t]*\n?", "", text[pos:]))
     return "".join(out)
 
 
 def strip_code_fences(text: str) -> str:
-    text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
-    text = re.sub(r"`[^`\n]+`", "", text)
-    return text
+    """The prose of a markdown file: fenced blocks and inline code replaced by spaces.
+
+    Replaced, not removed: removing `` `a`/`b`/`c` `` left `//`, and a sampled public
+    repository (2026-09-27) had 15 of 15 "code comment" findings made that way.
+    """
+    chars = list(text)
+    for a, b in _fenced_spans(text) + _inline_code_spans(text):
+        chars[a:b] = " " * (b - a)
+    return "".join(chars)
+
+
+_FENCE = re.compile(r"^ {0,3}(?:[ \t]*)(`{3,}|~{3,})(.*)$")
 
 
 def _fenced_spans(text: str) -> list[tuple[int, int]]:
-    """Character ranges covered by fenced code blocks, opening fence included."""
+    """Character ranges covered by fenced code blocks, both fences included.
+
+    CommonMark: a fence is 3+ backticks or tildes; it closes on the SAME character,
+    at least as many times, with nothing after it. A ```` ```` ```` block that shows
+    ``` ``` ``` blocks is one block - five ad hoc parsers in this file toggled on any
+    line starting with three backticks, and read the specimen inside as prose
+    (2026-09-27). The one parser every check goes through.
+    """
     spans: list[tuple[int, int]] = []
-    ouvert: int | None = None
+    ouvert: tuple[int, str, int] | None = None     # (start, char, length)
+    imbriques = 0
     pos = 0
     for line in text.splitlines(keepends=True):
-        if line.lstrip().startswith("```"):
+        m = _FENCE.match(line.rstrip("\r\n"))
+        if m:
+            run, info = m.group(1), m.group(2)
             if ouvert is None:
-                ouvert = pos
-            else:
-                spans.append((ouvert, pos + len(line)))
-                ouvert = None
+                if not (run[0] == "`" and "`" in info):
+                    ouvert = (pos, run[0], len(run))
+            elif run[0] == ouvert[1] and info.strip() and len(run) == ouvert[2]:
+                # ```markdown ... ```python ... ``` ... ``` : same-length nesting, which
+                # CommonMark closes at the first bare fence and authors - models first -
+                # write to mean an inner block. The model reads the intent, not the
+                # render: 9 of 66 ERRORs on a second public sample were links in the
+                # outer example, "outside" only by CommonMark's count (2026-09-27).
+                imbriques += 1
+            elif run[0] == ouvert[1] and len(run) >= ouvert[2] and not info.strip():
+                if imbriques:
+                    imbriques -= 1
+                else:
+                    spans.append((ouvert[0], pos + len(line)))
+                    ouvert = None
         pos += len(line)
     if ouvert is not None:
-        spans.append((ouvert, len(text)))
+        spans.append((ouvert[0], len(text)))
     return spans
+
+
+def _inline_code_spans(text: str) -> list[tuple[int, int]]:
+    """Inline code outside fenced blocks: a run of N backticks closed by a run of exactly N."""
+    # Searched in a copy where the fenced blocks are blanked: searched in the raw text,
+    # a backtick inside a block paired with one after it, and every inline span of the
+    # rest of the file shifted by one (second public sample, 2026-09-27).
+    chars = list(text)
+    for a, b in _fenced_spans(text):
+        chars[a:b] = " " * (b - a)
+    prose = "".join(chars)
+    spans: list[tuple[int, int]] = []
+    # Paragraph by paragraph, as CommonMark does: a span never crosses a blank line,
+    # and a failed pairing must not swallow the backtick that opens the next one.
+    for para in re.finditer(r"(?:[^\n]|\n(?![ \t]*\n))+", prose):
+        for m in re.finditer(r"(`+)(?!`)(.+?)(?<!`)\1(?!`)", para.group(0), re.S):
+            spans.append((para.start() + m.start(), para.start() + m.end()))
+    return spans
+
+
+def in_spans(pos: int, spans: list[tuple[int, int]]) -> bool:
+    return any(a <= pos < b for a, b in spans)
 
 
 def iter_relative_links(text: str) -> Iterable[tuple[str, int]]:
@@ -987,14 +1066,40 @@ def iter_relative_links(text: str) -> Iterable[tuple[str, int]]:
     # shows a reader how to write a context map links to the `src/ordering/`
     # the reader will create, not to one that exists here. Verified 2026-09-22
     # on a sampled public repository, where 3 of 9 link errors were examples.
-    spans = _fenced_spans(text)
-    for m in re.finditer(r"\]\((\.[^)\s]+)", text):
+    # Same for inline code (`[Testing](./TESTING.md)` quoted as a style example)
+    # and for an elided target (`](...issues/M)`): 6 of the 14 link ERRORs on a
+    # 150-repository sample, 2026-09-27, were one or the other.
+    spans = _fenced_spans(text) + _inline_code_spans(text)
+    # `](rules/x.md)` is as relative as `](./rules/x.md)`: only the `./` form was
+    # checked, so the same dead link was reported or not by its spelling (2026-09-27).
+    # Not a URL (`scheme:`), an anchor (`#`), an absolute path or a `<...>` placeholder.
+    for m in re.finditer(r"\]\((?![a-zA-Z][\w+.-]*:|#|/|<)([^)\s]+)", text):
         if any(a <= m.start() < b for a, b in spans):
             continue
         link = m.group(1)
         link = link.split("#", 1)[0]
-        if link:
+        # A bare link with no extension (`](cnspec_run)`) is a docs-site route the
+        # generator resolves, not a file: ~75 false ERRORs when it was read as one.
+        if not link.startswith(".") and not re.search(r"\.\w{1,5}$", link.split("/")[-1] or "x"):
+            continue
+        # Inside a quoted sentence the file tells an agent to WRITE ("Please read our
+        # [Code of Conduct](CODE_OF_CONDUCT.md)"), the link is text for another repository.
+        debut_ligne = text.rfind("\n", 0, m.start()) + 1
+        if text.count('"', debut_ligne, m.start()) % 2:
+            continue
+        if link and not link.startswith("..."):
             yield link, m.start()
+
+
+def racine_vivante(root: Path, link: str) -> bool:
+    """A bare link (`docs/x.md`, no `./` or `../`) that exists from the repository root.
+
+    The model reads a command, an agent or a skill from the working directory, which is
+    the root: `docs/infra-guide.md` cited in `.claude/commands/plan.md` is a file it
+    finds. Resolving it from the file's folder called 27 live links dead on a second
+    public sample (2026-09-27). `./` and `../` say "next to me" and stay strict.
+    """
+    return not link.startswith(("./", "../")) and (root / link).exists()
 
 
 def sort_du_depot(depuis: Path, link: str, root: Path) -> bool:
@@ -1175,7 +1280,9 @@ def check_claude_md(root: Path, report: Report) -> None:
                    "AGENTS.md only when no CLAUDE.md exists. Add `@AGENTS.md`, or drop one.",
                    str(root / "AGENTS.md"))
     stripped = strip_code_fences(text)
-    if re.search(r"^\s*//", stripped, re.MULTILINE) or re.search(r"/\*[^!]", stripped):
+    # `/*` after a word is a glob (`lib/*.v`) or bold markdown (`**agent/**`), not a
+    # comment: 9 of 12 findings on a public sample, 2026-09-27.
+    if re.search(r"^\s*//", stripped, re.MULTILINE) or re.search(r"(?:^|\s)/\*(?!!)", stripped, re.M):
         report.add(
             "12-no-code-comments",
             house(),
@@ -1264,6 +1371,8 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
     seen_names: dict[str, str] = {}
     for entry in sorted(entries):
         skill_md = entry / "SKILL.md"
+        if not skill_md.exists():
+            continue            # a dangling link: 47-dangling-symlink reports it
         text = skill_md.read_text(encoding="utf-8")
         fm, _ = parse_frontmatter(text)
         if not fm:
@@ -1282,10 +1391,23 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
             continue
         name = fm.get("name", "").strip()
         desc = fm.get("description", "").strip()
-        if not name:
-            report.add("02-skill-frontmatter", "ERROR", "Missing 'name' in frontmatter", str(skill_md))
+        # Claude Code: "All fields are optional", `name` defaults to the folder
+        # (skills). Only the Agent Skills spec requires it - a library is packaged
+        # and uploaded under that spec, a project skill never is. As an ERROR on
+        # projects it was 20 of 98 ERRORs on a 150-repository sample, 2026-09-27.
+        if not name and LAYOUT == "library":
+            report.add("02-skill-frontmatter", "WARN",
+                       f"Skill '{entry.name}' sets no 'name': Claude Code names it after the "
+                       "folder, but the Agent Skills spec requires the field, and packaging or "
+                       "upload rejects the skill without it.", str(skill_md))
         if not desc:
-            report.add("02-skill-frontmatter", "ERROR", "Missing 'description' in frontmatter", str(skill_md))
+            # Same defect as a SKILL.md with no frontmatter at all, which is a WARN: the
+            # skill loads, with nothing to be picked by. An ERROR here and a WARN there
+            # graded the same fact twice (third public sample, 2026-09-27).
+            report.add("02-skill-frontmatter", "WARN",
+                       f"Skill '{entry.name}' has no description (missing or empty): it loads, "
+                       "but Claude has nothing to pick it by - only /name reaches it.",
+                       str(skill_md))
 
         for key in frontmatter_keys(text):
             if key not in SKILL_KNOWN_KEYS:
@@ -1296,7 +1418,7 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
                            + (f" Did you mean '{near[0]}'?" if near else ""), str(skill_md))
         if re.search(r"[<>]", desc):
             # Claude Code loads it; claude.ai upload and skill-creator's quick_validate
-            # reject it. On `rom` all five hits were Vue vocabulary (`<script setup>`):
+            # reject it. On a Vue storefront (`ui-shop`) all five hits were Vue vocabulary (`<script setup>`):
             # legitimate in a project that never uploads, a real risk for a plugin.
             report.add("04-skill-description-brackets", "WARN" if LAYOUT == "plugin" else "NOTICE",
                        f"Skill '{entry.name}' description contains '<' or '>': Claude Code loads "
@@ -1313,10 +1435,18 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
                        f"{len(desc) + len(wtu)} chars (> {DESCRIPTION_LISTING_MAX_CHARS}); the "
                        "listing cuts the rest (skills).", str(skill_md))
         if name and name != entry.name:
+            # "Must match the parent folder" is the Agent Skills spec's: packaging rejects
+            # the skill. In Claude Code the /command comes from the folder and the skill
+            # still loads - two names, not a failure. As an ERROR on projects it was 39 of
+            # 159 ERRORs on a second public sample (2026-09-27), the P2 class again.
             report.add(
                 "03-skill-name-matches-folder",
-                "ERROR",
-                f"Frontmatter name '{name}' does not match folder '{entry.name}'",
+                "ERROR" if LAYOUT == "library" else "WARN",
+                f"Frontmatter name '{name}' does not match folder '{entry.name}'"
+                + (": the Agent Skills spec requires them equal, and packaging rejects the skill."
+                   if LAYOUT == "library" else
+                   f": the command is /{entry.name}, the listing shows '{name}' - two names for "
+                   "one skill. Packaging under the Agent Skills spec would reject it."),
                 str(skill_md),
             )
 
@@ -1357,25 +1487,30 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
                     # pairs, and check 33 is where it applies as a WARN. On a skill with
                     # no close neighbour the clause is only a cost paid every turn.
                     house(),
-                    f"Skill '{entry.name}' description has no anti-trigger clause. MEASURED, "
-                    "2026-09-22: on a near-miss case that names the objects this skill audits "
-                    "but asks for them to be authored, the skill fired in 5 of 10 runs with the "
-                    "clause removed and 0 of 10 with it present (Fisher exact, p=0.033). The "
-                    "count is the Skill tool call itself, not a judge's opinion - with an LLM "
-                    "grader the same twenty runs looked like noise, and an earlier reading at "
-                    "3 runs per arm pointed the other way. One case moved, a second did not: "
-                    "a clause earns its place against the near misses it is written for.",
+                    # The measurement (5/10 -> 0/10 on a near miss, 2026-09-22) was taken on
+                    # THIS plugin's skill; quoted in every report, 423 times on a public sample,
+                    # it read as a law about everyone's. It lives in the references.
+                    f"Skill '{entry.name}' description says when to use it, not when not to. "
+                    "A 'Do not use for ...' clause pays where a near request would fire the "
+                    "wrong skill (33-description-overlap measures that)."
+                    + house_note("an anti-trigger clause in every description",
+                                 "nothing for skills; plugin-dev recommends it for agents"),
                     str(skill_md),
                 )
 
         size = skill_md.stat().st_size
         vendored = is_vendored_skill(entry)
         if size > SKILL_MD_ERROR_BYTES:
+            # A house ceiling (skill-anatomy.md), reported as an ERROR until 2026-09-27. The
+            # documented mechanism - what survives compaction - is 21's, which fires too.
             report.add(
                 "05-skill-md-size",
-                "NOTICE" if vendored else "ERROR",
+                "NOTICE" if vendored else house(),
                 f"SKILL.md in '{entry.name}' is {size} bytes (> {SKILL_MD_ERROR_BYTES}). Split it."
-                + (" Vendored skill — reported for information only." if vendored else ""),
+                + (" Vendored skill — reported for information only." if vendored else
+                   house_note(f"at most {SKILL_MD_ERROR_BYTES} bytes", "under 500 lines (skill "
+                              "authoring best practices); past ~5,000 tokens, lost after "
+                              "compaction - checked by 21-skill-md-compaction")),
                 str(skill_md),
             )
         elif size > SKILL_MD_COMPACTION_WARN_BYTES:
@@ -1399,7 +1534,9 @@ def check_skills(root: Path, report: Report) -> dict[str, dict]:
         elif name:
             seen_names[name] = entry.name
 
-        for link, _ in iter_relative_links(text):
+        for link in dict.fromkeys(l for l, _ in iter_relative_links(text)):
+            if racine_vivante(root, link):
+                continue
             target = (skill_md.parent / link).resolve()
             try:
                 target.relative_to(skill_md.parent.resolve())
@@ -1439,7 +1576,7 @@ def check_agents(root: Path, report: Report) -> dict[str, dict]:
     # Subdirectories are scanned recursively, and the identity is `name`, not the
     # filename: "The filename doesn't have to match" (sub-agents, 2026-09-23).
     seen_names: dict[str, str] = {}
-    for entry in sorted(agents_dir.rglob("*.md")):
+    for entry in existants(agents_dir.rglob("*.md")):
         if not entry.is_file():
             continue
         text = entry.read_text(encoding="utf-8")
@@ -1522,11 +1659,15 @@ def check_agent_descriptions(report: Report, agents: dict[str, dict]) -> None:
                 meta["path"],
             )
         if not ANTI_TRIGGER_RE.search(desc):
+            # Same concept as 04, same severity: a WARN here and a NOTICE there made the
+            # grade depend on the object, not on the evidence (259 WARN on a public sample).
             report.add(
                 "08b-agent-description",
-                "WARN",
-                f"Agent '{name}' description has no anti-trigger clause. Anthropic's plugin-dev "
-                "(agent-development): \"Be specific about when NOT to use the agent\".",
+                house(),
+                f"Agent '{name}' description says when to use it, not when not to."
+                + house_note("an anti-trigger clause in every description",
+                             "plugin-dev (agent-development) recommends \"Be specific about "
+                             "when NOT to use the agent\"; the sub-agents docs require nothing"),
                 meta["path"],
             )
 
@@ -1654,7 +1795,7 @@ def check_unreadable(root: Path, report: Report) -> None:
     if not base.is_dir():
         return
     muets: list[str] = []
-    for f in sorted(base.rglob("*")):
+    for f in existants(base.rglob("*")):
         if not f.is_file():
             continue
         try:
@@ -1682,7 +1823,7 @@ def check_see_skill_targets(root: Path, report: Report, skills: dict[str, dict])
     for sub in ("skills", "agents", "rules"):
         base = root / CLAUDE_DIR / sub
         if base.is_dir():
-            targets.extend(sorted(base.rglob("*.md")))
+            targets.extend(existants(base.rglob("*.md")))
     for path in targets:
         try:
             text = path.read_text(encoding="utf-8")
@@ -1737,7 +1878,7 @@ def check_documented_flags(root: Path, report: Report) -> None:
     if not reels:
         return
     base = root / SKILLS_DIR
-    fichiers = sorted(base.rglob("*.md")) if base.is_dir() else []
+    fichiers = existants(base.rglob("*.md")) if base.is_dir() else []
     for extra in ("README.md", "CHANGELOG.md"):
         p = root / extra
         if p.is_file():
@@ -1756,12 +1897,11 @@ def check_documented_flags(root: Path, report: Report) -> None:
         # a flag inside a block someone COPIES AND RUNS; prose that mentions a flag
         # is a lesser problem and not this one. A detector that is wrong five times
         # out of five is one nobody keeps.
-        in_block = False
-        for i, line in enumerate(texte.splitlines(), 1):
-            if line.lstrip().startswith("```"):
-                in_block = not in_block
-                continue
-            if not in_block or "audit.py" not in line:
+        blocs, pos = _fenced_spans(texte), 0
+        for i, line in enumerate(texte.splitlines(keepends=True), 1):
+            debut, pos = pos, pos + len(line)
+            if not in_spans(debut, blocs) or _FENCE.match(line.rstrip("\r\n")) \
+                    or not re.search(r"(?<![\w.-])audit\.py\b", line):
                 continue
             for flag in re.findall(r"(?<![\w-])(--[a-z0-9-]+)", line):
                 if flag not in reels:
@@ -1822,7 +1962,7 @@ def check_foreign_skill_mentions(root: Path, report: Report, skills: dict[str, d
     base = root / SKILLS_DIR
     if not base.is_dir():
         return
-    for path in sorted(base.rglob("*.md")):
+    for path in existants(base.rglob("*.md")):
         try:
             text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
@@ -1909,7 +2049,7 @@ def check_english_only(root: Path, report: Report) -> None:
             # than exempting the whole file: exempting `audit.py` would have made
             # the one file where the drift happened the one file that cannot be
             # policed.
-            for p in sorted(list(skill.rglob("*.md")) + list(skill.rglob("*.py"))
+            for p in existants(list(skill.rglob("*.md")) + list(skill.rglob("*.py"))
                             + list(skill.rglob("*.sh"))):
                 if p.name.endswith(ENGLISH_ONLY_SUFFIX_EXEMPT):
                     continue
@@ -1966,14 +2106,15 @@ def check_no_code_comments_in_skills(root: Path, report: Report) -> None:
     skills_dir = root / SKILLS_DIR
     if not skills_dir.is_dir():
         return
-    for skill_md in skills_dir.glob("*/SKILL.md"):
+    for skill_md in existants(skills_dir.glob("*/SKILL.md")):
         text = skill_md.read_text(encoding="utf-8")
         stripped = strip_code_fences(text)
         if re.search(r"^\s*//", stripped, re.MULTILINE):
             report.add(
                 "12-no-code-comments",
-                "WARN",
-                "SKILL.md contains // comment outside fenced code block",
+                house(),
+                f"SKILL.md in '{skill_md.parent.name}' contains a // comment outside a code block."
+                + house_note("prose only, no code comments", "nothing on this"),
                 str(skill_md),
             )
 
@@ -2005,7 +2146,7 @@ def check_rules(root: Path, report: Report) -> None:
         return
     # "Rules are discovered recursively" - a rule in a subdirectory loads, and was
     # audited by nothing.
-    for entry in sorted(rules_dir.rglob("*.md")):
+    for entry in existants(rules_dir.rglob("*.md")):
         if not entry.is_file():
             continue
         text = entry.read_text(encoding="utf-8")
@@ -2023,11 +2164,15 @@ def check_rules(root: Path, report: Report) -> None:
         fm, _ = parse_frontmatter(text)
         if fm is not None:
             paths_val = fm.get("paths", "").strip()
-            if not paths_val:
+            # "Rules without a paths field are loaded unconditionally" (memory): valid,
+            # not a defect. The defect is a misnamed key (`globs:`, Cursor's), which
+            # 14-rule-unknown-field reports - here it was reported a second time, as a WARN.
+            if not paths_val and not {"globs", "glob", "path"} & set(fm):
                 report.add(
                     "14-rule-no-paths",
-                    "WARN",
-                    f"Rule '{entry.name}' has frontmatter but no 'paths:' glob.",
+                    "INFO",
+                    f"Rule '{entry.name}' has frontmatter but no 'paths:': it loads in every "
+                    "session, like CLAUDE.md (memory). Add 'paths:' only if it should not.",
                     str(entry),
                 )
 
@@ -2035,8 +2180,9 @@ def check_rules(root: Path, report: Report) -> None:
         if re.search(r"^\s*//", stripped, re.MULTILINE):
             report.add(
                 "14-rule-code-comments",
-                "WARN",
-                f"Rule '{entry.name}' contains // comment outside fenced code block.",
+                house(),
+                f"Rule '{entry.name}' contains a // comment outside a code block."
+                + house_note("prose only, no code comments", "nothing on this"),
                 str(entry),
             )
 
@@ -2067,6 +2213,16 @@ def check_skill_index(root: Path, report: Report, skills: dict[str, dict]) -> No
     text = claude_md.read_text(encoding="utf-8")
     section = re.search(r"##\s+Skills index.*?(?=^##\s|\Z)", text, re.DOTALL | re.MULTILINE)
     hidden = unreachable_skills(root, skills)
+    # Withheld from the model AND from the / menu: nobody can run it. That one is
+    # a defect on the documented mechanism, whatever the house convention says.
+    dead = {n for n in hidden
+            if str(skills[n].get("user-invocable", "")).strip().lower() in {"false", "no", "off", "0"}}
+    for name in sorted(dead):
+        report.add("15-skill-index", "ERROR",
+                   f"Skill '{name}' sets both disable-model-invocation and user-invocable: "
+                   "false: neither the model nor the user can invoke it (skills).",
+                   str(root / SKILLS_DIR / name / "SKILL.md"))
+    hidden -= dead
     if not section:
         # The section exists to point at what the listing withholds. With nothing
         # withheld, its right content is empty, and demanding an empty heading was
@@ -2081,13 +2237,20 @@ def check_skill_index(root: Path, report: Report, skills: dict[str, dict]) -> No
                 "nothing needs one.",
                 str(claude_md),
             )
+        # A house convention, not a defect: a withheld skill still runs when the user
+        # types /name - only the model cannot route to it. As an ERROR it was 39 of
+        # 98 ERRORs on a 150-repository sample (2026-09-27), all release or notes
+        # skills withheld on purpose.
         for name in sorted(hidden):
             report.add(
                 "15-skill-index",
-                "ERROR",
-                f"Skill '{name}' is withheld from the harness listing, and CLAUDE.md has no "
-                "'Skills index' section to point at it. A withheld skill that nothing points at "
-                "is unreachable.",
+                house(),
+                f"Skill '{name}' is withheld from the harness listing: the model cannot pick "
+                f"it on its own, and only someone who knows to type /{name} will reach it. "
+                "Nothing in CLAUDE.md names it."
+                + house_note("a 'Skills index' section in CLAUDE.md naming every withheld skill",
+                             "nothing - disable-model-invocation is meant for skills the user "
+                             "triggers by hand"),
                 str(claude_md),
             )
         return
@@ -2098,9 +2261,10 @@ def check_skill_index(root: Path, report: Report, skills: dict[str, dict]) -> No
         if name not in indexed:
             report.add(
                 "15-skill-index",
-                "ERROR",
-                f"Skill '{name}' is withheld from the harness listing but is not named in the CLAUDE.md 'Skills index'. "
-                "A withheld skill that nothing points at is unreachable.",
+                house(),
+                f"Skill '{name}' is withheld from the harness listing but is not named in the "
+                f"CLAUDE.md 'Skills index': the model cannot pick it on its own, and only someone "
+                f"who knows to type /{name} will reach it.",
                 str(claude_md),
             )
     for ref in sorted(indexed):
@@ -2128,7 +2292,7 @@ def check_reference_sizes(root: Path, report: Report) -> None:
     skills_dir = root / SKILLS_DIR
     if not skills_dir.is_dir():
         return
-    for ref in skills_dir.glob("*/references/**/*.md"):
+    for ref in existants(skills_dir.glob("*/references/**/*.md")):
         skill_dir = skills_dir / ref.relative_to(skills_dir).parts[0]
         try:
             text = ref.read_text(encoding="utf-8")
@@ -2174,9 +2338,9 @@ def check_frontmatter_quoting(root: Path, report: Report) -> None:
     skills_dir = root / SKILLS_DIR
     agents_dir = root / AGENTS_DIR
     if skills_dir.is_dir():
-        targets.extend(sorted(skills_dir.glob("*/SKILL.md")))
+        targets.extend(existants(skills_dir.glob("*/SKILL.md")))
     if agents_dir.is_dir():
-        targets.extend(sorted(agents_dir.rglob("*.md")))
+        targets.extend(existants(agents_dir.rglob("*.md")))
 
     for path in targets:
         try:
@@ -2216,7 +2380,18 @@ def check_all_relative_links(root: Path, report: Report) -> None:
     base = root / CLAUDE_DIR
     if not base.is_dir():
         return
-    for md in sorted(base.rglob("*.md")):
+    skills_root = root / SKILLS_DIR
+    # A plugin's configuration is its components, not the whole repository: with
+    # CLAUDE_DIR at ".", an application that ships a plugin had its README and its
+    # generated CLI docs audited as Claude configuration (2026-09-27).
+    homes = ([root / d for d in (SKILLS_DIR, AGENTS_DIR, "commands", "hooks")]
+             if LAYOUT == "plugin" else [base])
+    fichiers = existants({md for h in homes if h.is_dir() for md in h.rglob("*.md")})
+    vus: set[tuple[Path, str]] = set()
+    for md in fichiers:
+        # A template's links point at what the reader will create.
+        if "template" in md.name.lower() or "templates" in md.parent.parts:
+            continue
         try:
             text = md.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
@@ -2224,7 +2399,16 @@ def check_all_relative_links(root: Path, report: Report) -> None:
         for link, _ in iter_relative_links(text):
             if sort_du_depot(md.parent, link, root):
                 continue
-            if not (md.parent / link).exists():
+            # A SKILL.md link that stays in its skill folder is check 07's: reporting
+            # it here too counted one broken link as two ERRORs.
+            if md.name == "SKILL.md" and md.parent.parent == skills_root \
+                    and md.parent.resolve() in (md.parent / link).resolve().parents:
+                continue
+            cle = (md, link[2:] if link.startswith("./") else link)
+            if racine_vivante(root, link):
+                continue
+            if not (md.parent / link).exists() and cle not in vus:
+                vus.add(cle)            # one dead link, one finding - not one per mention or spelling
                 report.add(
                     "20-relative-links",
                     "ERROR",
@@ -2246,7 +2430,7 @@ def check_rule_globs(root: Path, report: Report) -> None:
         return
     files = repo_files(root)
     ignored = git_ignored(root)
-    for entry in sorted(rules_dir.rglob("*.md")):
+    for entry in existants(rules_dir.rglob("*.md")):
         try:
             fm, _ = parse_frontmatter(entry.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError):
@@ -2300,7 +2484,7 @@ def check_agent_frontmatter_validity(root: Path, report: Report, skills: dict[st
         return
     inventory: dict[str, int] = {}
     unvalidated: dict[str, int] = {}
-    for entry in sorted(agents_dir.rglob("*.md")):
+    for entry in existants(agents_dir.rglob("*.md")):
         try:
             text = entry.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
@@ -2372,6 +2556,11 @@ def check_agent_frontmatter_validity(root: Path, report: Report, skills: dict[st
             )
 
         mode = fm.get("permissionMode", "").strip()
+        # A plugin agent's permissionMode is ignored whatever its value, and
+        # 23-agent-frontmatter-keys says so: judging the value too reported one
+        # line twice (10 + 10 on a public sample, 2026-09-27).
+        if LAYOUT == "plugin" and "permissionMode" in PLUGIN_AGENT_IGNORED_KEYS:
+            mode = ""
         if mode and mode not in AGENT_PERMISSION_MODES:
             report.add("23-agent-permission-mode", "WARN",
                        f"Agent '{entry.stem}' declares permissionMode '{mode}', which is not a "
@@ -2487,10 +2676,21 @@ def _hook_paths(command: str) -> list[str]:
     dead path, and a check that cries wolf is how people learn to skip the whole
     report.
     """
-    out = []
-    for tok in command.split():
-        clean = tok.replace('"', "").replace("'", "")
-        if "/" not in clean:
+    # Split as the shell does: `"$X/post.py";` is the path `$X/post.py` then a `;`,
+    # not a file named `post.py;`. Whitespace splitting reported a live script
+    # dead on a sampled public repository (2026-09-27), once per `if`/`elif` arm.
+    try:
+        lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+        lexer.whitespace_split = True
+        tokens = list(lexer)
+    except ValueError:
+        tokens = [t.replace('"', "").replace("'", "") for t in command.split()]
+    out: list[str] = []
+    for clean in tokens:
+        if "/" not in clean or clean in out:
+            continue
+        # `go vet ./...`, `src/**/*.ts`: a pattern the tool expands, not a file.
+        if "..." in clean or any(c in clean for c in "*?["):
             continue
         if clean.startswith(HOOK_PLUGIN_ROOT_VARS + HOOK_PROJECT_DIR_VARS + ("./",)):
             out.append(clean)
@@ -2517,7 +2717,10 @@ def check_hooks(root: Path, report: Report) -> None:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            report.add("35-hooks-parse", "ERROR", f"'{rel}' is not valid JSON: {exc}", str(path))
+            # A settings file that does not parse is 24-settings-parse's to report: said
+            # here too, one empty file was two ERRORs (third public sample, 2026-09-27).
+            if path.name == "hooks.json":
+                report.add("35-hooks-parse", "ERROR", f"'{rel}' is not valid JSON: {exc}", str(path))
             continue
         hooks = data.get("hooks") if isinstance(data, dict) else None
         if hooks is None:
@@ -2685,7 +2888,7 @@ def check_orphan_references(root: Path, report: Report) -> None:
             continue
         linked = {(skill_md.parent / link).resolve() for link, _ in iter_relative_links(text)}
         routers: list[tuple[str, set[Path]]] = []
-        for router in sorted(refs_dir.glob("*.md")):
+        for router in existants(refs_dir.glob("*.md")):
             router_rel = router.relative_to(skill_dir).as_posix()
             if not (router.resolve() in linked or router_rel in text or router.name in text):
                 continue
@@ -2695,7 +2898,7 @@ def check_orphan_references(root: Path, report: Report) -> None:
                 continue
             router_links = {(router.parent / link).resolve() for link, _ in iter_relative_links(router_text)}
             routers.append((router_text, router_links))
-        for ref in sorted(refs_dir.rglob("*.md")):
+        for ref in existants(refs_dir.rglob("*.md")):
             rel = ref.relative_to(skill_dir).as_posix()
             if ref.resolve() in linked or rel in text or ref.name in text:
                 continue
@@ -2785,7 +2988,7 @@ def _skills_of_case(case: Path, base: Path, names: list[str]) -> set[str]:
     """
     named: set[str] = set()
     gdir = case / "graders"
-    for g in sorted(gdir.glob("*.md")) if gdir.is_dir() else []:
+    for g in existants(gdir.glob("*.md")) if gdir.is_dir() else []:
         try:
             fm, _ = parse_frontmatter(g.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError):
@@ -2826,7 +3029,7 @@ def check_eval_quality(root: Path, report: Report) -> None:
         rubriques: list[str] = []
         gdir = dossier / "graders"
         if gdir.is_dir():
-            for g in sorted(gdir.glob("*.md")):
+            for g in existants(gdir.glob("*.md")):
                 try:
                     brut = g.read_text(encoding="utf-8")
                 except (OSError, UnicodeDecodeError):
@@ -2911,9 +3114,9 @@ def check_doctrine_copy(root: Path, report: Report) -> None:
     skills_dir = root / SKILLS_DIR
     if not ours.is_dir() or not skills_dir.is_dir():
         return
-    names = {f.name for f in ours.glob("*.md")}
-    corpus = " ".join(f.read_text(encoding="utf-8", errors="replace") for f in ours.glob("*.md"))
-    for f in sorted(skills_dir.glob("*/references/**/*.md")):
+    names = {f.name for f in existants(ours.glob("*.md"))}
+    corpus = " ".join(f.read_text(encoding="utf-8", errors="replace") for f in existants(ours.glob("*.md")))
+    for f in existants(skills_dir.glob("*/references/**/*.md")):
         try:
             terms = set(re.findall(r"`([^`\n]{2,60})`", f.read_text(encoding="utf-8")))
         except (OSError, UnicodeDecodeError):
@@ -2970,12 +3173,17 @@ def check_evals(root: Path, report: Report) -> None:
         missing = [d.name for d in dirs if d not in withed]
         detail = (" Without: " + ", ".join(missing[:8]) + ("…" if len(missing) > 8 else "")
                   if missing else "")
+        # A house convention: it fired on 47 of ~53 repositories with skills in a public
+        # sample (2026-09-27) - a check that says yes 89% of the time measures adoption.
         report.add(
             "26-evals-coverage",
-            "WARN" if pct < EVALS_COVERAGE_WARN else "INFO",
+            house() if pct < EVALS_COVERAGE_WARN else "INFO",
             f"Eval coverage: {len(withed)}/{len(dirs)} skills carry an eval suite "
             f"({pct:.0%}). A skill with no suite cannot be shown wrong - it can only be "
-            f"trusted.{detail}",
+            f"trusted.{detail}"
+            + (house_note("an eval suite per skill", "build evaluations first (skill authoring "
+                          "best practices), with no per-skill coverage")
+               if pct < EVALS_COVERAGE_WARN else ""),
             str(skills_dir),
         )
     for skill_dir in dirs:
@@ -2996,11 +3204,21 @@ def check_evals(root: Path, report: Report) -> None:
                 str(path),
             )
             continue
-        if data["skill_name"] != name:
+        # "Name matching the skill's frontmatter" (skill-creator schemas.md) - not the
+        # folder: compared to the folder, 3 suites whose skill_name was exactly the
+        # frontmatter name were ERRORs (third public sample, 2026-09-27).
+        fm_name = ""
+        try:
+            fm_skill, _ = parse_frontmatter((skill_dir / "SKILL.md").read_text(encoding="utf-8"))
+            fm_name = (fm_skill or {}).get("name", "").strip()
+        except (OSError, UnicodeDecodeError):
+            pass
+        if data["skill_name"] not in {name, fm_name} - {""}:
             report.add(
                 "26-evals-schema",
                 "ERROR",
-                f"evals.json in '{name}' declares skill_name '{data['skill_name']}'.",
+                f"evals.json in '{name}' declares skill_name '{data['skill_name']}', which is "
+                f"neither the frontmatter name{f' ({fm_name!r})' if fm_name else ''} nor the folder.",
                 str(path),
             )
         cases = data["evals"]
@@ -3026,6 +3244,7 @@ def check_evals(root: Path, report: Report) -> None:
             continue
 
         ids: list = []
+        sans_assertions = 0
         for position, case in enumerate(cases, start=1):
             if not isinstance(case, dict):
                 report.add("26-evals-schema", "ERROR", f"Eval #{position} in '{name}' is not an object.", str(path))
@@ -3038,6 +3257,8 @@ def check_evals(root: Path, report: Report) -> None:
                     f"Eval #{position} in '{name}' is missing: {', '.join(missing)}.",
                     str(path),
                 )
+            if "expectations" not in case:
+                sans_assertions += 1
             expectations = case.get("expectations")
             if "expectations" in case and (
                 not isinstance(expectations, list)
@@ -3061,6 +3282,11 @@ def check_evals(root: Path, report: Report) -> None:
                 else:
                     ids.append(case["id"])
 
+        if sans_assertions:
+            report.add("26-evals-schema", "NOTICE",
+                       f"{sans_assertions} eval(s) in '{name}' carry no 'expectations' yet: they "
+                       "can be run, not graded. skill-creator drafts them during the first runs.",
+                       str(path))
         duplicates = sorted({str(i) for i in ids if ids.count(i) > 1})
         if duplicates:
             report.add(
@@ -3139,12 +3365,21 @@ def division_table_rows(body: str) -> list[tuple[str, str]] | None:
     return rows
 
 
+# Measured 2026-09-27, 8 real twin pairs x 4 arms x 3 repetitions, 1,152 runs per model: adding
+# the table to both bodies moved "the right skill was loaded" by -0.3 pts on Opus 5.5 (95% CI
+# -3.8..+3.1) and +0.4 pts on Haiku 4.5 (-3.8..+4.6). The table sits in the body, read only
+# after selection; it can only repair a wrong first pick, which was 3.5 % (Opus) and 8.8 %
+# (Haiku) of runs - and it repaired none of them. NOTICE under every profile, until a second
+# null measurement retires the check (evals/CONVENTIONS.md).
+TWIN_TABLE_SEVERITY = "NOTICE"
+
+
 def check_twin_division_tables(root: Path, report: Report, skills: dict[str, dict]) -> None:
     """Mutually anti-triggering skills must both carry a division table that names the twin.
 
     Twin pairs are detected mechanically: A's description points at B with
     `→ B` and B's points back at A. Pointers naming an agent rather than a
-    skill are ignored. Three things are asserted, each a WARN: the heading is
+    skill are ignored. Three things are asserted, each a NOTICE: the heading is
     present on both sides; each table has a row owned by the twin; and the
     concern text of the row naming the pair reads identically on both sides.
     The tables are family-wide, so their other rows may differ. A vendored
@@ -3183,18 +3418,24 @@ def check_twin_division_tables(root: Path, report: Report, skills: dict[str, dic
                 continue
             rows = tables.get(name)
             if rows is None:
+                # Only claim the twin documents the split when it does: with both sides
+                # bare, "only '<twin>'" was printed for each side at once (2026-09-27).
+                if tables.get(twin) is None:
+                    consequence = f"and neither does '{twin}': no side documents the split"
+                else:
+                    consequence = f"so only '{twin}' documents the split"
                 report.add(
                     "27-twin-division-table",
-                    house(),
+                    TWIN_TABLE_SEVERITY,
                     f"Twin pair '{first}' <-> '{second}': '{name}' has no "
-                    f"'Division of responsibilities' heading, so only '{twin}' documents the split.",
+                    f"'Division of responsibilities' heading, {consequence}.",
                     skills[name]["path"],
                 )
                 continue
             if not any(owner == twin for _, owner in rows):
                 report.add(
                     "27-twin-division-row",
-                    house(),
+                    TWIN_TABLE_SEVERITY,
                     f"Twin pair '{first}' <-> '{second}': the table in '{name}' has no row owned by "
                     f"'{twin}', so a reader of '{name}' never learns what '{twin}' takes.",
                     skills[name]["path"],
@@ -3213,7 +3454,7 @@ def check_twin_division_tables(root: Path, report: Report, skills: dict[str, dic
             if seen and claimed and not (seen & claimed):
                 report.add(
                     "27-twin-division-text",
-                    house(),
+                    TWIN_TABLE_SEVERITY,
                     f"Twin pair '{first}' <-> '{second}': '{reader}' says '{subject}' owns "
                     f"'{sorted(seen)[0][:80]}' but '{subject}' words its own row as "
                     f"'{sorted(claimed)[0][:80]}'. The row naming the pair must read identically on both sides.",
@@ -3231,13 +3472,23 @@ ROLLUP_AFTER = 5
 
 def print_text_report(report: Report, tout: bool = False) -> None:
     by_sev: dict[str, list[Finding]] = {"ERROR": [], "WARN": [], "NOTICE": [], "INFO": [], "OK": []}
+    # Under the doc profile a house convention is not a defect, and on a sample of 150
+    # public repositories (2026-09-27) it was most of what a reader saw: 423 notices
+    # for one clause alone. Shown as one line; --all and --json keep every finding,
+    # and the counts - which floors compare - are unchanged.
+    maison: dict[str, int] = {}
     for f in report.findings:
+        if (PROFILE == "doc" and not tout and f.severity == "NOTICE"
+                and HOUSE_MARKER in f.message):
+            maison[f.check] = maison.get(f.check, 0) + 1
+            continue
         by_sev.setdefault(f.severity, []).append(f)
     for sev in ("ERROR", "WARN", "NOTICE", "INFO"):
         items = by_sev.get(sev, [])
         if not items:
             continue
-        print(f"\n=== {sev} ({len(items)}) ===")
+        extra = len(maison) and sum(maison.values()) if sev == "NOTICE" else 0
+        print(f"\n=== {sev} ({len(items) + extra}) ===")
         vus: dict[str, int] = {}
         for f in items:
             vus[f.check] = vus.get(f.check, 0) + 1
@@ -3250,6 +3501,17 @@ def print_text_report(report: Report, tout: bool = False) -> None:
                 if n > ROLLUP_AFTER:
                     print(f"  [{chk}] ... and {n - ROLLUP_AFTER} more of the same "
                           f"({n} total). Run with --all, or --json, to see them.")
+        if sev == "NOTICE" and maison:
+            detail = ", ".join(f"{c} x{n}" for c, n in sorted(maison.items()))
+            print(f"  [house] {sum(maison.values())} notice(s) from this plugin's own conventions, "
+                  f"not the documentation ({detail}). Run with --all to list them, or set "
+                  "\"profile\": \"house\" in .claude/audit.local.json to adopt them.")
+    if maison and not by_sev.get("NOTICE"):
+        detail = ", ".join(f"{c} x{n}" for c, n in sorted(maison.items()))
+        print(f"\n=== NOTICE ({sum(maison.values())}) ===")
+        print(f"  [house] {sum(maison.values())} notice(s) from this plugin's own conventions, "
+              f"not the documentation ({detail}). Run with --all to list them, or set "
+              "\"profile\": \"house\" in .claude/audit.local.json to adopt them.")
     # Four severities, two kinds. ERROR, WARN and NOTICE each point at something in
     # this configuration; INFO is a measurement every run emits (the layout, the
     # budget, a coverage rate), so it never reaches zero and is never counted. The
@@ -3284,13 +3546,46 @@ ANCHOR_SEVERITY = "WARN"   # ratchet: move to "ERROR" once this repository is at
 # the first release that shipped this check, not introduced later. Absolute paths
 # are captured too, so they are reported as unverifiable instead of vanishing.
 ANCHOR_PATH_RE = re.compile(
-    r"(?<![\w./~$}-])((?:/|~/|(?:\.{1,2}/)*)(?:[\w.-]+/)*?"
+    # `:` too: `package:other/src/internal.dart` is a Dart import URI, not a path
+    # (second public sample, 2026-09-27).
+    r"(?<![\w./~$}:-])((?:/|~/|(?:\.{1,2}/)*)(?:[\w.-]+/)*?"
     r"(?:src|server|scripts|electron|docker|app|lib|packages|test|tests)"
-    r"/[A-Za-z0-9_./-]+\.[a-z]{2,4})\b"
+    r"/[A-Za-z0-9_./-]+\.[a-z]{2,4})\b(?!\.\w)"   # not the `.yml` of `x.yml.template`
 )
 ANCHOR_TEMPLATE_RE = re.compile(
-    r"(MyPage|Feature|Example|Foo|Bar|YourThing|<[^>]+>|placeholder|xxx)", re.IGNORECASE
+    # `/.../` is an author eliding the middle of a path (`core/src/.../Rule.kt`): 7 dead
+    # anchors on a second public sample were that, 2026-09-27.
+    r"(MyPage|Feature|Example|Foo|Bar|YourThing|<[^>]+>|placeholder|xxx|/\.\.\./)", re.IGNORECASE
 )
+
+
+def existants(paths) -> list[Path]:
+    """The files of a glob that can be read, sorted: a dangling link is listed and cannot.
+
+    One helper for every walk, because 25 walks each read what `glob` returned, and a
+    committed link to its author's disk crashed the audit (2026-09-27). The link itself
+    is 47-dangling-symlink's to report.
+    """
+    return sorted(p for p in paths if p.exists())
+
+
+def tracked_paths(root: Path) -> list[str]:
+    """Repository-relative paths of the working tree: tracked, or new and not ignored.
+
+    Not `ls-files` alone: a file created and not yet added is there for the model,
+    and calling an anchor to it dead was wrong on the first negative control.
+    """
+    r = subprocess.run(["git", "-C", str(root), "ls-files", "--cached", "--others",
+                        "--exclude-standard"], capture_output=True, text=True)
+    if r.returncode == 0:
+        return r.stdout.splitlines()
+    return [str(p.relative_to(root)) for p in root.rglob("*")
+            if p.is_file() and ".git" not in p.parts]
+
+
+def sous_paquet(rel: str, tracked: list[str]) -> str | None:
+    """The directory under which `rel` exists, when it does not exist at the root."""
+    return next((t[: -len(rel)] for t in tracked if t.endswith("/" + rel)), None)
 
 
 def git_ignored(root: Path):
@@ -3338,7 +3633,8 @@ def check_skill_anchors(root: Path, report: Report) -> None:
     total = anchored = alive = dead = 0
     unverifiable: list[str] = []
     ignored = git_ignored(root)
-    for skill_md in sorted(skills_dir.glob("*/SKILL.md")):
+    tracked: list[str] | None = None
+    for skill_md in existants(skills_dir.glob("*/SKILL.md")):
         total += 1
         name = skill_md.parent.name
         try:
@@ -3352,7 +3648,7 @@ def check_skill_anchors(root: Path, report: Report) -> None:
         body = re.sub(r"\$\{?CLAUDE_SKILL_DIR\}?/", "./", body)
         body = re.sub(r"\$\{?CLAUDE_(?:PROJECT_DIR|PLUGIN_ROOT)\}?/", "", body)
         refs = sorted(set(ANCHOR_PATH_RE.findall(body)))
-        fences = [(m.start(), m.end()) for m in re.finditer(r"```.*?```", body, re.S)]
+        fences = _fenced_spans(body)
         if not refs:
             continue
         anchored += 1
@@ -3374,9 +3670,17 @@ def check_skill_anchors(root: Path, report: Report) -> None:
                 alive += 1          # a sibling skill's file, the base the overlay resolves against too
             elif ANCHOR_TEMPLATE_RE.search(ref):
                 continue            # template / illustrative path
-            elif re.search(r"(?:e\.g\.|for example|such as|for instance)[\s,:(`]*$",
-                           body[max(0, body.find(ref) - 24):body.find(ref)], re.I):
+            elif re.search(r"(?:e\.g\.|\bexample\b|such as|for instance)[^.\n]{0,30}$",
+                           body[max(0, body.find(ref) - 48):body.find(ref)], re.I):
+                # `**Example**: `x``, `Example: when `x` changes` - the phrase need not
+                # touch the path. 2 of 23 dead anchors on a public sample, 2026-09-27.
                 unverifiable.append(f"{name}: {ref} (given as an example)")
+            elif (sous := sous_paquet(rel, tracked := tracked if tracked is not None
+                                      else tracked_paths(root))):
+                # A monorepo skill names paths from its package, not from the root:
+                # `src/x.ts` is `packages/api/src/x.ts`. Found, so not dead; not where
+                # it says, so not alive. 10 of 23 dead anchors on a public sample.
+                unverifiable.append(f"{name}: {ref} (only under {sous})")
             elif any(a <= body.find(ref) < b for a, b in fences):
                 # A dead path inside a code block is ambiguous: an illustration of some
                 # other codebase, or a stale command. Measured on a calibration sample
@@ -3497,9 +3801,11 @@ def check_plugin_cost(
     if total > PLUGIN_COST_WARN_CHARS:
         report.add(
             "30-plugin-cost",
-            "WARN",
+            house(),
             f"{message} Above {PLUGIN_COST_WARN_CHARS} chars: every consumer pays this on "
-            "every turn. Trim the descriptions or split the plugin.",
+            "every turn. Trim the descriptions or split the plugin."
+            + house_note(f"at most {PLUGIN_COST_WARN_CHARS} chars per plugin",
+                         "no per-plugin ceiling; the listing budget is 1% of the context"),
             str(manifest),
         )
     else:
@@ -3898,8 +4204,8 @@ def check_settings_semantics(root: Path, report: Report) -> None:
                 continue
             if key not in SETTINGS_KNOWN_KEYS:
                 report.add("24-settings-unknown-key", "NOTICE",
-                           f"'{key}' in '{name}' is not in the settings reference (231 keys, "
-                           "2026-09-23): a typo, or a key newer than this auditor.", str(path))
+                           f"'{key}' in '{name}' is not in the settings reference ({len(SETTINGS_KNOWN_KEYS)} keys, "
+                           "2026-09-27): a typo, or a key newer than this auditor.", str(path))
                 continue
             fields = SETTINGS_OBJECT_FIELDS.get(key)
             if fields and isinstance(data[key], dict):
@@ -3966,7 +4272,11 @@ def check_settings_semantics(root: Path, report: Report) -> None:
                            "then allow - the allow entry never applies (permissions).", str(path))
             for rule in lists["allow"]:
                 tool = _rule_tool(rule)
-                outside = re.sub(r"\([^)]*\)", "", rule)
+                # The specifier runs from the FIRST `(` to the closing one: `[^)]*` stopped at
+                # the first `)` inside `Bash(grep "[\);}]" ...)` and read the rest of the
+                # command as a bare glob (2 false ERRORs, second public sample, 2026-09-27).
+                outside = (rule.split("(", 1)[0] if "(" in rule and rule.rstrip().endswith(")")
+                           else re.sub(r"\([^)]*\)", "", rule))
                 if "*" in outside and not re.match(r"mcp__[A-Za-z0-9_-]+__", outside):
                     report.add("42-permissions-rule", "ERROR",
                                f"allow rule '{rule}' in '{name}' is an unanchored glob: it is "
@@ -4013,10 +4323,10 @@ def check_settings_semantics(root: Path, report: Report) -> None:
         style = data.get("outputStyle")
         if isinstance(style, str) and style:
             custom = {p.stem for d in (root / CLAUDE_DIR / "output-styles",)
-                      if d.is_dir() for p in d.glob("*.md")}
+                      if d.is_dir() for p in existants(d.glob("*.md"))}
             for d in (root / CLAUDE_DIR / "output-styles",):
                 if d.is_dir():
-                    for p in d.glob("*.md"):
+                    for p in existants(d.glob("*.md")):
                         fm, _ = parse_frontmatter(p.read_text(encoding="utf-8", errors="replace"))
                         if fm and fm.get("name"):
                             custom.add(fm["name"].strip())
@@ -4128,7 +4438,7 @@ def check_plugin_manifest(root: Path, report: Report) -> None:
             continue
         listed = {(root / v).resolve() for v in (vals if isinstance(vals, list) else [vals])
                   if isinstance(v, str)}
-        stray = [p for p in (root / folder).glob("*.md")
+        stray = [p for p in existants((root / folder).glob("*.md"))
                  if p.resolve() not in listed and p.parent.resolve() not in listed]
         if stray:
             report.add("44-plugin-path", "WARN",
@@ -4150,12 +4460,43 @@ def check_plugin_manifest(root: Path, report: Report) -> None:
                            "warning (plugins-reference).", str(market))
 
 
+# --- Dangling symbolic links ---------------------------------------------------
+def check_dangling_symlinks(root: Path, report: Report) -> None:
+    """A committed link to a file only its author has.
+
+    `SKILL.md -> /home/<author>/project/...` or `-> ../../.<tool>/skills/x/SKILL.md` (a
+    directory nobody commits) works on one machine. Everyone who clones gets a name and
+    no file: the skill, agent or command does not load, and nothing says why. Until
+    2026-09-27 this auditor read the link and died on it - 3 of 150 public repositories
+    in a second sample, with no report at all.
+    """
+    homes = ([root / CLAUDE_DIR] if LAYOUT == "project"
+             else [root / d for d in (SKILLS_DIR, AGENTS_DIR, "commands", "hooks")])
+    vus: set[Path] = set()
+    for home in homes:
+        if not home.is_dir():
+            continue
+        # sorted, not existants(): the links this check exists for are exactly what
+        # existants() drops - a bulk replace made it blind once (2026-09-27).
+        for p in sorted(home.rglob("*")):
+            if p in vus or not p.is_symlink() or p.exists():
+                continue
+            vus.add(p)
+            cible = os.readlink(p)
+            report.add("47-dangling-symlink", "WARN",
+                       f"'{p.relative_to(root)}' is a symbolic link to '{cible}', which does not "
+                       "exist in this checkout: whoever clones the repository gets the name and "
+                       "not the file, and what it declares does not load.", str(p))
+
+
 # --- Commands, rules, CLAUDE.md companions -----------------------------------
 def check_companions(root: Path, report: Report, skills: dict[str, dict]) -> None:
     """Files beside the configuration that change what it means."""
     cmd_dir = root / CLAUDE_DIR / "commands"
     if cmd_dir.is_dir():
-        for p in sorted(cmd_dir.rglob("*.md")):
+        for p in existants(cmd_dir.rglob("*.md")):
+            if not p.exists():
+                continue        # a dangling link: 47-dangling-symlink reports it
             if p.stem in skills:
                 report.add("45-command-shadowed", "WARN",
                            f"commands/{p.name} and the skill '{p.stem}' share a name: the skill "
@@ -4168,7 +4509,9 @@ def check_companions(root: Path, report: Report, skills: dict[str, dict]) -> Non
                                "support (skills, 'Command files').", str(p))
     rules_dir = root / CLAUDE_DIR / "rules"
     if rules_dir.is_dir():
-        for p in sorted(rules_dir.rglob("*.md")):
+        for p in existants(rules_dir.rglob("*.md")):
+            if not p.exists():
+                continue
             text = p.read_text(encoding="utf-8", errors="replace")
             for key in frontmatter_keys(text):
                 if key != "paths":
@@ -4202,67 +4545,8 @@ def check_companions(root: Path, report: Report, skills: dict[str, dict]) -> Non
                            "resolves relative to the importing file (memory).", str(md))
 
 
-def main(argv: list[str]) -> int:
-    # Windows writes a piped stdout in the ANSI code page (cp1252), which has no
-    # `➜` a finding may quote from an audited file: the first one raised UnicodeEncodeError and the text report died on it. Measured on a
-    # Windows runner, 2026-09-24. Every reader of this output - the host, an agent's
-    # shell tool, a modern terminal - decodes UTF-8.
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")
-    parser = argparse.ArgumentParser(description="Audit Claude configuration.")
-    parser.add_argument("--root", default=".", help="Repository root (default: cwd)")
-    parser.add_argument("--json", action="store_true", help="Output JSON instead of text")
-    parser.add_argument("--all", action="store_true",
-                        help="Show every finding; by default a check that fires more than "
-                             f"{ROLLUP_AFTER} times is rolled up")
-    parser.add_argument(
-        "--layout",
-        choices=("auto", "project", "plugin", "library", "none"),
-        default="auto",
-        help="Container being audited (default: auto, from .claude-plugin/plugin.json)",
-    )
-    parser.add_argument(
-        "--set-floor",
-        action="store_true",
-        help="Freeze the current counts in .claude/audit/floor.json as the ratchet",
-    )
-    parser.add_argument(
-        "--check-floor",
-        action="store_true",
-        help="Fail when the counts rose above the recorded floor (for CI)",
-    )
-    args = parser.parse_args(argv)
-
-    root = Path(args.root).resolve()
-    layout = detect_layout(root) if args.layout == "auto" else args.layout
-    apply_layout(root, layout)
-
-    _local = load_local_config(root)
-    global PROFILE
-    PROFILE = "house" if str(_local.get("profile", "")).strip().lower() == "house" else "doc"
-    report = Report()
-    # Before any check runs: a moved threshold must move for EVERY check that
-    # reads it, not only for the ones that happen to run afterwards.
-    apply_thresholds(_local, report)
-    detail = {
-        "library": "skills kept at the repository root, no project and no manifest: "
-                   "their content is audited, and where they would load is said.",
-        "none": "no Claude Code configuration here - no CLAUDE.md, no .claude/, no "
-                "skills/, no manifest. Nothing to audit, and nothing is missing.",
-    }
-    if layout in detail:
-        msg = f"Layout `{layout}`{'' if args.layout != 'auto' else ' (detected)'}: {detail[layout]}"
-    else:
-        msg = (f"Layout `{layout}`{'' if args.layout != 'auto' else ' (detected)'}: "
-               f"skills at `{SKILLS_DIR}/`, agents at `{AGENTS_DIR}/`."
-               + ("" if layout == "project" else
-                  f" {len(PROJECT_ONLY)} project-only check(s) skipped - a plugin has no "
-                  "CLAUDE.md, settings, rules or skills index.")
-               + (" No manifest: the plugin is named after its folder, which the manifest "
-                  "is optional for." if layout == "plugin"
-                  and not (root / ".claude-plugin" / "plugin.json").is_file() else ""))
-    report.add("00-layout", "INFO", msg, str(root))
-
+def run_checks(root: Path, report: Report, layout: str, _local: dict) -> None:
+    """Every check, dispatched for one container. Called twice for a dual-role repository."""
     def run(fn, *a):
         """Dispatch, skipping checks whose subject the current container lacks."""
         name = fn.__name__
@@ -4284,11 +4568,20 @@ def main(argv: list[str]) -> int:
         # happened to be wrapped - a dispatch that decides for some of its subjects
         # is not a dispatch, and the hole was invisible because the two lists were
         # written for checks that were wrapped.
-        return fn(*a)
+        try:
+            return fn(*a)
+        except Exception as exc:  # noqa: BLE001 - one check, not the whole report
+            # A check that dies took the whole report with it, and the CI step read a
+            # traceback as the verdict. Now its findings are missing and it says so.
+            report.add("00-check-crashed", "WARN",
+                       f"{name} stopped on {type(exc).__name__}: {exc}. Its findings are "
+                       "missing from this report; the rest ran. Please report it.", str(root))
+            return None
 
+    run(check_dangling_symlinks, root, report)
     run(check_claude_md, root, report)
-    skills = check_skills(root, report)
-    agents = check_agents(root, report) if layout not in ("library", "none") else {}
+    skills = run(check_skills, root, report) or {}
+    agents = (run(check_agents, root, report) or {}) if layout not in ("library", "none") else {}
     run(check_agent_descriptions, report, agents)
     run(check_cross_refs, root, report, skills, agents)
     run(check_english_only, root, report)
@@ -4325,6 +4618,112 @@ def main(argv: list[str]) -> int:
     run(check_mcp, root, report)
     run(check_plugin_manifest, root, report)
     run(check_companions, root, report, skills)
+
+
+
+def main(argv: list[str]) -> int:
+    # Windows writes a piped stdout in the ANSI code page (cp1252), which has no
+    # `➜` a finding may quote from an audited file: the first one raised UnicodeEncodeError and the text report died on it. Measured on a
+    # Windows runner, 2026-09-24. Every reader of this output - the host, an agent's
+    # shell tool, a modern terminal - decodes UTF-8.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    parser = argparse.ArgumentParser(description="Audit Claude configuration.")
+    parser.add_argument("--root", default=".", help="Repository root (default: cwd)")
+    parser.add_argument("--json", action="store_true", help="Output JSON instead of text")
+    parser.add_argument("--all", action="store_true",
+                        help="Show every finding; by default a check that fires more than "
+                             f"{ROLLUP_AFTER} times is rolled up")
+    parser.add_argument(
+        "--layout",
+        choices=("auto", "project", "plugin", "library", "none"),
+        default="auto",
+        help="Container being audited (default: auto, from .claude-plugin/plugin.json)",
+    )
+    parser.add_argument(
+        "--set-floor",
+        action="store_true",
+        help="Freeze the current counts in .claude/audit/floor.json as the ratchet",
+    )
+    parser.add_argument(
+        "--check-floor",
+        action="store_true",
+        help="Fail when the counts rose above the recorded floor (for CI)",
+    )
+    args = parser.parse_args(argv)
+
+    root = Path(args.root).resolve()
+    layout = detect_layout(root) if args.layout == "auto" else args.layout
+    # A repository that ships a plugin or a marketplace AND is itself worked on with
+    # Claude Code is both. Detection answered one role, and the project it also is went
+    # unaudited: 11 of 13 non-project repositories in a 150-repository sample
+    # (2026-09-27), 43 skills never read, and a message saying "a plugin has no CLAUDE.md"
+    # beside the one it had.
+    dual = args.layout == "auto" and layout in ("plugin", "marketplace") and has_project_config(root)
+    global DUAL_LIBRARY
+    DUAL_LIBRARY = (args.layout == "auto" and layout == "project"
+                    and len(root_level_skills(root)) >= LIBRARY_MIN_SKILLS)
+    apply_layout(root, layout)
+
+    _local = load_local_config(root)
+    global PROFILE
+    PROFILE = "house" if str(_local.get("profile", "")).strip().lower() == "house" else "doc"
+    report = Report()
+    # Before any check runs: a moved threshold must move for EVERY check that
+    # reads it, not only for the ones that happen to run afterwards.
+    apply_thresholds(_local, report)
+    detail = {
+        "library": "skills kept at the repository root, no project and no manifest: "
+                   "their content is audited, and where they would load is said.",
+        "none": "no Claude Code configuration here - no CLAUDE.md, no .claude/, no "
+                "skills/, no manifest. Nothing to audit, and nothing is missing.",
+    }
+    if layout in detail:
+        msg = f"Layout `{layout}`{'' if args.layout != 'auto' else ' (detected)'}: {detail[layout]}"
+    else:
+        msg = (f"Layout `{layout}`{'' if args.layout != 'auto' else ' (detected)'}: "
+               f"skills at `{SKILLS_DIR}/`, agents at `{AGENTS_DIR}/`."
+               + ("" if layout == "project" else
+                  f" {len(PROJECT_ONLY)} project-only check(s) skipped - a plugin has no "
+                  "CLAUDE.md, settings, rules or skills index.")
+               + (" No manifest: the plugin is named after its folder, which the manifest "
+                  "is optional for." if layout == "plugin"
+                  and not (root / ".claude-plugin" / "plugin.json").is_file() else ""))
+    if layout == "none":
+        # "Nothing to audit, and nothing is missing" was said beside a `symfony/CLAUDE.md`:
+        # a subdirectory's CLAUDE.md "loads on demand when Claude reads files in those
+        # directories" (memory). 1 of 2 `none` repositories on a public sample, 2026-09-27.
+        imbriques = sorted(t for t in tracked_paths(root)
+                           if t.endswith("/CLAUDE.md") and "node_modules/" not in t)
+        if imbriques:
+            shown = ", ".join(imbriques[:5]) + (f" (+{len(imbriques) - 5})" if len(imbriques) > 5 else "")
+            msg = (f"Layout `none`{'' if args.layout != 'auto' else ' (detected)'}: no configuration "
+                   f"at the root, but {len(imbriques)} CLAUDE.md in subdirectories, loaded when "
+                   f"Claude reads a file there (memory): {shown}. Audit each with --root <its directory>.")
+    if dual:
+        msg = (f"Layout `{layout}` (detected), and a project as well: this repository also carries "
+               "a CLAUDE.md or a .claude/ configuration, so it is audited twice - as a "
+               f"{layout} (skills at `{SKILLS_DIR}/`) and as a project (`.claude/`).")
+    if DUAL_LIBRARY:
+        msg += (f" It is also a skills library: {len(root_level_skills(root))} skill(s) at the "
+                "root, audited as one in a second pass.")
+    report.add("00-layout", "INFO", msg, str(root))
+
+    run_checks(root, report, layout, _local)
+    if DUAL_LIBRARY:
+        apply_layout(root, "library")
+        run_checks(root, report, "library", _local)
+        apply_layout(root, layout)
+        report.findings = list({(f.check, f.severity, f.message, f.location): f
+                                for f in report.findings}.values())
+    if dual:
+        # Second pass, same report: the project this repository also is. Checks that
+        # do not depend on the layout run twice and say the same thing twice - kept once.
+        apply_layout(root, "project")
+        run_checks(root, report, "project", _local)
+        apply_layout(root, layout)
+        report.findings = list({(f.check, f.severity, f.message, f.location): f
+                                for f in report.findings}.values())
 
     apply_overlay(report, _local, root)
     floor_rc = check_floor(root, report) if args.check_floor else 0

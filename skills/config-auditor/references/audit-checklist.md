@@ -55,7 +55,7 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[AUTO 32-skill-name-shape]` / `[AUTO 32-skill-name-reserved]` Lowercase, digits, single hyphens, ≤ 64; no `anthropic` / `claude`.
 - `[AUTO 33-description-overlap]` Close descriptions exclude each other; a one-way exclusion names the missing side.
 - `[AUTO 40-skill-not-loaded]` No `SKILL.md` outside a location Claude Code loads.
-- `[AUTO 27-twin-division-*]` Twin skills carry matching "Division of responsibilities" rows — house convention.
+- `[AUTO 27-twin-division-*]` Twin skills carry matching "Division of responsibilities" rows — house convention, NOTICE: measured without effect on routing (antipattern B6). The routing lever is the crossed anti-trigger in the descriptions.
 - `[MANUAL]` Description says what and when, in the third person, without shouted imperatives.
 - `[MANUAL]` `SKILL.md` is method + index; `allowed-tools` of a committed skill reviewed (not gated by workspace trust).
 - `[MANUAL]` A `` !`cmd` `` injection cannot fail the whole invocation (`|| true` where exit 1 is normal).

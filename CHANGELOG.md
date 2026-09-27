@@ -1,5 +1,118 @@
 # Changelog
 
+## 0.17.0 — 2026-09-27
+
+`audit.py` changes: a floor set with 0.16.1 no longer compares - re-set it after upgrading.
+
+Validated on four samples of 150 public repositories each, 600 in all, none reused. The last two
+were measured with the auditor frozen and nothing fixed during the measurement. No audit fails.
+New reading mechanisms found per round: 13, 7, 1, 0. Precision of ERRORs on the last round: 84%
+strict, below the 90% set beforehand - the misses are specimens (placeholder links such as
+`path/to/file.ts`, links in example files or in prose showing a syntax), which a reading rule
+can only guess at.
+
+### Fixed
+
+- **Four false ERRORs, found on a sample of 150 public repositories.** 84 of the 98 ERRORs the
+  auditor raised there were wrong or misgraded. After every fix below, the same sample gives 28
+  ERRORs in 10 repositories, each read by hand and real.
+  - `35-hooks-command` split the command on whitespace, so `"$DIR/restock.py";` named a file
+    `restock.py;` and `go vet ./...` a file `./...`. The command is now split as the shell splits
+    it, patterns (`...`, `*`) are not paths, and a path repeated across `if`/`else` arms is
+    checked once.
+  - `02-skill-frontmatter` reported a missing `name` as an ERROR on project skills, against the
+    doc ("All fields are optional"; the folder gives the name) and against this plugin's own
+    `skill-anatomy.md`. It is now a WARN on a `library` only, where the Agent Skills spec applies.
+  - `15-skill-index` is a house convention and now follows `house()`: a NOTICE, a WARN under
+    `profile: house`. Its message no longer says "unreachable": a `disable-model-invocation` skill
+    runs when the user types `/name`. The ERROR is kept for a skill that also sets
+    `user-invocable: false`, which nobody can run.
+  - `07-skill-broken-link` and `20-relative-links` counted one dead link of a `SKILL.md` twice;
+    `20` now leaves those links to `07`. Links inside inline code and elided targets
+    (`](...issues/12)`) are specimens, not references, and are no longer resolved.
+- **A repository that ships a plugin and is also worked on was audited as the plugin only.** Its
+  `.claude/` was never read, and the layout line said "a plugin has no CLAUDE.md" beside the one
+  it had: 11 of 13 plugin or marketplace repositories in the sample, 43 skills never audited. Such
+  a repository is now audited twice, as the plugin and as the project, in one report.
+- **One markdown parser instead of five.** Each check had its own idea of a code block, none of
+  them CommonMark's: a ```` ```` ```` block showing ``` ``` ``` blocks was read as prose, `~~~`
+  was not a fence, and removing inline code turned `` `a`/`b`/`c` `` into `//`. With a `/*` read in
+  globs (`lib/*.v`) and bold paths (`**api/**`), `12-no-code-comments` was wrong 15 times out of
+  15. Code is now blanked out, not removed, and a C comment needs a `/*` that starts a word.
+- **`28-skill-anchors` called live paths dead.** A monorepo skill names `src/x.ts` for
+  `packages/api/src/x.ts`; `**Example**: path` was not read as an example; `x.yml.template` was
+  cut to `x.yml`. Such paths are now "not verifiable" with where they were found, and a file
+  created but not yet added to git counts. Dead anchors on the sample: 23 → 11, 10 of them real.
+- **Links written without `./` were never checked**, so one dead link was reported or not by its
+  spelling. They are now, except a route with no extension (a docs site resolves it), a link in
+  a quoted sentence the file tells an agent to write, and anything in a template. In a plugin,
+  only its components are read, not the application's README and docs. One dead link is one
+  finding, however often and however spelled it is mentioned.
+- **The `none` layout said "nothing is missing" beside a subdirectory's CLAUDE.md**, which loads
+  when Claude reads a file there. It now names those files.
+- **One defect, one finding.** A rule with Cursor's `globs:` was reported by `14-rule-unknown-field`
+  and again as a WARN "no paths"; a rule without `paths` is valid (it loads every session) and is
+  now an INFO. A plugin agent's `permissionMode` is ignored whatever its value, and its value is
+  no longer judged as well.
+- **A second sample of 150 new repositories, audited before release, found seven more.**
+  - **The audit died on a committed symbolic link** to its author's disk
+    (`SKILL.md -> /home/<author>/...`), 3 repositories out of 150, with no report at all. Such a
+    link is now a finding, `47-dangling-symlink` (WARN): whoever clones gets the name and not
+    the file. And a check that fails no longer takes the report with it: `00-check-crashed`
+    (WARN) names it, and the rest runs.
+  - **A bare link that exists from the repository root is live.** `docs/guide.md` cited in a
+    command is found by the model, which reads from the root; `./` and `../` stay relative to
+    the file.
+  - **Same-length nested code blocks** (```` ```markdown ```` then ```` ```python ````, the way
+    models write them) are read as the author meant, and inline code is paired paragraph by
+    paragraph: one stray backtick no longer shifts every span after it.
+  - `03-skill-name-matches-folder` is a WARN outside a `library`: in Claude Code the command comes
+    from the folder and the skill loads - two names, not a failure.
+  - `26-evals-schema` no longer requires `expectations`: skill-creator saves evals "just the
+    prompts" first. A suite without them is a NOTICE - it runs, it cannot be graded.
+  - `37-documented-flag` read `fleet_audit.py` as `audit.py`; `42-permissions-rule` read
+    `Bash(grep "[);}]" ...)` as a bare glob; `28-skill-anchors` read `src/.../Rule.kt` and
+    `package:app/src/x.dart` as paths.
+  On that second sample: 57 ERRORs, 56 real on inspection and 1 plausible. No audit fails.
+- **A third sample, measured with the auditor frozen, found four more** - fixed, then measured
+  again on a fourth.
+  - **A skills library that is also a project** (skills at the root, a `CLAUDE.md` beside them)
+    was audited as the project only, and its 30 or 72 skills were "loaded nowhere" - an ERROR on
+    skills made to be copied. With 3 or more root skills it is now audited as both, and `40` says
+    so as an INFO; one stray root skill in a project stays an ERROR.
+  - `26-evals-schema` compared `skill_name` to the folder; skill-creator's schema says "matching
+    the skill's frontmatter", and now so does the check.
+  - An empty settings file was reported twice, by `24-settings-parse` and `35-hooks-parse`.
+  - A missing or empty `description` is a WARN, as a `SKILL.md` with no frontmatter already was:
+    the skill loads, with nothing to be picked by.
+- **Three settings keys were unknown to the auditor** (`availableModelsMatch`, `deniedModels`,
+  `maxProseWidth`), so any use was a NOTICE "not in the settings reference". The first two now
+  report their scope (managed only), the third is accepted in any file. 234 keys, read 2026-09-27.
+- **`27-twin-division-table` contradicted itself.** With neither twin carrying a table, it told
+  each side that "only '<the other>' documents the split". It now says that no side does.
+
+### Changed
+
+- **The documentation first, this plugin's conventions as an option.** A finding whose only
+  source is this plugin now follows the profile - a NOTICE under the default `doc` profile, a
+  WARN under `"profile": "house"` - wherever it was hard-coded: `05-skill-md-size` (an ERROR at
+  50 KB; the documented mechanism is 21's), `26-evals-coverage`, `30-plugin-cost`, `12` and
+  `14-rule-code-comments`. A negative clause is a NOTICE for agents as for skills: `plugin-dev`
+  recommends it for agents, the Claude Code docs require it for neither, and the message quotes
+  the recommendation. The `04` message no longer quotes, in every report, a measurement taken
+  on this plugin's own skill.
+- **The text report folds those notices into one line** under the `doc` profile - `[house] N
+  notice(s) from this plugin's own conventions` with the checks that raised them. `--all` and
+  `--json` list every finding, and the counts a floor compares do not change. On the 150-repository
+  sample, the findings a reader sees (ERROR, WARN, NOTICE lines) fell from 1,167 to 616.
+- **`27-twin-division-*` is a NOTICE under every profile, and its doctrine is rewritten.** The
+  convention had no source and no measurement. A pre-registered A/B on 8 real twin pairs, 1,152
+  runs per model, found that a division table in both bodies moves "the right skill was loaded"
+  by −0.3 pts on Opus 5.5 and +0.4 pts on Haiku 4.5, both 95% intervals containing zero. The
+  body is read after selection; the table can only repair a wrong first pick, and repaired none.
+  Antipattern B6, core rule 5 and the conventions register now say so. The check retires at the
+  next null measurement.
+
 ## 0.16.1 — 2026-09-24
 
 `audit.py` is unchanged: a floor set with 0.16.0 keeps comparing.

@@ -177,7 +177,7 @@ for a listed skill pays twice and rots on the next rename.
 - **Doc** ([memory](https://code.claude.com/docs/en/memory), "Write effective instructions"):
   concrete enough to verify ("Use 2-space indentation", not "Format code properly"); headers and
   bullets over dense paragraphs; no contradictions — "Claude may pick one arbitrarily."
-- **House convention** (`12-no-code-comments`, WARN): no `//` or `/* */` outside fenced code in
+- **House convention** (`12-no-code-comments`, NOTICE; WARN under `profile: house`): no `//` or `/* */` outside fenced code in
   `CLAUDE.md`. Reason: a comment-style line in prose is almost always a pasted code fragment or a
   maintainer note; the documented place for the latter is an HTML comment, which is stripped.
 
@@ -215,8 +215,8 @@ for a listed skill pays twice and rots on the next rename.
 | `01-agents-md-unread` | WARN | An `AGENTS.md` beside a `CLAUDE.md` is imported with `@AGENTS.md` | Doc |
 | `01-claude-local` | WARN | `CLAUDE.local.md` is ignored by the repository's git rules | Doc |
 | `01-claude-md-import` | WARN | Each in-repo `@path` import resolves, relative to the importing file | Doc |
-| `12-no-code-comments` | WARN | No `//` or `/* */` outside code fences | House convention |
-| `15-skill-index` | ERROR (withheld skill not indexed) / WARN (listed skill indexed) | The skills index names withheld skills, and only them | House convention |
+| `12-no-code-comments` | NOTICE; WARN under `profile: house` | No `//` or `/* */` outside code fences | House convention |
+| `15-skill-index` | NOTICE, WARN under `profile: house` (withheld skill not indexed; `/name` still runs it) / ERROR (withheld from the model and `user-invocable: false`: nobody can run it) | The skills index names withheld skills, and only them | House convention; the ERROR is doc |
 | `17-always-loaded-budget` | INFO / WARN / ERROR | `CLAUDE.md` + skill and agent descriptions under budget | House convention |
 
 Path-scoped rules have their own page: [rules-anatomy.md](./rules-anatomy.md).

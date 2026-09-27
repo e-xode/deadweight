@@ -52,7 +52,7 @@ fifth file, `~/.claude.json`, holds trust decisions, MCP configurations and the 
 
 ## Key scope: a key that is valid and inert
 
-[doc] `settings-reference § Settings index`: each of the 231 keys carries a **Scope** — `Any file`,
+[doc] `settings-reference § Settings index`: each of the 234 keys carries a **Scope** — `Any file`,
 `User, local, or managed`, `User or managed`, `Managed`, or `Global config` (`~/.claude.json`).
 A key outside its scope is ignored; the table is not reproduced here, audit.py carries it.
 
