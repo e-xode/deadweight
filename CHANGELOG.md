@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.18.0 — 2026-09-27
+
+`audit.py` changes: a floor set with 0.17.0 no longer compares - re-set it after upgrading.
+**A CI step may now fail**: `43-mcp-secret` is an ERROR, and an ERROR makes `audit.py` exit 1 - a
+repository with a literal credential in `.mcp.json` fails where 0.17.0 passed. Move the value to
+an environment variable (`"${VAR}"`) before upgrading, and rotate it: it has already been cloned.
+
+### Changed
+
+- **`43-mcp-secret` is an ERROR.** A value in a committed `.mcp.json` that looks like a literal
+  credential has reached every clone - it was a WARN, while an agent missing its description was
+  an ERROR. On 600 public repositories it fired twice, and one was checked to be a real key.
+
+### Fixed
+
+- **`01-agents-md-unread` reported a CLAUDE.md and an AGENTS.md linked to each other** - one a
+  symbolic link to the other, so the content is read once, which the docs say needs nothing
+  more. That was 16 of its 144 findings on 600 public repositories. Its message also stated the
+  default as a rule: it now names the default (`claude-md-or-agents-md`), says that a CLAUDE.md
+  naming AGENTS.md in words is not enough, and that the user setting `claude-md-and-agents-md`
+  reads both for whoever sets it.
+
 ## 0.17.0 — 2026-09-27
 
 `audit.py` changes: a floor set with 0.16.1 no longer compares - re-set it after upgrading.

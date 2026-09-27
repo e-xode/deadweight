@@ -1274,11 +1274,19 @@ def check_claude_md(root: Path, report: Report) -> None:
         report.add("01-claude-md-lines", "WARN",
                    f"CLAUDE.md is {lines} lines (> {CLAUDE_MD_MAX_LINES}). \"Files over 200 lines "
                    "consume more context and may reduce adherence\" (memory).", str(path))
-    if (root / "AGENTS.md").is_file() and "@AGENTS.md" not in text:
+    agents_md = root / "AGENTS.md"
+    # One file linked to the other is read once, and read: "A CLAUDE.md symlinked to
+    # AGENTS.md: nothing [to do]" (memory). Missed, it was 16 of 144 findings on 600
+    # public repositories (2026-09-27).
+    same_file = agents_md.exists() and os.path.realpath(agents_md) == os.path.realpath(path)
+    if agents_md.is_file() and not same_file and "@AGENTS.md" not in text:
         report.add("01-agents-md-unread", "WARN",
-                   "AGENTS.md sits beside a CLAUDE.md that does not import it: Claude Code reads "
-                   "AGENTS.md only when no CLAUDE.md exists. Add `@AGENTS.md`, or drop one.",
-                   str(root / "AGENTS.md"))
+                   "AGENTS.md sits beside a CLAUDE.md that does not import it. By default "
+                   "(`claude-md-or-agents-md`), Claude Code reads AGENTS.md only when no CLAUDE.md "
+                   "exists - a CLAUDE.md that names it in words is not enough. Add `@AGENTS.md`, or "
+                   "make one a symlink to the other; the user setting `claude-md-and-agents-md` "
+                   "reads both, but only for whoever sets it (memory).",
+                   str(agents_md))
     stripped = strip_code_fences(text)
     # `/*` after a word is a glob (`lib/*.v`) or bold markdown (`**agent/**`), not a
     # comment: 9 of 12 findings on a public sample, 2026-09-27.
@@ -4379,7 +4387,10 @@ def check_mcp(root: Path, report: Report) -> None:
             if not isinstance(val, str):
                 continue
             if SECRET_LITERAL_RE.search(val) and "${" not in val:
-                report.add("43-mcp-secret", "WARN",
+                # ERROR since 0.18.0: a credential in a committed file has leaked to every
+                # clone - more serious than most ERRORs here, and it was a WARN beside an
+                # agent missing its description (600 public repositories, 2026-09-27).
+                report.add("43-mcp-secret", "ERROR",
                            f"MCP server '{srv}' {where} holds what looks like a literal "
                            "credential in a file every clone receives. Reference an environment "
                            "variable instead: \"${VAR}\" (mcp).", str(path))

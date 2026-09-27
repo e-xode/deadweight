@@ -89,7 +89,7 @@ Protected names: Claude Code's own credentials (`ANTHROPIC_API_KEY`, `ANTHROPIC_
 
 ## Secrets
 
-- `.mcp.json` is committed by design (mcp, Project scope). A literal credential in it is in every clone. → `43-mcp-secret` WARN: a value in `url`, `headers`, `env` or `args` that looks like a literal token and contains no `${`. **House:** the pattern is a heuristic (bearer strings, common vendor prefixes); a secret in an unusual shape passes.
+- `.mcp.json` is committed by design (mcp, Project scope). A literal credential in it is in every clone. → `43-mcp-secret` ERROR: a value in `url`, `headers`, `env` or `args` that looks like a literal token and contains no `${`. **House:** the pattern is a heuristic (bearer strings, common vendor prefixes); a secret in an unusual shape passes.
 - Prefer, in this order: a `${VAR}` reference; **`headersHelper`**, a command printing a JSON object of headers, run at each connection and re-run once on a 401/403 (mcp, Use dynamic headers); OAuth for `http`.
 - `headersHelper` facts that change an audit (mcp, same section):
   - it runs in a shell, 10 s limit, output overrides static `headers` of the same name;
@@ -159,7 +159,7 @@ Callable name: `mcp__<server>__<tool>` (permissions, MCP; hooks, Match MCP tools
 | Check | Reads | Fires on |
 | --- | --- | --- |
 | `43-mcp-shape` | `.mcp.json` at the root | invalid JSON (ERROR); `url` without `type` (ERROR); `type: sse` (NOTICE) |
-| `43-mcp-secret` | same, `url`/`headers`/`env`/`args` | literal-looking token without `${` (WARN) |
+| `43-mcp-secret` | same, `url`/`headers`/`env`/`args` | literal-looking token without `${` (ERROR) |
 | `43-mcp-credential-var` | same, `url`/`headers` | one of the five documented protected names (ERROR) |
 | `43-mcp-approval` | shared `.claude/settings.json` | `enableAllProjectMcpServers` / `enabledMcpjsonServers` committed (WARN) |
 | `35-hooks-matcher` | hook configs | matcher shapes, including a bare `mcp__<server>` |
