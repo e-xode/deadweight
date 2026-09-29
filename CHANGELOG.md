@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.20.1 — 2026-09-29
+
+`audit.py` is unchanged: floors set with 0.20.0 still compare.
+
+### Changed
+
+- **The description names three situations the skill was missing**: settings files that disagree on
+  which one wins, `AGENTS.md` that stops loading, and an exemption being asked for - within the
+  1,024-character field, by dropping two phrases that decided nothing (1,005 → 1,021).
+  Measured the same day with pinned models, 20 runs per case, published description → this one:
+  - Sonnet 5.5: an exemption request loaded the skill 0 → 20 times and was answered right 0 → 20;
+    a deny rule that seems ignored 6 → 16 loads, 7 → 17 right answers; `AGENTS.md` hidden by a
+    `CLAUDE.local.md` 7 → 20 loads.
+  - Opus 5.5: "which of two settings wins" 2 → 19 loads; false loads on the "must not trigger"
+    cases 2 → 0.
+  - **Not fixed**: a permission rule that seems ignored stays at 3 loads in 20 on Sonnet 5.5, which
+    answers it right without the skill 13 times in 20. The description already names that
+    situation word for word; rewording it changes nothing, as it did not on Haiku.
+
+Why it mattered: `sonnet` now resolves to `claude-sonnet-5-5` (Claude Code 2.1.284), which consults
+the skill less than Sonnet 5 on questions it believes it can answer - including ones it gets wrong.
+
 ## 0.20.0 — 2026-09-29
 
 `audit.py` changes: a floor set with 0.19.0 no longer compares - re-set it after upgrading.

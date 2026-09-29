@@ -325,3 +325,13 @@ Two things this run taught about running the suite:
   (`allow-rules-shared`, `skills-folder-shared-with-other-tools`) loaded the skill 0 times in 10
   with either description, against 20 in 20 two days earlier: something outside the plugin had
   changed. A before/after taken on two dates measures both changes at once.
+
+## Routing on Sonnet 5.5 and Opus 5.5 - 2026-09-29 (0.20.1)
+
+Claude Code 2.1.284 made the `sonnet` alias resolve to `claude-sonnet-5-5`. On the same case,
+same day, `claude-sonnet-5` loaded the skill 20/20 and `claude-sonnet-5-5` 0/20: before comparing
+two dates, pin the model. On 21 conversational cases (10 runs per arm), Sonnet 5.5 answered right
+every time it loaded the skill where it fails without it (19/19), and skipped the skill there too -
+it judges its need by how simple the question looks. The 0.20.1 description, measured against the
+0.20.0 one with both models pinned, is in the CHANGELOG; the one case it does not fix
+(`permission-rule-inert`, 3/20 loads on Sonnet 5.5) already contains its trigger word for word.
