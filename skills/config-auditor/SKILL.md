@@ -1,6 +1,6 @@
 ---
 name: config-auditor
-description: "Audit and govern a Claude Code configuration - a project's (CLAUDE.md, skills, sub-agents, path-scoped rules, hooks, settings and permissions, .mcp.json, the always-loaded budget) or a plugin's (manifest, marketplace entry, shipped skills) - and the reference for how those mechanisms work, checked against the docs each release: read it before writing a project's own notes on them, which should record only that project's decisions. Trigger when authoring or auditing a skill, agent, rule or hook, when a description is written or trimmed, when two skills fire on each other's requests or one never fires, when a hook never runs or a permission rule seems ignored, when an MCP config or settings file is about to be committed, when CLAUDE.md or the budget grows, when an audit finding is contested, or when asked whether a configuration is sound. Runs scripts/audit.py for the mechanical checks. Do not use to scaffold a configuration, ship a release, review a diff, or write application code."
+description: "Audit and govern a Claude Code configuration - a project's (CLAUDE.md, skills, sub-agents, path-scoped rules, hooks, settings and permissions, .mcp.json) or a plugin's manifest and skills, and what other agents (Cursor, Copilot, Gemini CLI, AGENTS.md) read from the same repository - and the reference for how those mechanisms work: read it before writing a project's own notes on them, which should record only that project's decisions. Trigger when authoring or auditing a skill, agent, rule or hook, when a description is written or trimmed, when two skills fire on each other's requests or one never fires, when a hook never runs, a permission rule seems ignored or another agent skips a rule file, when an MCP config or settings file is about to be committed, when CLAUDE.md or the budget grows, when an audit finding is contested, or when asked whether a configuration is sound. Runs scripts/audit.py. Do not use to scaffold a configuration, ship a release, review a diff, or write application code."
 ---
 
 # Config auditor — audit and doctrine for a project's Claude Code configuration
@@ -9,44 +9,19 @@ description: "Audit and govern a Claude Code configuration - a project's (CLAUDE
 
 ## What this skill does (and does not)
 
-| In scope                                                     | Out of scope                                                            |
-| ------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| Rules for writing/editing `CLAUDE.md`                        | Validating modified application code (your own validation agent)                  |
+| In scope | Out of scope |
+| --- | --- |
+| Rules for writing/editing `CLAUDE.md` | Validating modified application code (your own validation agent) |
 | Anatomy of a project skill (frontmatter, references, budget) | The workflow of drafting and evaluating a new skill (Anthropic's `skill-creator`, where installed) |
-| Anatomy of a project sub-agent                               | Git hooks and commit format                                                       |
-| Anatomy of path-scoped rules (`.claude/rules/`)              | Framework lifecycle hooks (Vue, React…)                                           |
-| Hooks, settings, permissions, MCP servers, plugin manifests  | Skill description optimisation tooling (`skill-creator`, where installed)         |
-| Audit checklist + automated `scripts/audit.py`               | Application architecture                                                          |
-| Anthropic doctrine: progressive disclosure, agent design     |                                                                                   |
+| Anatomy of a project sub-agent | Git hooks and commit format |
+| Anatomy of path-scoped rules (`.claude/rules/`) | Framework lifecycle hooks (Vue, React…) |
+| Hooks, settings, permissions, MCP servers, plugin manifests | Skill description optimisation tooling (`skill-creator`, where installed) |
+| Audit checklist + automated `scripts/audit.py` | Application architecture |
+| Anthropic doctrine: progressive disclosure, agent design |  |
 
 ## Division of responsibilities — `config-auditor` ↔ `skill-creator`
 
-**`skill-creator` may not be installed where you are reading this, and absent is a valid state.**
-This plugin needs nothing from it and declares no dependency on it: the table below is a routing
-hint for projects that have both, not a requirement. A plugin that routes to a skill it does not
-ship hands the reader a dangling reference — a human shrugs at one, a model goes looking, and the
-cost of looking is unbounded.
-
-`skill-creator` is Anthropic's upstream skill (Apache-2.0). The two are complementary, not
-competing: `skill-creator` builds one skill, `config-auditor` judges the configuration a skill
-lands in. Load both when authoring a skill; load this one alone when auditing.
-
-| Concern                                                                   | Owner            |
-| ------------------------------------------------------------------------- | ---------------- |
-| Generic create / evaluate / iterate workflow                              | `skill-creator`  |
-| Eval harness, grading, benchmarking, blind A/B comparison                 | `skill-creator`  |
-| Description-optimisation loop, packaging a skill for distribution         | `skill-creator`  |
-| Description conventions (discriminating, what + when, anti-triggers)      | `config-auditor` |
-| Skill naming, placement, folder layout                                    | `config-auditor` |
-| `SKILL.md` anatomy and the always-loaded token budget                     | `config-auditor` |
-| Skill and agent runtime mechanisms available in Claude Code               | `config-auditor` |
-| Configuration anti-patterns                                               | `config-auditor` |
-| Post-creation audit and skills-index update                               | `config-auditor` |
-| Configuration audit (`scripts/audit.py`), project and plugin alike        | `config-auditor` |
-| Anthropic doctrine (model spec, progressive disclosure, agent design)     | `config-auditor` |
-
-When this skill hands off, use the convention: `➜ See skill: <name> — <reason>`.
-
+`skill-creator` (Anthropic's upstream skill) builds one skill; `config-auditor` judges the configuration a skill lands in. Load both when authoring a skill, this one alone when auditing. This plugin declares no dependency on it, and absent is a valid state. Hand-offs use `➜ See skill: <name> — <reason>`.
 
 ## Core rules (the strict minimum)
 
@@ -67,7 +42,7 @@ When this skill hands off, use the convention: `➜ See skill: <name> — <reaso
 15. **Always-loaded budget — measured, never extrapolated.** `CLAUDE.md` + every _listed_ skill description + every agent description load every turn; `17` caps the sum at 43,000 / 47,000 chars. **A house ratchet, not Anthropic guidance**: the harness sizes its own listing budget from `skillListingBudgetFraction` (`29`). Re-measure with `/context` and `/skill-doctor` after any listing change.
 16. **The ratchet, not the report.** A measurement with no floor is a measurement people learn to ignore. `--set-floor` freezes the counts, `--check-floor` fails when they rise, and the floor carries the **sha of `audit.py`**: the comparison refuses to run across two instruments, because a count taken with a different auditor is a different measurement, not a better state. Run it in CI.
 17. **Check ids are a compatibility surface.** A consuming project names them in its `.claude/audit.local.json`, so they are never renamed — an id that must change gets an entry in `CHECK_ID_ALIASES` and the old one keeps working, for good.
-    On overflow the harness keeps every skill **name** and drops **descriptions, least-invoked first** — degradation, not a cliff. Three levers keep a **project** skill out of the starting listing: `disable-model-invocation` (name goes too), `skillOverrides` (`name-only` drops the description; `user-invocable-only` and `off` drop the name as well), and `paths:` — absent at start, loaded when a matching file is read (measured on 2.1.280, and what the docs say); all three are audit-aware. **None of them reaches a plugin skill** — measured 2026-09-22, both with and without the `<plugin>:` prefix on the key, against a project skill that the same setting did remove. A consuming project's only lever on a plugin skill is disabling the whole plugin, so a plugin's listing cost is a tax its consumers cannot negotiate: write the description short because nobody downstream can trim it. **Every withheld skill the model cannot come upon by itself must be named in the `CLAUDE.md` Skills index — and only those** (house convention, `15`): a `paths:` skill surfaces on its own and is not required there. Levers, overflow rule and the measured `/context` figures: [references/skill-runtime-mechanisms.md](./references/skill-runtime-mechanisms.md).
+    Listing levers (`disable-model-invocation`, `skillOverrides`, `paths:`) act on project skills only - **none reaches a plugin skill** (measured). A withheld skill the model cannot come upon must be named in the `CLAUDE.md` Skills index (`15`). Overflow rule and measurements: [references/skill-runtime-mechanisms.md](./references/skill-runtime-mechanisms.md).
 
 ## Audit method
 
@@ -105,13 +80,13 @@ it; `audit.py` covers what it does not — what the harness ignores **silently**
 `audit.py` counts characters on disk; nothing static sees what the harness injected. Confirm in a
 fresh session:
 
-| Command              | What it answers                                                                                        |
-| -------------------- | ------------------------------------------------------------------------------------------------------ |
-| `/skill-doctor`      | Per-skill listing cost, 7-day tokens, invocation counts, never-invoked warnings.                       |
-| `/doctor`            | Setup checkup: listing cost, top contributors, version drift, **CLAUDE.md trim proposals**.            |
-| `/context all`       | Tokenizer-accurate per-skill estimates. Plain `/context` shows the Skills row _after_ budget.          |
-| `/skills`            | The listing sorted by estimated token cost.                                                            |
-| `/usage`             | Per-category breakdown — skills, subagents, plugins, per-MCP — over 24 h and 7 d.                      |
+| Command | What it answers |
+| --- | --- |
+| `/skill-doctor` | Per-skill listing cost, 7-day tokens, invocation counts, never-invoked warnings. |
+| `/doctor` | Setup checkup: listing cost, top contributors, version drift, **CLAUDE.md trim proposals**. |
+| `/context all` | Tokenizer-accurate per-skill estimates. Plain `/context` shows the Skills row _after_ budget. |
+| `/skills` | The listing sorted by estimated token cost. |
+| `/usage` | Per-category breakdown — skills, subagents, plugins, per-MCP — over 24 h and 7 d. |
 | `claude --safe-mode` | The baseline arm: the session with **none** of this config — the only way to ask if it earns its keep. |
 
 Invocation counts are the input most projects have never had: without them, every "merge or keep"
@@ -142,21 +117,22 @@ ceiling of core rule 3.
 
 ## Where to look (routing table)
 
-| If you need…                                            | Read                                                                                                                                                         |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Why `CLAUDE.md` is so terse / what belongs there        | [references/claude-md-anatomy.md](./references/claude-md-anatomy.md)                                                                                         |
-| How to write a discriminating description               | [references/skill-anatomy.md](./references/skill-anatomy.md)                                                                                                 |
-| How to choose `tools` / `model` for an agent            | [references/agent-anatomy.md](./references/agent-anatomy.md)                                                                                                 |
-| When to use rules vs skills / rule anatomy              | [references/rules-anatomy.md](./references/rules-anatomy.md)                                                                                                 |
-| Hooks: events, matchers, `if`, timeouts, exit codes     | [references/hooks-anatomy.md](./references/hooks-anatomy.md)                                                                                                 |
-| Settings scope, permission rules, status line           | [references/settings-permissions-anatomy.md](./references/settings-permissions-anatomy.md)                                                                   |
-| `.mcp.json`: secrets, credential variables, approvals   | [references/mcp-anatomy.md](./references/mcp-anatomy.md)                                                                                                     |
-| Plugin manifest, marketplace, component paths           | [references/plugin-anatomy.md](./references/plugin-anatomy.md)                                                                                               |
-| Full audit checklist (auto + manual)                    | [references/audit-checklist.md](./references/audit-checklist.md)                                                                                             |
-| Known anti-patterns and corrections                     | [references/antipatterns.md](./references/antipatterns.md)                                                                                                   |
+| If you need… | Read |
+| --- | --- |
+| Why `CLAUDE.md` is so terse / what belongs there | [references/claude-md-anatomy.md](./references/claude-md-anatomy.md) |
+| How to write a discriminating description | [references/skill-anatomy.md](./references/skill-anatomy.md) |
+| How to choose `tools` / `model` for an agent | [references/agent-anatomy.md](./references/agent-anatomy.md) |
+| When to use rules vs skills / rule anatomy | [references/rules-anatomy.md](./references/rules-anatomy.md) |
+| Hooks: events, matchers, `if`, timeouts, exit codes | [references/hooks-anatomy.md](./references/hooks-anatomy.md) |
+| Settings scope, permission rules, status line | [references/settings-permissions-anatomy.md](./references/settings-permissions-anatomy.md) |
+| `.mcp.json`: secrets, credential variables, approvals | [references/mcp-anatomy.md](./references/mcp-anatomy.md) |
+| Other agents reading this repository: `AGENTS.md`, Copilot, Cursor, Gemini CLI | [agents-md](./references/agents-md-anatomy.md), [copilot](./references/copilot-anatomy.md), [cursor](./references/cursor-anatomy.md), [gemini](./references/gemini-anatomy.md) — one per tool |
+| Plugin manifest, marketplace, component paths | [references/plugin-anatomy.md](./references/plugin-anatomy.md) |
+| Full audit checklist (auto + manual) | [references/audit-checklist.md](./references/audit-checklist.md) |
+| Known anti-patterns and corrections | [references/antipatterns.md](./references/antipatterns.md) |
 | Why the project is organised this way (its own decisions) | `.claude/audit/decisions.md` — **in the consuming project**, absent by default |
-| What each exemption was granted for, and when            | `.claude/audit.local.json` — in the consuming project |
-| What the audit reported, run by run                     | the git history of `.claude/audit/floor.json` — timestamped, with an author and a reason |
-| Skill/agent runtime mechanisms available in Claude Code | [references/skill-runtime-mechanisms.md](./references/skill-runtime-mechanisms.md)                                                                           |
-| Anthropic official documentation                        | [references/official-links.md](./references/official-links.md)                                                                                               |
-| The step-by-step procedure for a given change           | the project's own notes — not this skill |
+| What each exemption was granted for, and when | `.claude/audit.local.json` — in the consuming project |
+| What the audit reported, run by run | the git history of `.claude/audit/floor.json` — timestamped, with an author and a reason |
+| Skill/agent runtime mechanisms available in Claude Code | [references/skill-runtime-mechanisms.md](./references/skill-runtime-mechanisms.md) |
+| Anthropic official documentation | [references/official-links.md](./references/official-links.md) |
+| The step-by-step procedure for a given change | the project's own notes — not this skill |

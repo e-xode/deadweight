@@ -175,6 +175,7 @@ Each report ends with the number of check groups it ran. Check ids are stable (s
 | **What is silently ignored** | settings and permissions that look active and do nothing | keys outside their scope, allow rules naming no tool, a rule both allowed and denied |
 | **What leaks** | credentials in files every clone receives | literal tokens in `.mcp.json`, credential variables read as empty, committed MCP approvals, routing `env` |
 | **Plugin packaging** | a plugin that ships what does not load | components inside `.claude-plugin/`, paths without `./`, fields replacing a default directory, version drift |
+| **What other agents read** | Cursor, Copilot and the `AGENTS.md` family skip misplaced files without a word, and read Claude Code's own | a `.md` in `.cursor/rules/` (only `.mdc` is read), a chat mode left in `.github/chatmodes/`, an instructions file without the `.instructions.md` suffix, `AGENTS.override.md` that Claude Code never reads, `CLAUDE.md` lines only Claude Code can follow - Cursor applies that file to every conversation |
 
 It recognises the container before judging it: a **project** (`.claude/`), a **plugin** (manifest,
 or `skills/` at the root without one), a **marketplace**, a **library** of skills kept at the root,

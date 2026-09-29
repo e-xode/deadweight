@@ -297,3 +297,31 @@ hedging. The 40 answers were re-graded without re-running the model, after two c
 Re-graded on substance: 20/20 with, 20/20 without. The case separated no model, and was removed; the
 finding it carried stays in `CONVENTIONS.md` and antipattern B6. An LLM-graded case measures the
 model, the plugin **and** the grader: before reading a delta, check that a failure is a failure.
+
+## Three cases on what other agents read - 2026-09-28
+
+Sonnet, 20 runs per arm, with plugin / without:
+
+| Case | With | Without | Skill loaded (with) |
+| --- | --- | --- | --- |
+| `cursor-applies-claude-md` | 20/20 | 14/20 | 19/20 |
+| `local-notes-hide-agents-md` | 20/20 | 17/20 | 20/20 |
+| `cursor-rule-never-applies` | 20/20 | 20/20 | 1/20, then 13/20 |
+
+The first is the one the model does not know: without the plugin, 6 answers in 20 said Cursor
+does not read `CLAUDE.md`. The second was expected to discriminate as much and did not - the
+model knows most of it. The third is a ceiling case kept as a **routing sentinel**: a question
+that names only Cursor loaded the skill 1 time in 20 while the description named no other agent.
+With "Cursor, Copilot, Gemini CLI, AGENTS.md" in it, measured the same day against a copy that
+differed only by its description: 0/20 → 13/20. The three `anti-trigger-*` cases stayed at 0
+false loads in 20 each.
+
+Two things this run taught about running the suite:
+
+- **Cases with a `scaffold_script` score 0 on both arms without `--scaffold`** - no fixture, no
+  defect to find - and nothing warns. Run them with `--scaffold`; with it on Sonnet: every one of
+  the nine at 0.90 or above with the plugin (`silent-agent-2` 1.00 / 0.00 without).
+- **Compare two versions on the same day.** On 2026-09-29 the conversational cases
+  (`allow-rules-shared`, `skills-folder-shared-with-other-tools`) loaded the skill 0 times in 10
+  with either description, against 20 in 20 two days earlier: something outside the plugin had
+  changed. A before/after taken on two dates measures both changes at once.

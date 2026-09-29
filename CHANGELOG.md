@@ -1,5 +1,72 @@
 # Changelog
 
+## 0.20.0 — 2026-09-29
+
+`audit.py` changes: a floor set with 0.19.0 no longer compares - re-set it after upgrading.
+
+### Added
+
+- **Other coding agents that read the repository.** Claude Code is rarely alone: on 300 public
+  repositories with a Claude Code configuration, 48 % also carry another agent's files -
+  `AGENTS.md` 42 %, Copilot 8 %, Cursor 7 %, Gemini CLI 4 %. Each tool, like Claude Code, skips a
+  misplaced file without a word, and some read Claude Code's own files: Cursor applies `CLAUDE.md`
+  to every conversation and loads `.claude/skills/`. One reference per tool, each quoting its
+  vendor's official documentation: `agents-md-anatomy.md`, `copilot-anatomy.md`,
+  `cursor-anatomy.md`, `gemini-anatomy.md` (doctrine only for Gemini CLI in this release).
+  - `54-agents-md-variant` (NOTICE): `AGENTS.override.md` / `AGENTS.local.md`, read by Codex, never by Claude Code.
+    Not measured: no such file in 1,200 public repositories with a Claude Code configuration - it
+    rests on the quoted docs alone.
+  - `55-cursor-rule-ignored` (WARN; a folder rule `<name>/RULE.md` is a NOTICE - the current docs require
+    `.mdc` and name no folder format, so whether it loads depends on the Cursor version: 215
+    findings in 8 of 601 fresh repositories; a skill folder kept in `.cursor/rules/` is one finding,
+    not one per file), `55-cursor-rule-manual` (NOTICE), `55-cursor-rule-glob` (NOTICE),
+    `55-cursorrules-legacy` (NOTICE).
+  - `56-copilot-chatmode` (WARN), `56-copilot-instructions-name` (WARN), `56-copilot-apply-to`
+    (NOTICE: `applyTo` matching no file, or neither `applyTo` nor `description`).
+  - Measured before release on the 98 public repositories, among 1,200, that carry Cursor or
+    Copilot files: the three WARNs were right 30/31, 53/53 and 3/3. The two "matches no file"
+    checks were right 79 % and 22 % - repositories that distribute rules for others aim their
+    globs at the user's tree - so they are NOTICEs. The measure also caught two reading defects
+    before release: `**/*.{ts,tsx}` split on its commas, and an `applyTo` written as a YAML list.
+  - `55-cursor-reads-claude-md`, `56-copilot-reads-claude-md` (NOTICE): where Cursor or Copilot also
+    work on the repository, `CLAUDE.md` names a Claude Code-only mechanism - a built-in slash
+    command, the `Task` or `Skill` tool, `.claude/agents|hooks|commands`. Cursor applies `CLAUDE.md`
+    to every conversation, Copilot's agent reads it: they take these lines as instructions they
+    cannot follow. Subagents are not counted - Cursor and Copilot have their own, and the word was
+    60 of 68 findings in a first pass. On 315 repositories carrying Cursor or Copilot files: 10
+    findings in 6, all real ("delegates everything [...] via the Task tool", "Use `/compact`").
+    Known limit: a built-in command name that is also an HTTP route ("MCP at /mcp") is counted, and
+    a `CLAUDE.md` that addresses both agents explicitly still gets the notice.
+  - A tool's files kept under `vendor/`, `templates/`, `examples/`, `fixtures/` and their kin
+    (`SPECIMEN_DIRS`, derived from GitHub Linguist's `vendor.yml`) are not read as the repository's
+    own: third-party code, generator skeletons and test data. A fresh sample of 166 repositories
+    found 97 false WARNs in 2 of them, all in vendored upstream templates. A second fresh sample
+    (51 repositories carrying such files, among 900): every WARN right, 12 of 12.
+  - Two more fresh samples, drawn from a pool built for these files (repositories with a Claude
+    Code configuration and another agent's files, none seen before): 601, then 513 repositories.
+    The first found a folder rule format, `<name>/RULE.md`, in 8 of them - now a NOTICE. The
+    second: every WARN right bar one (877 of 878), no reading defect over the pre-set bar.
+  - `evals/`: three cases on what other agents read (`cursor-applies-claude-md`,
+    `local-notes-hide-agents-md`, `cursor-rule-never-applies`); results in `evals/PROVENANCE.md`.
+
+### Changed
+
+- Five settings keys added by the docs since 0.19.0 are known, all "Global config" (they apply
+  from `~/.claude.json` only): `claudeInChromeDefaultEnabled`, `copyFullResponse`,
+  `defaultToAgentsView`, `leftArrowOpensAgents`, `prStatusFooterEnabled`. In a `settings.json` they
+  are now reported as ignored at that scope, not as unknown.
+- `01-agents-md-unread` also fires when only a `CLAUDE.local.md` sits beside `AGENTS.md`: "Because
+  CLAUDE.local.md counts, adding one [...] stops Claude from reading AGENTS.md for you" (memory).
+- `SKILL.md` is 25 % lighter (19,816 → 14,849 bytes) with nothing lost: table padding, rule 17's
+  listing paragraph moved to `skill-runtime-mechanisms.md` (two facts added there first), and the
+  division-of-responsibilities table - the very kind of table this plugin measured inert - cut to a
+  paragraph. `plugin-skill-cannot-be-trimmed`, the eval that depends on rule 17: 20/20 with the
+  plugin on Sonnet after the cut, 0/20 without.
+- **The description names the other agents** (Cursor, Copilot, Gemini CLI, `AGENTS.md`) and a new
+  trigger, "another agent skips a rule file" - 995 to 1,005 characters. A question about Cursor
+  alone loaded the skill 0 times out of 20 with the old description and 13 with the new one,
+  measured the same day on Sonnet; the three "must not trigger" cases stayed at 0 of 20 each.
+
 ## 0.19.0 — 2026-09-27
 
 `audit.py` changes: a floor set with 0.18.0 no longer compares - re-set it after upgrading.

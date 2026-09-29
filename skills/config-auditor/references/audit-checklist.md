@@ -31,7 +31,8 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[AUTO 01-claude-md-lines]` ≤ 200 lines — the documented target.
 - `[AUTO 01-claude-md-size]` ≤ 12 KB — house proxy, movable per project through the overlay.
 - `[AUTO 01-claude-md-import]` Every `@path` import resolves, relative to the importing file.
-- `[AUTO 01-agents-md-unread]` An `AGENTS.md` beside a `CLAUDE.md` is imported (`@AGENTS.md`) or it is not read.
+- `[AUTO 01-agents-md-unread]` An `AGENTS.md` beside a `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` is imported (`@AGENTS.md`) or it is not read.
+- `[AUTO 54-agents-md-variant]` No `AGENTS.override.md` / `AGENTS.local.md` relied on for Claude Code: Codex reads them, Claude Code never does. See [agents-md-anatomy.md](./agents-md-anatomy.md).
 - `[AUTO 01-claude-local]` `CLAUDE.local.md` is ignored by the repository's git rules.
 - `[AUTO 12-no-code-comments]` No `//` or `/* */` outside fenced code blocks.
 - `[MANUAL]` Every line passes the deletion test: "would removing this cause Claude to make mistakes?"
@@ -56,6 +57,10 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[AUTO 33-description-overlap]` Close descriptions exclude each other; a one-way exclusion names the missing side.
 - `[AUTO 40-skill-not-loaded]` No `SKILL.md` outside a location Claude Code loads.
 - `[AUTO 48-agents-dir-skills]` No skill kept only in `.agents/skills/`: Claude Code does not load it. Link it into `.claude/skills/` to share it between tools.
+- `[AUTO 55-cursor-*]` Cursor rules are `.mdc` (a `.md` in `.cursor/rules/` is ignored), each has `alwaysApply`, `globs` or a `description`, and every `globs` matches a file; no legacy `.cursorrules`. See [cursor-anatomy.md](./cursor-anatomy.md).
+- `[AUTO 56-copilot-*]` Copilot instruction files end `.instructions.md`, each has `applyTo` or `description`, every `applyTo` matches a file; no chat mode left in `.github/chatmodes/`. See [copilot-anatomy.md](./copilot-anatomy.md).
+- `[AUTO 55-cursor-reads-claude-md, 56-copilot-reads-claude-md]` Where Cursor or Copilot also works on the repository, `CLAUDE.md` does not give them Claude Code-only instructions (`/compact`, the `Task` tool, `.claude/agents/`): Cursor applies `CLAUDE.md` to every conversation, Copilot's agent reads it.
+- `[MANUAL]` `CLAUDE.md` and the other agents' files (`AGENTS.md`, `copilot-instructions.md`) do not contradict each other. Gemini CLI: doctrine only, [gemini-anatomy.md](./gemini-anatomy.md).
 - `[AUTO 49-plugin-var-in-project]` No `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_PLUGIN_DATA}` used in a project skill: substituted only in plugin skills.
 - `[AUTO 50-security-*]` Security family, own grade (high ERROR, medium WARN, low NOTICE): no allow rule granting arbitrary code execution, no unpinned stdio MCP server, no download-and-run command, no hidden bidi/tag character, no literal secret in settings `env`, no plain-http remote MCP server, no `additionalDirectories` wider than the project, no `claude -p` isolated by allow/deny lists alone.
 - `[AUTO 51-stale-command]` / `[AUTO 28-config-anchors]` / `[AUTO 52-claude-md-tree]` / `[AUTO 53-no-verification-command]` Instructions match the repository: named commands are defined, named paths exist, no file tree in CLAUDE.md, a verification command is named where the repository has one.

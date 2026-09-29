@@ -137,6 +137,11 @@ optimistic it is; `30-plugin-cost` reports what a plugin's own descriptions cost
 
 `skillOverrides` in settings controls visibility without editing the skill (skills § Override skill
 visibility from settings). It does **not** apply to plugin skills — manage those through `/plugin`.
+Measured on 2026-09-22: neither `skillOverrides`, `disable-model-invocation` nor `paths:` removes a
+plugin skill from the listing, with or without the `<plugin>:` prefix on the key, while the same
+setting did remove a project skill. A consuming project's only lever on a plugin skill is disabling
+the whole plugin, so a plugin's listing cost is a tax its consumers cannot negotiate: a plugin
+author writes the description short because nobody downstream can trim it.
 
 | Value | Listed to Claude | In the `/` menu |
 | --- | --- | --- |
@@ -155,7 +160,8 @@ keep it in the tracked `.claude/settings.json`, so the decision is shared and re
 
 A withheld skill costs nothing per turn and cannot be discovered semantically, so **house
 convention** requires every withheld skill to be named in the `CLAUDE.md` skills index and reached
-through an explicit pointer — `15-skill-index`. Since 2.1.222, when Claude tries to invoke a
+through an explicit pointer — `15-skill-index`. A `paths:` skill surfaces on its own when a
+matching file is read, and is not required there. Since 2.1.222, when Claude tries to invoke a
 `disable-model-invocation` skill it is told to ask the user to run it instead of replicating the
 workflow ([changelog](https://code.claude.com/docs/en/changelog)).
 
