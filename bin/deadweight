@@ -31,6 +31,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 PLUGIN_ROOT = HERE.parent
 AUDIT = PLUGIN_ROOT / "skills" / "config-auditor" / "scripts" / "audit.py"
+sys.path.insert(0, str(AUDIT.parent))
+# The auditor's identity is computed in one place, so this line and the floor cannot disagree.
+from deadweight_audit.identity import audit_sha  # noqa: E402
 TEMPLATE = PLUGIN_ROOT / "skills" / "config-auditor" / "templates" / "statusline.py"
 LAUNCHER = PLUGIN_ROOT / "skills" / "config-auditor" / "templates" / "statusline-launcher.py"
 
@@ -57,7 +60,7 @@ def remedy(root: Path, d: dict) -> str | None:
     """
     sl = statusline_module()
     cache = cache_path(root)
-    current = hashlib.sha256(AUDIT.read_bytes()).hexdigest()[:8]
+    current = audit_sha()
     if sl.config_touched_since(str(root), cache.stat().st_mtime) or d.get("audit_sha") != current:
         return "the measurement is older than the configuration or the auditor: `deadweight --fresh`"
     floor = sl.read(str(root / ".claude" / "audit" / "floor.json"))

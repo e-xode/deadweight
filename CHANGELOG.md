@@ -1,5 +1,68 @@
 # Changelog
 
+## 0.21.0 — 2026-09-30
+
+`audit.py` changes, and so does what the floor's sha covers: the auditor is now `audit.py` and
+the package beside it, `deadweight_audit/`. A floor set with 0.20.x no longer compares - re-set
+it after upgrading, reading both counts first.
+
+### Changed
+
+- **The auditor is a package.** `scripts/audit.py` (5,736 lines) is now a 65-line entry point to
+  `scripts/deadweight_audit/`: one module per family of checks, parsing, vocabulary, report,
+  overlay, floor and identity - see "Inside the auditor" in the README. Every check takes
+  `(ctx, report, ...)`; the state of one audit lives in an `AuditContext` instead of module
+  globals rebound mid-run. Same command, same path, same flags, same check ids. Verified output
+  for output: identical to the byte on 200 public repositories re-cloned at their recorded
+  commits (JSON, text and four forced layouts), then compared with 0.20.1 on 150 repositories
+  never seen before and on 2,254 more - no difference the split explains.
+- **The instrument's identity covers the package.** `audit_sha` hashes `audit.py` and every
+  module of `deadweight_audit/`, line endings normalised, computed in one place for the audit,
+  `deadweight` and the status line. A change in any check now changes the sha.
+- **`46-doctrine-copy` compares against a frozen vocabulary.** It read this plugin's references at
+  run time, so adding a documentation page changed findings in consuming projects while the sha
+  stayed the same. Its terms are now frozen in the package, and matched exactly: a term used to
+  count when it appeared anywhere in 247,000 characters of references, and 16 of 18 plain shop
+  words did. On 3,013 public reference files, labelled by hand: 5 findings, 3 right before; 4
+  findings, 4 right now (a small count - read it as "no false positive in 4"). Most public copies
+  restate the Claude Code documentation rather than these references, and are still not found.
+- `34-floor` names the auditor rather than `audit.py`.
+- `allowClaudeInChromeWithManagedMcp` (Claude Code 2.1.282) is a known managed-only key: in a project's
+  settings it is reported as honoured only in managed settings, no longer as an unknown key.
+
+### Added
+
+- **`--runtime <log>`: what actually loaded.** An `InstructionsLoaded` hook - which you place
+  yourself; this plugin never places one - logs every instruction file Claude Code loads and why.
+  The audit reads that log beside the files: `57-runtime-never-loaded` for a path-scoped rule or a
+  nested `CLAUDE.md` no recorded session loaded (said only over 5 sessions or more - a file that
+  never loads leaves no line), `57-runtime-rule-unscoped` for a rule with `paths:` loaded at
+  session start anyway, `57-runtime-log` for what the log covers. NOTICE until measured on real
+  logs. The hook, measured on Claude Code 2.1.284, and what `/skill-doctor`, OpenTelemetry and
+  transcripts can and cannot offer instead: `references/runtime-data.md`. Without `--runtime`,
+  nothing in the report changes.
+- **Public tests.** `python3 -m unittest discover -s tests`: 202 labelled cases (fictional
+  repositories, each with the exact findings it must produce, most from a false positive once
+  found on a real repository) and the auditor's assumptions about itself - its identity, the
+  files it reads, and that one audit leaves nothing behind for the next. They run on Linux, macOS
+  and Windows in CI.
+
+### Fixed
+
+- **A threshold moved by one project's overlay reached the next audit in the same process** - it
+  was written into the module's globals. The command line runs one audit per process and never
+  showed it; a script importing the auditor did.
+- `55-cursor-rule-ignored`: skills kept one level down, `.cursor/rules/skills/<name>/`, were read
+  as plain `.md` files and each of their references reported - 88 findings for 15 skills in one
+  repository, 34 for 25 in another; now one per skill folder, with the right message.
+- `55-cursor-reads-claude-md` / `56-copilot-reads-claude-md`: an HTTP route (`MCP at /mcp`,
+  `POST /mcp/messages`) was taken for the `/mcp` command - 4 findings in 2 of 513 repositories.
+
+### Known limits
+
+- A command written as inline code (`` `/compact` ``) is not seen by `55/56-*-reads-claude-md`:
+  inline code is removed before that text is read.
+
 ## 0.20.1 — 2026-09-29
 
 `audit.py` is unchanged: floors set with 0.20.0 still compare.

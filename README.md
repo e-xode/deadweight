@@ -177,6 +177,8 @@ Each report ends with the number of check groups it ran. Check ids are stable (s
 | **Plugin packaging** | a plugin that ships what does not load | components inside `.claude-plugin/`, paths without `./`, fields replacing a default directory, version drift |
 | **What other agents read** | Cursor, Copilot and the `AGENTS.md` family skip misplaced files without a word, and read Claude Code's own | a `.md` in `.cursor/rules/` (only `.mdc` is read), a chat mode left in `.github/chatmodes/`, an instructions file without the `.instructions.md` suffix, `AGENTS.override.md` that Claude Code never reads, `CLAUDE.md` lines only Claude Code can follow - Cursor applies that file to every conversation |
 
+| **What actually loads** (opt-in) | a rule or a nested `CLAUDE.md` that no session needed; a `paths:` the harness did not honour | `--runtime <log>` reads an `InstructionsLoaded` hook log you record yourself ([how](skills/config-auditor/references/runtime-data.md)) |
+
 It recognises the container before judging it: a **project** (`.claude/`), a **plugin** (manifest,
 or `skills/` at the root without one), a **marketplace**, a **library** of skills kept at the root,
 or **none** — a repository with no Claude Code configuration, which gets no finding rather than
@@ -255,8 +257,8 @@ direction, and a year later every step looked reasonable. The floor is the numbe
 may not rise above. Commit `.claude/audit/floor.json` — a ratchet nobody else can see is a private
 opinion — and let its git history be the run history, each move with a commit message saying why.
 
-The floor records the **fingerprint of `audit.py`**, and `--check-floor` refuses to compare across
-two of them. A count taken with a different auditor is not a better or worse state — it is a
+The floor records the **fingerprint of the auditor** — `audit.py` and every module of its package
+`deadweight_audit/` — and `--check-floor` refuses to compare across two of them. A count taken with a different auditor is not a better or worse state — it is a
 different measurement, and comparing the two silently is how a change of instrument gets read as
 progress. The refusal is a warning, not a failure, so it does not break CI; it prints both counts
 side by side and asks you to re-set deliberately.
@@ -266,7 +268,7 @@ an auditor and does not run it on itself has the exact defect it exists to catch
 
 ## Versions and your floor
 
-| Release | `audit.py` | Your floor |
+| Release | The auditor | Your floor |
 | --- | --- | --- |
 | **patch** (`0.9.x`) | unchanged | still valid |
 | **minor** (`0.x.0`) | may have changed | re-set it after reading both counts |
@@ -278,7 +280,7 @@ the auditor changed.
 **After a minor update**, in this order:
 
 1. Open a new session (a plugin loads at session start), then run `--check-floor`. No
-   `34-floor` warning means `audit.py` did not change: nothing else to do.
+   `34-floor` warning means the auditor did not change: nothing else to do.
 2. Compare the floor's `warning_ids` with the new run's: gone ids are the auditor's fixes, new ids
    are what to read. Read every ERROR.
 3. `--set-floor` on the configuration as it is, and commit `floor.json` alone — the commit records a
@@ -340,8 +342,41 @@ project has recorded nothing", a valid state.
 ## Check ids are a public API
 
 A consuming project names check ids in its `.claude/audit.local.json`, so ids are **never renamed**.
-An id that must change goes into `CHECK_ID_ALIASES` in `audit.py`, old → new; the old id keeps
+An id that must change goes into `CHECK_ID_ALIASES` in `deadweight_audit/catalog.py`, old → new; the old id keeps
 working for good, and the audit says once that a newer name exists.
+
+## Inside the auditor
+
+`scripts/audit.py` is the entry point every command above calls; the auditor is the package beside
+it, standard library only:
+
+```
+skills/config-auditor/scripts/
+  audit.py                 entry point
+  deadweight_audit/
+    cli.py                 arguments, the passes over a dual-role repository, output
+    registry.py            which check runs on which container, and the dispatcher
+    context.py             AuditContext: the state of one audit, passed to every check
+    catalog.py             check inventory and id aliases (the public API above)
+    report.py  layout.py  overlay.py  floor.py  identity.py  limits.py  repo.py
+    parsing/               frontmatter, markdown spans and links, globs
+    vocabulary/            lists copied from the documentation: tools, keys, hook events
+    checks/                one module per family: skills, agents, hooks, settings, security…
+```
+
+A check is a function `check_<what>(ctx, report, ...)` in the module of its family. It reads the
+repository through `ctx` (root, layout, where skills and agents live, thresholds) and adds findings
+to `report`; it never keeps state of its own, so two audits in one process cannot leak into each
+other. To add one: write it, call it from `registry.run_checks`, name its containers in the
+registry's lists if it does not apply everywhere, and add its line to `catalog.CHECKS`.
+
+```bash
+python3 -m unittest discover -s tests    # labelled cases + the auditor's assumptions about itself
+```
+
+`tests/cases.json` holds fictional repositories with the exact findings each must produce, checked
+by hand; most began as a false positive on a real repository. It is generated from the maintainer's
+labelled source — to propose a case, describe the repository and the verdict in an issue or a PR.
 
 ## Where the examples come from
 

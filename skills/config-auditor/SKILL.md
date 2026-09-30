@@ -40,7 +40,7 @@ description: "Audit and govern a Claude Code configuration - a project's (CLAUDE
 13. **Rules are lightweight guardrails.** `.claude/rules/` files are path-scoped constraints (< 2 KB, imperative, no references). They complement skills (which carry knowledge). Use rules for hard DON'Ts tied to specific file paths; use skills for how-to procedures. See [references/rules-anatomy.md](./references/rules-anatomy.md).
 14. **Domain prefixes:** a skill scoped to one area of the project carries its area as a prefix. The worked example used throughout these references is a fictional shop: `shop-*`, `ui-*`, `api-*`, `data-*`. Cross-cutting skills (`translate`, `review`, `release`, `skill-creator`, `git-workflow`, this one) take none. A project-scoped skill keeps its project prefix even inside a go-to-market topic (`shop-onboarding-email`).
 15. **Always-loaded budget — measured, never extrapolated.** `CLAUDE.md` + every _listed_ skill description + every agent description load every turn; `17` caps the sum at 43,000 / 47,000 chars. **A house ratchet, not Anthropic guidance**: the harness sizes its own listing budget from `skillListingBudgetFraction` (`29`). Re-measure with `/context` and `/skill-doctor` after any listing change.
-16. **The ratchet, not the report.** A measurement with no floor is a measurement people learn to ignore. `--set-floor` freezes the counts, `--check-floor` fails when they rise, and the floor carries the **sha of `audit.py`**: the comparison refuses to run across two instruments, because a count taken with a different auditor is a different measurement, not a better state. Run it in CI.
+16. **The ratchet, not the report.** A measurement with no floor is a measurement people learn to ignore. `--set-floor` freezes the counts, `--check-floor` fails when they rise, and the floor carries the **sha of the auditor** (`audit.py` and its `deadweight_audit/` package): the comparison refuses to run across two instruments, because a count taken with a different auditor is a different measurement, not a better state. Run it in CI.
 17. **Check ids are a compatibility surface.** A consuming project names them in its `.claude/audit.local.json`, so they are never renamed — an id that must change gets an entry in `CHECK_ID_ALIASES` and the old one keeps working, for good.
     Listing levers (`disable-model-invocation`, `skillOverrides`, `paths:`) act on project skills only - **none reaches a plugin skill** (measured). A withheld skill the model cannot come upon must be named in the `CLAUDE.md` Skills index (`15`). Overflow rule and measurements: [references/skill-runtime-mechanisms.md](./references/skill-runtime-mechanisms.md).
 
@@ -65,7 +65,7 @@ whole report while notices exist. INFO lines are measurements every run emits (l
 coverage): do not list them, give their count and ask whether to show them — they are already in
 the output, so a yes costs no second run. With no one to ask (a sub-agent, `-p`), append them.
 
-The script's `CHECKS` tuple is the authoritative inventory of what it covers — read it there rather
+`CHECKS` in `scripts/deadweight_audit/catalog.py` is the authoritative inventory of what the script covers — read it there rather
 than trusting a count copied into prose; a clean run prints the number it executed (`Executed N
 check groups`). Most checks report only on failure; the budget always prints its total as INFO. Exit code 1 on any error. A check that fires more than
 five times is rolled up in the text report - `--all` or `--json` show every finding, and the
@@ -134,5 +134,6 @@ ceiling of core rule 3.
 | What each exemption was granted for, and when | `.claude/audit.local.json` — in the consuming project |
 | What the audit reported, run by run | the git history of `.claude/audit/floor.json` — timestamped, with an author and a reason |
 | Skill/agent runtime mechanisms available in Claude Code | [references/skill-runtime-mechanisms.md](./references/skill-runtime-mechanisms.md) |
+| Which instruction files actually load (`--runtime`)      | [references/runtime-data.md](./references/runtime-data.md) |
 | Anthropic official documentation | [references/official-links.md](./references/official-links.md) |
 | The step-by-step procedure for a given change | the project's own notes — not this skill |

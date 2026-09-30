@@ -157,6 +157,7 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[MANUAL]` Configuration disabled by renaming (`settings._json`, `*.disabled`, `*.bak` beside a live
   file) loads nothing and misleads a reader: restore it or delete it; git keeps the history.
 - `[AUTO 11-english-only]` One declared language — house convention, exemptable.
+- `[AUTO 57-runtime-*]` With `--runtime <InstructionsLoaded log>`: path-scoped rules and nested `CLAUDE.md` never loaded over the recorded sessions, rules loaded unscoped. The log is the maintainer's hook, never the agent's.
 - `[AUTO 31-overlay-*]` / `[AUTO 34-*]` Exemptions carry a reason and a date, and still excuse something (`31-overlay-unused`); the floor compares one instrument only.
 
 ## Required exit

@@ -27,3 +27,6 @@ jobs:
       - name: Hook, deadweight --fresh and status line on a throwaway project
         shell: bash
         run: python .github/smoke/portability.py
+      - name: Labelled cases and the auditor's assumptions about itself
+        shell: bash
+        run: python -B -m unittest discover -s tests

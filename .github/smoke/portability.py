@@ -54,11 +54,15 @@ def main():
     if not cached.is_file():
         fail(f"no cache at {key}; the cache holds {found}")
     sha = json.loads(cached.read_text(encoding="utf-8")).get("audit_sha")
-    crlf = b"\r\n" in (PLUGIN / "skills" / "config-auditor" / "scripts" / "audit.py").read_bytes()
-    print(f"  cache: {key}, audit_sha {sha}, audit.py has CRLF: {crlf}")
+    # The identity normalises line endings, and .gitattributes checks out LF: two defences,
+    # this one says whether the first is still needed on this runner.
+    scripts = PLUGIN / "skills" / "config-auditor" / "scripts"
+    crlf = [f.name for f in [scripts / "audit.py", *sorted((scripts / "deadweight_audit").rglob("*.py"))]
+            if b"\r\n" in f.read_bytes()]
+    print(f"  cache: {key}, audit_sha {sha}, auditor files with CRLF: {crlf or 'none'}")
     if crlf:
-        fail("audit.py was checked out with CRLF: its sha differs from the one Linux and macOS "
-             "compute, and a floor set on one machine refuses to compare on another")
+        fail(f"the auditor was checked out with CRLF ({', '.join(crlf[:5])}): .gitattributes no longer "
+             "holds, and only the identity's normalisation keeps floors comparable across machines")
 
     # 2. The command a user runs to see the detail and to measure again.
     fresh = subprocess.run([sys.executable, str(PLUGIN / "bin" / "deadweight"), "--fresh"], env=env,
