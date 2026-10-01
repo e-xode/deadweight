@@ -41,14 +41,16 @@ TWO DESIGN RULES, both learned the hard way.
    Code keeps on disk: no network, no subprocess, and nothing shown when the local
    catalogue was never refreshed.
 
-2. FRESHNESS IS MEASURED, NOT GUESSED FROM AGE. The audit runs once, at session
-   start; this reads a frozen number that looks live. Fix five warnings and it still
-   shows the old count; add a broken rule and it still shows zero errors. An earlier
-   version flagged AGE past a threshold, but age is a proxy: a three-day-old
-   measurement in a repository nobody touched is still true, and a two-minute-old one
-   in a repository you just edited is already false. The direct signal is the newest
-   mtime of the configuration itself - about 6 ms over 500 files, against a 300 ms
-   debounce.
+2. FRESHNESS IS MEASURED, AND THE AGE IS SHOWN BESIDE IT. The audit runs once, at
+   session start; this reads a frozen number that looks live. Fix five warnings and it
+   still shows the old count; add a broken rule and it still shows zero errors. Age
+   alone is a proxy - a three-day-old measurement in a repository nobody touched is
+   still true, a two-minute-old one in a repository you just edited is already false -
+   so `↻` comes from the newest mtime of the configuration itself (about 6 ms over 500
+   files, against a 300 ms debounce). The age (`2h`, `3d`) is shown from one hour on,
+   `↻` or not: `↻` says the number may be false, the age says since when, and a user
+   asked for the second after seeing `↻` alone with no way to tell 10 minutes from
+   8 hours (2026-10-01).
 
 Prints nothing where no audit has ever run: absent is a valid state.
 """
@@ -156,9 +158,9 @@ def age(path):
         s = int(time.time() - os.path.getmtime(path))
     except OSError:
         return ""
-    if s < 5400:
+    if s < 3600:
         return ""                     # minutes add nothing
-    if s < 172800:
+    if s < 86400:
         return f"{s // 3600}h"
     return f"{s // 86400}d"
 
@@ -200,10 +202,9 @@ def segment(root):
         col = DIM
         suffix = " ↻"
 
-    # The age only shows when it adds something: dating a measurement already
-    # declared stale is a second signal for one fact, and two signals for one fact
-    # teach the reader to read neither.
-    when = "" if (stale or (floor and not same_instrument)) else age(cache)
+    # Shown with `↻` too: `↻` says the count may be wrong, the age says how long ago
+    # it was right - two facts, not one.
+    when = age(cache)
     tail = f"{DIM} · {when}{OFF}" if when else ""
 
     newer = update_available(root)

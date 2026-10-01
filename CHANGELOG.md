@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.21.2 — 2026-10-01
+
+`audit.py` is unchanged: floors set with 0.21.0 still compare. Only the status line template changes.
+
+### Changed
+
+- **The status line shows how old the measurement is, from one hour on, `↻` included.** The age
+  (`1h` … `23h`, then `1d`, `2d` …) used to appear only past 90 minutes and was hidden whenever `↻`
+  was shown - so the case where the count may be wrong was the one case with no date. `↻` says the
+  number may be false; the age says since when. Run `claude plugin update` to get it.
+
 ## 0.21.1 — 2026-10-01
 
 `audit.py` is unchanged: floors set with 0.21.0 still compare. What this release adds is a separate
