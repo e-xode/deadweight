@@ -177,6 +177,7 @@ Each report ends with the number of check groups it ran. Check ids are stable (s
 | **Plugin packaging** | a plugin that ships what does not load | components inside `.claude-plugin/`, paths without `./`, fields replacing a default directory, version drift |
 | **What other agents read** | Cursor, Copilot and the `AGENTS.md` family skip misplaced files without a word, and read Claude Code's own | a `.md` in `.cursor/rules/` (only `.mdc` is read), a chat mode left in `.github/chatmodes/`, an instructions file without the `.instructions.md` suffix, `AGENTS.override.md` that Claude Code never reads, `CLAUDE.md` lines only Claude Code can follow - Cursor applies that file to every conversation |
 
+| **What a reader sees** (opt-in) | two instructions that cannot both be followed; one rule copied into two files that drift apart | `scripts/semantic.py` asks a model, through your Claude Code session, with every quote checked and nothing counted ([what it is worth, measured, and what it sends](skills/config-auditor/references/semantic-layer.md)) |
 | **What actually loads** (opt-in) | a rule or a nested `CLAUDE.md` that no session needed; a `paths:` the harness did not honour | `--runtime <log>` reads an `InstructionsLoaded` hook log you record yourself ([how](skills/config-auditor/references/runtime-data.md)) |
 
 It recognises the container before judging it: a **project** (`.claude/`), a **plugin** (manifest,
@@ -362,6 +363,8 @@ skills/config-auditor/scripts/
     parsing/               frontmatter, markdown spans and links, globs
     vocabulary/            lists copied from the documentation: tools, keys, hook events
     checks/                one module per family: skills, agents, hooks, settings, security…
+  semantic.py              a separate command: never counted, outside the auditor's sha
+  deadweight_semantic/     its package
 ```
 
 A check is a function `check_<what>(ctx, report, ...)` in the module of its family. It reads the

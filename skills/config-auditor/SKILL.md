@@ -135,5 +135,6 @@ ceiling of core rule 3.
 | What the audit reported, run by run | the git history of `.claude/audit/floor.json` — timestamped, with an author and a reason |
 | Skill/agent runtime mechanisms available in Claude Code | [references/skill-runtime-mechanisms.md](./references/skill-runtime-mechanisms.md) |
 | Which instruction files actually load (`--runtime`)      | [references/runtime-data.md](./references/runtime-data.md) |
+| Contradictions and duplicates a reader sees (`semantic.py`) | [references/semantic-layer.md](./references/semantic-layer.md) |
 | Anthropic official documentation | [references/official-links.md](./references/official-links.md) |
 | The step-by-step procedure for a given change | the project's own notes — not this skill |

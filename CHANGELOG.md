@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.21.1 — 2026-10-01
+
+`audit.py` is unchanged: floors set with 0.21.0 still compare. What this release adds is a separate
+command, so the auditor that counts keeps its sha.
+
+### Added
+
+- **`scripts/semantic.py`: what a reader sees and a parser does not.** A model, reached through
+  your own Claude Code session (`claude -p`, no tools, a pinned model id), reads the configuration
+  for two defects no mechanical check can see: `58-semantic-contradiction`, two instructions that
+  cannot both be followed, and `59-semantic-duplicate`, one rule copied into two files that will
+  drift. Every finding carries verbatim quotes, each checked against the file it names; a quote
+  that is not there rejects the finding, and so does an explanation that disowns it. On request
+  (`--also`): duplicates inside one file, untestable instructions, descriptions that promise what
+  the body does not do, method knowledge in `CLAUDE.md`.
+  Measured on configuration defects that maintainers declared fixing in their own commits, then on
+  a sample labelled by hand: 50 of 50 contradictions and 49 of 50 duplicates were real; 4 of 24
+  declared defects were found at their spot, 6 counting the same conflict found in another file.
+  Precise and partial. About 5 USD for a configuration of 50 skills and agents.
+- **Never counted, by construction.** Two runs agree on about three findings in four, so the layer
+  is a separate command over a separate package (`deadweight_semantic/`): it writes no floor, and
+  `audit.py` neither imports it nor changes with it. See `references/semantic-layer.md`, which also
+  says what is sent to the model.
+
+### Known limits
+
+- `allowedProviders`, a managed-only settings key documented on 2026-10-01, is not yet in the
+  auditor's vocabulary: in a project's settings it is reported as an unknown key rather than as
+  honoured only in managed settings - either way, a key that does nothing there. It joins the
+  vocabulary in the next minor release, which changes the auditor; this patch does not.
+
 ## 0.21.0 — 2026-09-30
 
 `audit.py` changes, and so does what the floor's sha covers: the auditor is now `audit.py` and
