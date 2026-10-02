@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .catalog import CHECK_ID_ALIASES
+from .catalog import CHECK_ID_ALIASES, RETIRED_CHECK_IDS
 from .context import AuditContext, STATE_DIR
 from .limits import ISO_DATE_RE, MECHANISM_THRESHOLDS, OVERRIDABLE_THRESHOLDS
 from .report import Finding, Report
@@ -120,7 +120,7 @@ def apply_thresholds(ctx: AuditContext, report: Report) -> None:
 UNEXEMPTABLE = frozenset({
     "31-overlay", "31-overlay-parse", "31-overlay-schema", "31-overlay-stale",
     "31-overlay-alias", "31-overlay-unknown-check", "31-overlay-threshold",
-    "31-overlay-unused",
+    "31-overlay-unused", "31-overlay-retired",
     "34-audit-sha", "00-layout",
 })
 
@@ -196,7 +196,8 @@ def apply_overlay(ctx: AuditContext, report: "Report", local: dict) -> None:
     # can leave an exemption idle legitimately.
     overlay = str(root / STATE_DIR / "audit.local.json")
     for chk, _base, _sev, i in resolved_links:
-        if i not in served:
+        # A retired check is reported once, by 31-overlay-retired, not again here.
+        if i not in served and chk not in RETIRED_CHECK_IDS:
             e = raw[i]
             report.add("31-overlay-unused", "NOTICE",
                        f"exemptions[{i}] (`{chk}` on `{e.get('path')}`, {e.get('date')}) "

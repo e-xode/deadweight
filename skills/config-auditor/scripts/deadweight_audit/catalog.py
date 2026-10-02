@@ -16,6 +16,21 @@ from .identity import instrument_files
 CHECK_ID_ALIASES: dict[str, str] = {}
 
 
+# Retired checks, same contract seen from the other side: an exemption a project wrote
+# for a check this script no longer runs is reported as harmless and removable, not as
+# a typo (31-overlay-unknown-check, a WARN that would raise the project's floor for a
+# change made here). Never remove an entry.
+RETIRED_CHECK_IDS: dict[str, str] = {
+    # 0.22.0, 2026-10-02. The table it required had no measured effect on selection
+    # (2026-09-27, 1,152 runs per model), and 27-twin-division-text demanded the same
+    # row word for word in two files - the duplication core rule 5 and
+    # 59-semantic-duplicate tell a project to remove.
+    "27-twin-division-table": "0.22.0",
+    "27-twin-division-row": "0.22.0",
+    "27-twin-division-text": "0.22.0",
+}
+
+
 CHECKS = (
     "dangling symbolic links",
     "instructions against the repository: stale commands, dead anchors, file trees, verification",
@@ -49,7 +64,6 @@ CHECKS = (
     "settings.json scope semantics",
     "orphan references (unreachable from SKILL.md)",
     "evals schema + coverage",
-    "twin-skill division-of-responsibilities tables (heading, twin row, shared row text)",
     "skill anchors resolve to real files (falsifiability)",
     "listing budget derived from skillListingBudgetFraction",
     "plugin cost imposed on each consuming project",

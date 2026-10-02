@@ -3778,46 +3778,39 @@
    ]
   },
   {
-   "id": "27-neither-side",
+   "id": "27-retired",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
     ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoice corrections (→ shop-invoices).\n---\n\nSee `README.md`.\n",
-    ".claude/skills/shop-invoices/SKILL.md": "---\nname: shop-invoices\ndescription: Generate and correct shop invoices: VAT lines, credit notes, invoice numbering. Do not use for refund requests (→ shop-refunds).\n---\n\nSee `README.md`.\n"
+    ".claude/skills/shop-invoices/SKILL.md": "---\nname: shop-invoices\ndescription: Generate and correct shop invoices: VAT lines, credit notes, invoice numbering. Do not use for refund requests (→ shop-refunds).\n---\n\n➜ See skill: shop-refunds — division of responsibilities\n",
+    ".claude/audit.local.json": "{\"exemptions\": [{\"check\": \"27-twin-division-table\", \"path\": \".\", \"severity\": \"INFO\", \"reason\": \"one shared division table, pointers elsewhere\", \"date\": \"2026-10-02\"}]}\n"
    },
    "git": true,
    "expected": [
     [
-     "27-twin-division-table",
-     "NOTICE",
-     2
-    ]
-   ],
-   "forbidden_messages": [
-    [
-     "27-twin-division-table",
-     "only '"
-    ]
-   ]
-  },
-  {
-   "id": "27-one-side-only",
-   "files": {
-    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
-    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoice corrections (→ shop-invoices).\n---\n\nSee `README.md`.\n",
-    ".claude/skills/shop-invoices/SKILL.md": "---\nname: shop-invoices\ndescription: Generate and correct shop invoices: VAT lines, credit notes, invoice numbering. Do not use for refund requests (→ shop-refunds).\n---\n\n## Division of responsibilities\n\n| Concern | Owner |\n| --- | --- |\n| Refund requests | `shop-refunds` |\n| Invoice corrections | `shop-invoices` |\n\n"
-   },
-   "git": true,
-   "expected": [
-    [
-     "27-twin-division-table",
+     "31-overlay-retired",
      "NOTICE",
      1
-    ]
-   ],
-   "forbidden_messages": [
+    ],
     [
      "27-twin-division-table",
-     "neither"
+     "NOTICE",
+     0
+    ],
+    [
+     "27-twin-division-table",
+     "INFO",
+     0
+    ],
+    [
+     "31-overlay-unknown-check",
+     "WARN",
+     0
+    ],
+    [
+     "31-overlay-unused",
+     "NOTICE",
+     0
     ]
    ]
   },

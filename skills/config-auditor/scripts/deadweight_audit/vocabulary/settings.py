@@ -63,7 +63,7 @@ SETTINGS_KEYS_USER_LOCAL_MANAGED = frozenset({
 
 
 SETTINGS_KEYS_USER_MANAGED = frozenset({
-    "askUserQuestionTimeout", "autoContinueAtUsageLimit", "autoMode",
+    "appendPlugins", "askUserQuestionTimeout", "autoContinueAtUsageLimit", "autoMode", "prependPlugins",
     "autoMode.classifyAllShell", "bashEditDiffEnabled", "desktopSessionCleanupPeriodDays",
     "dialogExpiry", "feedbackDrafts", "footerLinksRegexes", "modelPicker", "pluginConfigs",
     "processWrapper", "sandbox.allowAppleEvents", "sandbox.credentials.allowPlaintextInject",
@@ -75,7 +75,7 @@ SETTINGS_KEYS_USER_MANAGED = frozenset({
 
 SETTINGS_KEYS_MANAGED = frozenset({
     "allowAllClaudeAiMcps", "allowClaudeInChromeWithManagedMcp", "allowManagedHooksOnly", "allowManagedMcpServersOnly",
-    "allowManagedPermissionRulesOnly", "allowedChannelPlugins", "availableModelsMatch",
+    "allowManagedPermissionRulesOnly", "allowedChannelPlugins", "allowedProviders", "availableModelsMatch",
     "blockedMarketplaces", "browserExternalPageTools", "channelsEnabled", "claudeMd",
     "deniedModels",
     "disableBrowserExternalNavigation", "disableCommandPluginSources",

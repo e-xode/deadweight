@@ -44,7 +44,6 @@ from .checks.skills import (
     check_skills,
     check_unloadable_skills,
 )
-from .checks.twins import check_twin_division_tables
 from .context import AuditContext
 from .report import Report
 
@@ -156,7 +155,6 @@ def run_checks(ctx: AuditContext, report: Report) -> None:
     run(check_evals, ctx, report)
     run(check_doctrine_copy, ctx, report)
     run(check_eval_quality, ctx, report)
-    run(check_twin_division_tables, ctx, report, skills)
 
     run(check_skill_anchors, ctx, report)
     run(check_listing_budget_derived, ctx, report, skills)

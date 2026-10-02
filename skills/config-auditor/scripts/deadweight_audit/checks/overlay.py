@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 
-from ..catalog import CHECK_ID_ALIASES, known_check_ids
+from ..catalog import CHECK_ID_ALIASES, RETIRED_CHECK_IDS, known_check_ids
 from ..context import AuditContext, STATE_DIR
 from ..limits import ISO_DATE_RE
 from ..overlay import DOWNGRADE_TO, UNEXEMPTABLE
@@ -82,7 +82,11 @@ def check_project_overlay(ctx: AuditContext, report: Report, local: dict) -> Non
                        f"{where} names `{chk}`, renamed to `{CHECK_ID_ALIASES[chk]}`. The old id "
                        "still works and always will; update it when convenient.", str(path))
             chk = CHECK_ID_ALIASES[chk]
-        if isinstance(chk, str) and valid and chk not in valid:
+        if isinstance(chk, str) and chk in RETIRED_CHECK_IDS:
+            report.add("31-overlay-retired", "NOTICE",
+                       f"{where} exempts `{chk}`, a check retired in {RETIRED_CHECK_IDS[chk]}. "
+                       "It excuses nothing any more; remove the entry when convenient.", str(path))
+        elif isinstance(chk, str) and valid and chk not in valid:
             report.add("31-overlay-unknown-check", "WARN",
                        f"{where} exempts `{chk}`, which this audit never emits. Stale entry, "
                        "or a typo that makes the exemption silently inert.", str(path))

@@ -64,7 +64,7 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[AUTO 49-plugin-var-in-project]` No `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_PLUGIN_DATA}` used in a project skill: substituted only in plugin skills.
 - `[AUTO 50-security-*]` Security family, own grade (high ERROR, medium WARN, low NOTICE): no allow rule granting arbitrary code execution, no unpinned stdio MCP server, no download-and-run command, no hidden bidi/tag character, no literal secret in settings `env`, no plain-http remote MCP server, no `additionalDirectories` wider than the project, no `claude -p` isolated by allow/deny lists alone.
 - `[AUTO 51-stale-command]` / `[AUTO 28-config-anchors]` / `[AUTO 52-claude-md-tree]` / `[AUTO 53-no-verification-command]` Instructions match the repository: named commands are defined, named paths exist, no file tree in CLAUDE.md, a verification command is named where the repository has one.
-- `[AUTO 27-twin-division-*]` Twin skills carry matching "Division of responsibilities" rows — house convention, NOTICE: measured without effect on routing (antipattern B6). The routing lever is the crossed anti-trigger in the descriptions.
+- `[MANUAL]` Twin skills name each other with a crossed anti-trigger in their descriptions (antipattern B6). A "Division of responsibilities" table is optional, kept once and pointed to, never copied into each twin.
 - `[MANUAL]` Description says what and when, in the third person, without shouted imperatives.
 - `[MANUAL]` `SKILL.md` is method + index; `allowed-tools` of a committed skill reviewed (not gated by workspace trust).
 - `[MANUAL]` A `` !`cmd` `` injection cannot fail the whole invocation (`|| true` where exit 1 is normal).

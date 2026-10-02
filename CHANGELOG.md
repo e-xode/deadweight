@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.22.0 — 2026-10-02
+
+**`audit.py` changed: floors set with 0.21.x no longer compare** (`34-floor` refuses two
+auditors). Run `audit.py --set-floor` once and commit `floor.json`; the counts it freezes can only
+go down, because nothing in this release adds an ERROR or a WARN.
+
+### Removed
+
+- **`27-twin-division-*` is retired** (`-table`, `-row`, `-text`). It asked every twin skill to
+  carry a "Division of responsibilities" table, and `-text` asked for the same row word for word
+  in both files - the duplication core rule 5 and `59-semantic-duplicate` tell a project to
+  remove. A project replacing copied tables with one shared table and pointers was given one
+  NOTICE per twin side for doing so. The table had no measured effect on which skill gets loaded
+  (2026-09-27, 1,152 runs per model). Retired after one null measurement rather than the two
+  `evals/CONVENTIONS.md` asks for, and the row there says why. The routing lever is unchanged:
+  crossed `→ <twin>` anti-triggers in the descriptions (antipattern B6).
+
+### Added
+
+- **`31-overlay-retired` (NOTICE).** An exemption naming a retired check is reported as harmless
+  and removable, not as `31-overlay-unknown-check` (WARN): a check this plugin retires must not
+  raise a consumer's floor through the exemption the consumer wrote for it.
+- **Three settings keys documented since 0.21.0** are known to `24-settings-*`: `allowedProviders`
+  (managed only, 2026-10-01), `appendPlugins` and `prependPlugins` (user or managed, 2026-10-02).
+
+### Changed
+
+- **`46-doctrine-copy` vocabulary regenerated** from today's references: it now includes the
+  semantic layer's terms (0.21.1) and drops the retired `27-*`.
+
 ## 0.21.2 — 2026-10-01
 
 `audit.py` is unchanged: floors set with 0.21.0 still compare. Only the status line template changes.

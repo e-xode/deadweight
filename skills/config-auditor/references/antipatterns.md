@@ -100,7 +100,7 @@ Contents: [A. `CLAUDE.md`](#a-claudemd) · [B. Skills](#b-skills) · [C. Sub-age
   line), withhold it (`disable-model-invocation`, `skillOverrides`, or `paths:`) instead of
   trimming. Trim what competes for selection; withhold what does not.
 
-### B6. Twin skills that do not name each other — House convention (`27-twin-division-*`, NOTICE)
+### B6. Twin skills that do not name each other — House convention
 
 - **Symptom.** Two skills cover related topics; neither description says which requests belong to
   the other.
@@ -115,8 +115,9 @@ Contents: [A. `CLAUDE.md`](#a-claudemd) · [B. Skills](#b-skills) · [C. Sub-age
   twin. Measured 2026-09-27 on 8 real twin pairs, 1,152 runs per model: the table moved "the right
   skill was loaded" by −0.3 pts on Opus 5.5 and +0.4 pts on Haiku 4.5, both 95% intervals
   containing zero. The model handed off to the twin as often without the table as with it. Keep
-  one if humans read it; `27-*` reports its absence as a NOTICE and will retire after a second null
-  measurement. The larger loss on the same runs was elsewhere: 14–22 % of boundary requests loaded
+  one if humans read it - once, with a pointer from the other skills: a table copied into every
+  twin is a duplicate (`59-semantic-duplicate`). The check that required it (`27-twin-division-*`)
+  was retired in 0.22.0. The larger loss on the same runs was elsewhere: 14–22 % of boundary requests loaded
   **neither** skill, which nothing in a body can repair.
 
 ### B7. `SKILL.md` past the compaction slice — Universal
