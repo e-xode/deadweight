@@ -6,8 +6,8 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 **Audit the Claude Code configuration of a project or a plugin** — `CLAUDE.md`, skills, sub-agents,
-rules, hooks, settings, and the context all of it costs on every turn. One skill, one Python script,
-no dependencies, no network.
+rules, hooks, settings, and the context all of it costs on every turn — and what Cursor, Copilot and
+`AGENTS.md` read from the same repository. One skill, one Python package, no dependencies, no network.
 
 Deadweight is configuration you carry that does nothing: instructions paid for on every turn that
 nothing reads, rules whose glob matches no file, links to files that are gone, two skills stealing
@@ -391,10 +391,16 @@ by `docs/render_statusline.py`.
 
 ## Status
 
-Pre-1.0. The doctrine comes from one private fleet, and has since been measured against two samples
-of public repositories the auditor had never seen — the second drawn after the first, so it could
+Pre-1.0. The doctrine comes from one private fleet, and has since been measured against samples
+of public repositories the auditor had never seen — each drawn after the previous one, so they could
 not overlap. Each sample found defects in the auditor itself, recorded in the CHANGELOG. Issues and
 counter-examples are the point.
+
+## Maintainer
+
+Built and maintained by Christophe Bragard at [E-XODE](https://www.e-xode.net/en/products/deadweight),
+who audits Claude Code configurations and sets up coding agents for teams. To talk about yours:
+[e-xode.net/en/contact](https://www.e-xode.net/en/contact).
 
 ## License
 
