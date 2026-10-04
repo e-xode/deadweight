@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.22.1 — 2026-10-04
+
+`audit.py` is unchanged: floors set with 0.22.0 still compare.
+
+### Added
+
+- **`deadweight --semantic` and `deadweight --both`.** The semantic layer (0.21.1) was reachable
+  only as `scripts/semantic.py` by path. `--semantic` runs it alone; `--both` shows the cached
+  findings, then runs it. The default stays the deterministic audit: the semantic layer sends the
+  configuration to a model and costs per run, where the cached findings cost nothing. Its own
+  options (`--also`, `--model`, `--max-requests`) stay on `semantic.py`.
+- **The skill's audit method names the semantic layer** (Step 1b), to run on request only. Until
+  now only the routing table at the end of `SKILL.md` mentioned it, so asking Claude to audit a
+  configuration never reached it.
+
 ## 0.22.0 — 2026-10-02
 
 **`audit.py` changed: floors set with 0.21.x no longer compare** (`34-floor` refuses two

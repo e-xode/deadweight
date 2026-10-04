@@ -16,6 +16,8 @@ declare and which fails silently where it is missing.
     deadweight --info            also the measurements (INFO), which the default leaves out
     deadweight --fresh           measure now, rewrite the cache the status line reads, show it
     deadweight --json            the raw cached report
+    deadweight --semantic        only the semantic layer: a model reads the configuration (sends it, costs)
+    deadweight --both            the cached findings, then the semantic layer
     deadweight --setup-statusline  install the status line in Claude Code and/or Copilot CLI
     deadweight --where           print this plugin's root (to alias the command)
 """
@@ -31,6 +33,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 PLUGIN_ROOT = HERE.parent
 AUDIT = PLUGIN_ROOT / "skills" / "config-auditor" / "scripts" / "audit.py"
+SEMANTIC = AUDIT.parent / "semantic.py"
 sys.path.insert(0, str(AUDIT.parent))
 # The auditor's identity is computed in one place, so this line and the floor cannot disagree.
 from deadweight_audit.identity import audit_sha  # noqa: E402
@@ -239,19 +242,25 @@ def main(argv: list[str]) -> int:
     cwd = Path.cwd().resolve()
     named = os.environ.get("CLAUDE_PROJECT_DIR")
     root = Path(named) if named else Path(statusline_module().project_of(str(cwd)))
-    fresh = errors = as_json = setup = with_info = False
+    fresh = errors = as_json = setup = with_info = semantic = both = False
     for a in argv:
         if a == "--fresh":                   fresh = True
         elif a == "--errors":                errors = True
         elif a == "--info":                  with_info = True
         elif a == "--json":                  as_json = True
         elif a == "--setup-statusline":      setup = True
+        elif a == "--semantic":              semantic = True
+        elif a == "--both":                  both = True
         elif a == "--where":                 print(PLUGIN_ROOT); return 0
         elif a in ("-h", "--help"):          print(__doc__); return 0
         elif not a.startswith("-"):          root = Path(a).expanduser()
         else:
             print(f"unknown option: {a}", file=sys.stderr); return 2
     root = root.resolve()
+    if both and (as_json or semantic):
+        print("--both is the cached findings plus --semantic: give it alone, and for JSON run "
+              "`deadweight --json` and `deadweight --semantic --json` separately", file=sys.stderr)
+        return 2
 
     if setup:
         # The guard looks at where the command was run too: from bin/, the walk up
@@ -265,7 +274,19 @@ def main(argv: list[str]) -> int:
         # the `↻` it had just told the reader to clear - exactly as it was.
         env = dict(os.environ, CLAUDE_PROJECT_DIR=str(root), CLAUDE_PLUGIN_ROOT=str(PLUGIN_ROOT))
         subprocess.call([sys.executable, str(HOOK)], env=env)
-    return show(root, errors, as_json, with_info)
+    # The semantic layer is never the default: it sends the configuration to a model and
+    # costs per run, where the cached findings cost nothing. A separate script, so the
+    # auditor that counts, its sha and every floor stay untouched (references/semantic-layer.md).
+    # Its own options (--also, --model, --max-requests) stay on semantic.py itself.
+    code = 0 if semantic else show(root, errors, as_json, with_info)
+    if semantic or both:
+        if both:
+            print()
+        # Flushed first: the child writes to the same terminal, and without it the
+        # cached report arrived after the semantic one.
+        sys.stdout.flush()
+        subprocess.call([sys.executable, str(SEMANTIC), "--root", str(root)] + (["--json"] if as_json else []))
+    return code
 
 
 if __name__ == "__main__":

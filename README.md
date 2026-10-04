@@ -71,6 +71,7 @@ only this one.)
 | the measurements too (INFO) | `deadweight --info` |
 | to measure again after editing | `deadweight --fresh` — measures, updates the status line, shows the result |
 | the raw report | `deadweight --json` |
+| contradictions and duplicates a model reads (sends the files, costs per run) | `deadweight --semantic`; `deadweight --both` for the findings then this |
 | the counts in your status line | `deadweight --setup-statusline` from the project's root — Claude Code, Copilot CLI or both — then a new session |
 | to stop the configuration from getting worse | `--set-floor` once, `--check-floor` in CI — see [The ratchet](#the-ratchet) |
 | to turn it off in one project | `claude plugin disable deadweight --scope project` |

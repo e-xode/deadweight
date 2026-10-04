@@ -75,6 +75,13 @@ floor always counts every one, because the ceiling is a display decision, not a 
 2.1.233 it reports `SKILL.md` frontmatter that does not parse. Run it first and do not duplicate
 it; `audit.py` covers what it does not — what the harness ignores **silently**.
 
+### Step 1b — Semantic layer, on request only
+
+`deadweight --semantic` (or `--both`, the cached findings then this) has a model read the
+configuration for contradictions and duplicates no parser sees. It sends the files and costs per
+run, so run it when the user asks for it, never as part of a routine audit. Never counted, never in
+the floor: [references/semantic-layer.md](./references/semantic-layer.md).
+
 ### Step 2 — Runtime measurement (after any listing change)
 
 `audit.py` counts characters on disk; nothing static sees what the harness injected. Confirm in a
