@@ -95,7 +95,12 @@ paths:
 None of these failures produces a runtime error, which is why `22-rule-glob-match` expands every
 glob, brace branches included, and reports one matching no file in the repository. It reads `\[`
 as a literal bracket, reports an invalid pattern (an unclosed `[`) as matching nothing, and keeps a
-flow list's braces whole (`[src/**/*.{ts,tsx}]` is one pattern).
+flow list's braces whole (`[src/**/*.{ts,tsx}]` is one pattern). "The repository" is the disk
+and git together: a walk of the files on disk, which skips the usual dependency and build folders,
+plus every file git tracks or would add under the repository's own ignore rules. A file git ignores
+but Claude reads (a generated client, a local env file), a checked-out submodule or a nested
+repository is on disk, so it counts; configuration committed under a folder called build is in
+git's list, so it counts too. Outside a git repository the walk alone is used.
 
 **House convention** (`22-rule-glob-match`, NOTICE): a glob rooted in a directory the repository's
 git ignores (`dist/**`, `data-exports/**`) can only be checked on machines that hold those

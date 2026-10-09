@@ -235,8 +235,24 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                                "only after a literal `mcp__<server>__` prefix (permissions).",
                                str(path))
                     continue
+                # The whole Agent tool: Manual mode does not list it among the tools that
+                # ask (permissions), sub-agents started with no rule at all in default and
+                # dontAsk modes (claude -p, 2026-10-09), and auto mode drops `Agent` allow
+                # rules (permission-modes). Restricting is done with deny or ask rules.
+                if rule.strip() in ("Agent", "Agent(*)"):
+                    report.add("42-permissions-rule", "NOTICE",
+                               f"allow rule '{rule}' in '{name}' has no measured effect: "
+                               "sub-agents start without it in default and dontAsk modes, and "
+                               "auto mode drops it. To limit sub-agents, deny or ask "
+                               "`Agent(<name>)` instead (permissions, permission-modes).",
+                               str(path))
+                    continue
+                # `MultiEdit(<path>)` is a path rule for the legacy tool: the never-consulted
+                # ERROR below says what to write. Two findings, "write it Edit(...)" and "names
+                # no known tool", contradicted each other (user report, 2026-10-09).
                 if (tool not in KNOWN_TOOLS and tool not in TOOL_ALIASES
-                        and not tool.startswith("mcp__")):
+                        and not tool.startswith("mcp__")
+                        and not re.match(r"^MultiEdit\(.+\)$", rule.strip())):
                     report.add("42-permissions-rule", "WARN",
                                f"allow rule '{rule}' in '{name}' names no known tool: unlike a "
                                "deny or ask rule, a mistyped allow rule raises no startup "
@@ -252,16 +268,26 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                         tool_name = "Read" if m_path.group(1) == "Glob" else "Edit"
                         # The advice must not stay wrong: `Write(/abs/**)` became `Edit(/abs/**)`,
                         # still anchored at the settings source (anthropics/claude-code#98443).
-                        fixed = _absolute_path(m_path.group(2), root, ctx, name)
+                        home = _home_variable(m_path.group(2))
+                        fixed = home or _absolute_path(m_path.group(2), root, ctx, name)
                         report.add("42-permissions-rule", "ERROR",
                                    f"{kind} rule '{rule}' in '{name}' is never consulted: file "
                                    f"permissions are checked against Edit(...) and Read(...) only. "
                                    f"Write it {tool_name}({fixed or m_path.group(2)})"
-                                   + (" - with `//`: a single leading `/` anchors at the settings "
+                                   + (f" - with `~/`: `$HOME` {_HOME_NOT_EXPANDED}" if home else
+                                      " - with `//`: a single leading `/` anchors at the settings "
                                       "source, not the filesystem root" if fixed else "")
                                    + " (permissions).", str(path))
                         continue
                     m_rw = re.match(r"^(Read|Edit)\((.+)\)$", rule.strip())
+                    home = _home_variable(m_rw.group(2)) if m_rw else None
+                    if home:
+                        report.add("42-permissions-rule", "WARN",
+                                   f"{kind} rule '{rule}' in '{name}' names `$HOME`, which "
+                                   f"{_HOME_NOT_EXPANDED}, so the rule does not apply to the home "
+                                   f"directory. Write {m_rw.group(1)}({home}) (permissions).",
+                                   str(path))
+                        continue
                     fixed = _absolute_path(m_rw.group(2), root, ctx, name) if m_rw else None
                     if fixed:
                         report.add("42-permissions-path-anchor", "WARN",
@@ -341,6 +367,20 @@ SYSTEM_ROOTS = ("Users", "home", "opt", "tmp", "private", "var", "etc", "mnt", "
 
 def _settings_source(name: str) -> str:
     return "~/.claude/" if name.startswith("~") else "the project root"
+
+
+# The permissions page names four path forms - `//` absolute, `~/` home, `/` relative to the
+# settings source, and relative - and no variable. Probe, Claude Code 2.1.295 (2026-10-09,
+# `claude -p` with --settings, one run each): a deny on `Read($HOME/probe/secret.txt)` let the
+# file be read, a deny on `Read(~/probe/secret.txt)` refused it.
+_HOME_NOT_EXPANDED = ("is not expanded in a permission rule (a deny on Read($HOME/...) did not "
+                      "block the read on Claude Code 2.1.295; `~/` is the home directory)")
+
+
+def _home_variable(spec: str) -> str | None:
+    """`~/<rest>` when a rule's path starts with `$HOME/` or `${HOME}/`, else None."""
+    m = re.match(r"^\$(?:HOME|\{HOME\})/(.*)$", spec.strip())
+    return f"~/{m.group(1)}" if m else None
 
 
 def _absolute_path(spec: str, root, ctx, name: str) -> str | None:

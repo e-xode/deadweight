@@ -8295,6 +8295,338 @@
      "missing\\.md"
     ]
    ]
+  },
+  {
+   "id": "22-glob-under-tracked-build-folder",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/rules/vhost.md": "---\npaths:\n  - \"docker/build/nginx/**/*.conf\"\n---\nOne server block per file.\n",
+    ".claude/rules/deploy.md": "---\npaths:\n  - \"deploy/**\"\n---\nNever deploy on Friday.\n",
+    "docker/build/nginx/sites/shop.conf": "server { listen 80; }\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "22-rule-glob-match",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "22-rule-glob-match",
+     "docker/build"
+    ]
+   ]
+  },
+  {
+   "id": "42-bare-agent-allow-rule",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"Agent\",\n      \"Bash(npm test)\"\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "42-permissions-rule",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "50-security-broad-allow",
+     "'Agent'"
+    ]
+   ]
+  },
+  {
+   "id": "42-named-agent-rules-not-flagged",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"Agent(vue)\",\n      \"WebFetch\"\n    ],\n    \"deny\": [\n      \"Agent(Explore)\"\n    ],\n    \"ask\": [\n      \"Agent(model:opus)\"\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "50-security-broad-allow",
+     "WARN",
+     1
+    ],
+    [
+     "42-permissions-rule",
+     "NOTICE",
+     0
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "50-security-broad-allow",
+     "Agent"
+    ],
+    [
+     "42-permissions-rule",
+     "Agent"
+    ]
+   ]
+  },
+  {
+   "id": "50-broad-allows-without-agent",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"Agent\",\n      \"Bash(*)\",\n      \"Bash(python3:*)\",\n      \"Monitor\",\n      \"WebFetch\"\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "50-security-broad-allow",
+     "ERROR",
+     1
+    ],
+    [
+     "50-security-broad-allow",
+     "WARN",
+     3
+    ],
+    [
+     "42-permissions-rule",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "22-glob-on-ignored-files-present",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/rules/gen.md": "---\npaths:\n  - \"src/**/*.generated.ts\"\n---\nDo not edit generated clients.\n",
+    ".claude/rules/deploy.md": "---\npaths:\n  - \"deploy/**\"\n---\nNever deploy on Friday.\n",
+    "src/index.ts": "export {};\n",
+    "src/api/client.generated.ts": "export {};\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "22-rule-glob-match",
+     "WARN",
+     1
+    ]
+   ],
+   "gitignore": "*.generated.ts\n",
+   "forbidden_messages": [
+    [
+     "22-rule-glob-match",
+     "generated"
+    ]
+   ]
+  },
+  {
+   "id": "22-generated-glob-without-prefix",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/rules/generated.md": "---\npaths:\n  - \"**/*.gen.ts\"\n---\nRegenerate, never edit.\n",
+    ".claude/rules/deploy.md": "---\npaths:\n  - \"deploy/**\"\n---\nNever deploy on Friday.\n",
+    "src/api.gen.ts": "export {};\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "22-rule-glob-match",
+     "WARN",
+     1
+    ]
+   ],
+   "gitignore": "*.gen.ts\n",
+   "forbidden_messages": [
+    [
+     "22-rule-glob-match",
+     "gen\\.ts"
+    ]
+   ]
+  },
+  {
+   "id": "22-glob-on-ignored-local-files",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/rules/local.md": "---\npaths:\n  - \"**/*.local.yaml\"\n---\nNever commit local overrides.\n",
+    ".claude/rules/deploy.md": "---\npaths:\n  - \"deploy/**\"\n---\nNever deploy on Friday.\n",
+    "config/db.local.yaml": "host: localhost\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "22-rule-glob-match",
+     "WARN",
+     1
+    ]
+   ],
+   "gitignore": "*.local.yaml\n",
+   "forbidden_messages": [
+    [
+     "22-rule-glob-match",
+     "local\\.yaml"
+    ]
+   ]
+  },
+  {
+   "id": "23-agent-key-typo",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-reviewer.md": "---\nname: shop-reviewer\ndescription: Review shop refund code for errors. Do not use for invoices.\ndisallowed-tools: Bash\nmaxturns: 3\nobserver: true\n---\n\nReview the diff.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-frontmatter-keys",
+     "WARN",
+     3
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "23-agent-frontmatter-keys",
+     "'(?:disallowed-tools|maxturns)'.*nothing guarantees"
+    ],
+    [
+     "23-agent-frontmatter-keys",
+     "'disallowed-tools'(?!.*Rename it 'disallowedTools')"
+    ],
+    [
+     "23-agent-frontmatter-keys",
+     "'maxturns'(?!.*Rename it 'maxTurns')"
+    ]
+   ]
+  },
+  {
+   "id": "42-home-variable-in-rule",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"Write($HOME/notes/**)\"\n    ],\n    \"deny\": [\n      \"Read($HOME/.ssh/**)\",\n      \"Read(~/.aws/**)\"\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "42-permissions-rule",
+     "WARN",
+     1
+    ],
+    [
+     "42-permissions-rule",
+     "ERROR",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "42-permissions-rule",
+     "Edit\\(\\$HOME"
+    ],
+    [
+     "42-permissions-rule",
+     "~/\\.aws"
+    ]
+   ]
+  },
+  {
+   "id": "42-multiedit-single-message",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"MultiEdit(/home/a/**)\",\n      \"Bash(npm test)\"\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "42-permissions-rule",
+     "ERROR",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "42-permissions-rule",
+     "names no known tool"
+    ]
+   ]
+  },
+  {
+   "id": "51-non-ascii-path",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `npm run deploy` to ship, then `npm run release`.\n",
+    "package.json": "{\"name\": \"shop-api\", \"scripts\": {\"build\": \"vite build\"}}\n",
+    "apps/café/package.json": "{\"name\": \"shop-cafe\", \"scripts\": {\"deploy\": \"node deploy.js\"}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "51-stale-command",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "51-stale-command",
+     "npm run deploy"
+    ]
+   ]
+  },
+  {
+   "id": "23-misspelt-plugin-ignored-field",
+   "files": {
+    ".claude-plugin/plugin.json": "{\n  \"name\": \"shop-kit\"\n}",
+    "skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "agents/shop-reviewer.md": "---\nname: shop-reviewer\ndescription: Review shop refund code for errors. Do not use for invoices.\npermission-mode: plan\nmcp_servers: [shop-db]\ninitial-prompt: hi\nmaxturns: 3\n---\n\nReview the diff.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-frontmatter-keys",
+     "WARN",
+     4
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "23-agent-frontmatter-keys",
+     "Rename it '(?:permissionMode|mcpServers|initialPrompt)'"
+    ],
+    [
+     "23-agent-frontmatter-keys",
+     "'maxturns'(?!.*Rename it 'maxTurns')"
+    ]
+   ]
+  },
+  {
+   "id": "23-undocumented-key-no-verdict",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-reviewer.md": "---\nname: shop-reviewer\ndescription: Review shop refund code for errors. Do not use for invoices.\nobserver: true\n---\n\nReview the diff.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-frontmatter-keys",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "23-agent-frontmatter-keys",
+     "'observer'.*ignores a field"
+    ]
+   ]
   }
  ]
 }

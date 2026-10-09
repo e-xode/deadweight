@@ -8,7 +8,7 @@ from ..context import AuditContext
 from ..parsing.frontmatter import frontmatter_list, parse_frontmatter
 from ..parsing.globs import glob_match_count
 from ..parsing.markdown import strip_code_fences
-from ..repo import readable_files, git_ignored, repo_files
+from ..repo import readable_files, git_ignored, rule_scope_files
 from ..report import Report, house, house_note
 
 
@@ -97,7 +97,7 @@ def check_rule_globs(ctx: AuditContext, report: Report) -> None:
     rules_dir = root / ctx.claude_dir / "rules"
     if not rules_dir.is_dir():
         return
-    files = repo_files(root)
+    files = rule_scope_files(root)
     ignored = git_ignored(root)
     for entry in readable_files(rules_dir.rglob("*.md")):
         try:

@@ -45,6 +45,24 @@
     "how": "claude mcp list with a disposable CLAUDE_CONFIG_DIR, against a local HTTP server that logs the headers it receives; each name set and unset, with and without :-default.",
     "result": "AWS_SESSION_TOKEN, AWS_SECRET_ACCESS_KEY, CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_FOUNDRY_API_KEY, ANTHROPIC_CUSTOM_HEADERS, AZURE_CLIENT_SECRET, GOOGLE_APPLICATION_CREDENTIALS and NODE_AUTH_TOKEN arrive empty in every case; AWS_ACCESS_KEY_ID, GITHUB_TOKEN and a name of the project's own expand, and :-DEF gives DEF."
    }
+  },
+  "42-permissions-rule": {
+   "documented": "https://code.claude.com/docs/en/permission-modes (auto mode drops `Agent` allow rules); https://code.claude.com/docs/en/permissions (the Manual-mode table does not list the Agent tool among those that ask; Agent(<name>) rules are described for deny, parameter rules for deny and ask)",
+   "documented_note": "Scope of this entry: the NOTICE on a whole-tool Agent allow rule (\"Agent\", \"Agent(*)\"). The other 42-permissions-rule findings cite the permissions page directly. Read 2026-10-09. Also the `$HOME` advice: the permissions page names `//`, `~/`, `/` and relative paths, and no variable.",
+   "tested": {
+    "date": "2026-10-09",
+    "claude_code": "2.1.295",
+    "system": "Linux",
+    "how": "claude -p with --setting-sources \"\" (no permission rule at all), in default and in dontAsk mode, asked to delegate to a sub-agent; then the same with --disallowedTools \"Agent(general-purpose)\".",
+    "result": "Without any rule the Agent tool was called, the sub-agent started and answered, permission_denials empty, in both modes. With the deny rule the call was refused: \"Agent type 'general-purpose' has been denied by permission rule\"."
+   },
+   "tested_home_variable": {
+    "date": "2026-10-09",
+    "claude_code": "2.1.295",
+    "system": "Linux",
+    "how": "claude -p --model claude-haiku-5-5 --setting-sources project --settings <file>, HOME set to a temporary folder holding probe/secret.txt (also the working directory), asked to Read that file; three settings files: no rule, deny Read($HOME/probe/secret.txt), deny Read(~/probe/secret.txt). One run each.",
+    "result": "No rule: the content was returned. Deny Read($HOME/...): the content was returned, permission_denials empty. Deny Read(~/...): refused, \"File is in a directory that is denied by your permission settings.\""
+   }
   }
  }
 }

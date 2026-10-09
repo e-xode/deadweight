@@ -44,9 +44,15 @@ All doc, [sub-agents]:
 - **A `:` in `name`** is reserved for plugin-scoped identifiers: since 2.1.218 the file is not loaded,
   and the error goes only to the debug log. `[08-agent-frontmatter]` reports it as ERROR.
 - A frontmatter that does not parse can be found with `claude plugin validate .claude/agents`, which
-  says the agent then does not load. `[08-agent-frontmatter]` reports it as ERROR for the forms
-  `claude plugin validate` 2.1.294 rejects (measured on 63 probes); other rejected forms may pass
-  unflagged. A `name` that starts with `-` or exceeds 256 characters is an ERROR too, and a `---` not
+  says the agent then does not load. `[08-agent-frontmatter]` reports it as ERROR for eight shapes
+  only, each rejected by `claude plugin validate` (2.1.294, and again on 2.1.295): a quoted value never
+  closed; text after a closing quote; a value opening with `- ` or `? `; an unquoted value ending with
+  `:`; inside a `[` or `{` spread over several lines, a line at column 0 or text after the closing
+  bracket; an indented line holding `:` under an unquoted value; a line at column 0 that is not a key.
+  It does not judge a `[` or `{` left open (`name: [`, `name: [a3`, `description: {x`), which the
+  2.1.295 validator does not report either, and it reads a one-line flow list
+  (`description: [TODO: explain]`) as text, where the validator reports an array whose value is
+  dropped at runtime. Other rejected forms may pass unflagged. A `name` that starts with `-` or exceeds 256 characters is an ERROR too, and a `---` not
   on line 1 makes the file documentation, not an agent. In a plugin an unparsable frontmatter is a
   WARN: the agent still loads, under its filename.
 
@@ -66,11 +72,16 @@ model: sonnet
 
 ### The eighteen fields
 
-Doc, [sub-agents]: the list below. The documentation says only that `color` and `experimental` "aren't
-accepted here and are ignored rather than rejected". Any other key is **undocumented, not proven
-ignored**: `observer` is accepted by recent builds (reported in anthropics/claude-code#93109), so
-nothing guarantees whether it is read, now or after an update. `[23-agent-frontmatter-keys]` reports
-it, because a typo such as `tool:` silently widens the agent to every tool.
+Doc, [sub-agents]: the list below. Field names "must match the table exactly: Claude Code ignores a
+field it doesn't recognize without reporting an error". `[23-agent-frontmatter-keys]` reports any other
+key, because a misspelt field is silently off: `disallowed-tools` for `disallowedTools` leaves the tools
+it lists available, `maxturns` sets no turn limit, `permission-mode` applies no mode, and `tool:` widens
+the agent to every tool. When the key differs from a documented field only by case, `-` or `_`, the
+finding names the field it was meant to be - except, in a plugin, for a field the plugin loader ignores
+whatever its spelling (`permissionMode`, `mcpServers`, `initialPrompt`, `hooks`): renaming it applies
+nothing there. Any other key is **undocumented, not proven ignored**: `observer` is accepted by recent
+builds (reported in anthropics/claude-code#93109), so nothing guarantees whether it is read, now or
+after an update.
 
 | Field | What the doc says | Note |
 | --- | --- | --- |

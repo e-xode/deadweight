@@ -141,7 +141,9 @@ first match decides, and specificity does not reorder them. `Bash(aws *)` in den
 - **Read / Edit — gitignore paths.** `//abs`, `~/home`, `/relative-to-the-settings-source`,
   `path` or `./path` relative to the current directory. A single leading `/` is **not** absolute:
   in `.claude/settings.json` it anchors at the working directory, in `~/.claude/settings.json` at
-  `~/.claude/`. `Edit` rules cover every built-in editing tool; a path rule on `Write`, `Glob`,
+  `~/.claude/`. No variable is listed: `$HOME/...` is not expanded (measured on 2.1.295, a deny on
+  `Read($HOME/...)` did not block the read where `Read(~/...)` did) - `[42-permissions-rule]` warns.
+  `Edit` rules cover every built-in editing tool; a path rule on `Write`, `Glob`,
   `NotebookEdit` or `MultiEdit` is accepted, never consulted, and warned at start-up. An allow rule
   whose path is not a usable gitignore pattern approves nothing. Not checked by audit.py.
 - **Negation `!`** (deny and ask only) carves paths out of the `path`/`./path` rules listed
@@ -170,6 +172,7 @@ first match decides, and specificity does not reorder them. `Bash(aws *)` in den
 | tool name matching no known tool | start-up warning (names with `_` or `*` exempt) | no warning documented [inference: silent] → **`42-permissions-rule`** (WARN) |
 | unanchored glob `"*"`, `"B*"`, `"mcp__*"` | valid: matches every tool / every MCP tool | **skipped with a warning, approves nothing** → **`42-permissions-rule`** (ERROR) |
 | `mcp__…(…)` | skipped at load, listed in the invalid-settings dialog and `claude doctor` | same → **`42-permissions-rule`** (ERROR) |
+| the whole `Agent` tool (`"Agent"`, `"Agent(*)"`) | `Agent(<name>)` restricts: the documented use | no effect seen [tested]: sub-agents start with no rule in default and dontAsk modes, and auto mode drops it [doc] → **`42-permissions-rule`** (NOTICE) |
 
 [doc] Warnings appear at **interactive** start-up; a `-p` run shows no dialog (`settings § Fix a
 broken settings file`). A rule nobody saw warned about is the common case in CI.
@@ -211,7 +214,13 @@ folder`; `settings § A committed key doesn't reach teammates`.
   shared file, each approves that code for everyone who clones and trusts the repository, with no
   prompt. Same for a bare `WebFetch` or `WebFetch(domain:*)`: every host is reachable
   ([permissions](https://code.claude.com/docs/en/permissions)). High when every command passes
-  (`Bash`, `Bash(*)`), medium for the rest. The fix is narrowing, not deleting: name the exact
+  (`Bash`, `Bash(*)`), medium for the rest. `Agent` is the exception, and this check does not
+  report it: the Manual-mode table of [permissions](https://code.claude.com/docs/en/permissions)
+  does not list the Agent tool among those that ask, its `Agent(<name>)` rules are documented for
+  deny (and parameter rules for deny and ask), and [tested] a sub-agent started and answered with
+  no rule at all, in default and in dontAsk mode, while a deny on `Agent(general-purpose)` refused
+  the call. A whole-tool `Agent` allow rule is therefore reported as a rule with no effect
+  (`42-permissions-rule`, NOTICE), not as code execution. The fix is narrowing, not deleting: name the exact
   commands the team runs (`Bash(npm test)`, `Bash(npm run lint)`) and the domains it fetches
   (`WebFetch(domain:docs.shop.example)`); a person who wants broader approvals keeps them in their
   own `settings.local.json` or user settings. A named subagent (`Agent(Explore)`) or a folder of

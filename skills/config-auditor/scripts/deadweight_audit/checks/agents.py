@@ -325,12 +325,8 @@ def check_agent_frontmatter_validity(ctx: AuditContext, report: Report, skills: 
             inventory[key] = inventory.get(key, 0) + 1
             if key not in AGENT_VALIDATED_KEYS:
                 unvalidated[key] = unvalidated.get(key, 0) + 1
-                report.add("23-agent-frontmatter-keys", "WARN",
-                           # Undocumented is not proven ignored: `observer` is accepted by the
-                           # 2.1.266 bundle (anthropics/claude-code#93109). Say what is known.
-                           f"Agent '{entry.stem}' sets '{key}', which is not a documented subagent "
-                           f"field (sub-agents lists {len(AGENT_VALIDATED_KEYS)}): nothing guarantees it "
-                           "is read, now or after an update.", str(entry))
+                report.add("23-agent-frontmatter-keys", "WARN", _unknown_agent_key(entry.stem, key, ctx.layout),
+                           str(entry))
 
     if inventory:
         seen = ", ".join(f"{k} ({v})" for k, v in sorted(inventory.items()))
@@ -341,6 +337,45 @@ def check_agent_frontmatter_validity(ctx: AuditContext, report: Report, skills: 
             f"Agent frontmatter keys in use: {seen}. Keys this script does not validate: {drift}.",
             str(agents_dir),
         )
+
+
+# What a misspelt field was meant to do, and does not: the field is ignored, so its effect is absent.
+_LOST_EFFECT = {
+    "tools": "the agent is not limited to the tools it lists",
+    "disallowedTools": "the tools it lists stay available",
+    "maxTurns": "no turn limit is set by it",
+    "permissionMode": "the mode it names is not applied",
+}
+
+
+def _unknown_agent_key(agent: str, key: str, layout: str = "project") -> str:
+    """The 23 message for a key outside the documented subagent fields.
+
+    The sub-agents page: field names "must match the table exactly: Claude Code ignores a
+    field it doesn't recognize without reporting an error". A misspelt field
+    (`disallowed-tools`, `maxturns`) is the case that costs, because the restriction it
+    carries is silently off: that message quotes the page and names the field. Any other
+    undocumented key keeps the 0.23.0 hedge - the CLI schema has accepted undocumented keys
+    (`observer`, anthropics/claude-code#93109), so "ignored" would be more than is known.
+    In a plugin, renaming a field the plugin loader ignores whatever its spelling
+    (`permissionMode`, `mcpServers`, `initialPrompt`, `hooks`) applies nothing.
+    """
+    norm = lambda k: re.sub(r"[-_\s]", "", k).lower()  # noqa: E731
+    meant = next((k for k in sorted(AGENT_VALIDATED_KEYS) if norm(k) == norm(key)), None)
+    doc = ("\"Claude Code ignores a field it doesn't recognize without reporting an error\" "
+           "(sub-agents)")
+    if meant and layout == "plugin" and meant in PLUGIN_AGENT_IGNORED_KEYS:
+        return (f"Agent '{agent}' sets '{key}', a misspelling of the documented field '{meant}', "
+                "which Claude Code ignores on an agent shipped by a plugin whatever its spelling "
+                "(plugins-reference): renaming it would not apply it. To use it, the agent must "
+                "be a project or user agent (.claude/agents/).")
+    if meant:
+        lost = _LOST_EFFECT.get(meant, "its value is not applied")
+        return (f"Agent '{agent}' sets '{key}', a misspelling of the documented field '{meant}': "
+                f"{doc}, so {lost}. Rename it '{meant}'.")
+    return (f"Agent '{agent}' sets '{key}', which is not a documented subagent field "
+            f"(sub-agents lists {len(AGENT_VALIDATED_KEYS)}): nothing guarantees it is read, "
+            "now or after an update.")
 
 
 def check_agents_dir_skills(ctx: AuditContext, report: Report) -> None:

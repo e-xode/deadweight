@@ -89,7 +89,7 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 
 ## Agents
 
-- `[AUTO 08-agent-frontmatter]` Frontmatter parses as YAML (ERROR: the agent does not load); `---` on line 1; `name` and `description` present; no `:` in `name`, no leading `-`, ≤ 256 chars; no duplicate `name`. In a plugin, an empty or unparsable frontmatter is a WARN: the agent loads under its filename.
+- `[AUTO 08-agent-frontmatter]` Frontmatter in none of the eight shapes the validator rejects (ERROR: the agent does not load; the shapes are listed in agent-anatomy.md); `---` on line 1; `name` and `description` present; no `:` in `name`, no leading `-`, ≤ 256 chars; no duplicate `name`. In a plugin, an empty or unparsable frontmatter is a WARN: the agent loads under its filename.
 - `[AUTO 08b-agent-description]` 80–900 chars with an anti-trigger clause — house convention.
 - `[AUTO 09-*]` Listed in `## Agents directory` and back — house convention (WARN).
 - `[AUTO 23-agent-tools]` Every tool resolves (tools-reference); `Task` is an alias (NOTICE); `Agent(<type>)` in a subagent definition is ignored (WARN), except for the agent the `agent` setting names; a tool removed from sub-agents is a WARN; ERROR only when no entry resolves.
@@ -130,7 +130,7 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[AUTO 24-settings-skill-overrides]` Keys name a project skill, or are NOTICE (bundled, user, synced).
 - `[AUTO 24-settings-statusline]` / `[AUTO 24-settings-output-style]` The script exists, `refreshInterval` ≥ 1; the style name matches exactly.
 - `[AUTO 42-permissions-conflict]` No rule both allowed and denied or asked.
-- `[AUTO 42-permissions-rule]` Allow rules name known tools, no unanchored glob, no `mcp__…(…)`, `:*` only at the end of a `Bash` or `PowerShell` pattern.
+- `[AUTO 42-permissions-rule]` Allow rules name known tools, no unanchored glob, no `mcp__…(…)`, `:*` only at the end of a `Bash` or `PowerShell` pattern; a whole-tool `Agent` allow rule has no effect (NOTICE); a path rule never starts with `$HOME/`, which is not expanded (write `~/`).
 - `[AUTO 24-settings-unknown-subkey]` Every field of a closed object (`attribution`, `permissions`…) is documented.
 - `[MANUAL]` A rule the prose states and a setting can enforce is in the setting too — commit attribution first: a
   CLAUDE.md that forbids a co-author trailer, with no `attribution` in settings, holds only while the rule is read.

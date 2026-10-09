@@ -56,6 +56,33 @@ def repo_files(root: Path) -> list[str]:
     return files
 
 
+def rule_scope_files(root: Path) -> list[str]:
+    """The files a rule's `paths:` glob is tested against: the pruned walk PLUS git's list.
+
+    The walk of repo_files() sees what is on disk - files git ignores but Claude reads
+    (generated clients, local env files), checked-out submodules, nested repositories, a
+    project folder its enclosing repository ignores. Testing against git's list alone
+    reported working rules as inert on all of these (external audit of 0.24.0). But the
+    walk drops any folder named like build output whatever git says: a project that
+    commits its configuration under `docker/build/` had 13 tracked files under a rule's
+    glob, and was told the glob matched nothing (0.24.0). So both: the walk, and every
+    file git tracks or would add (`ls-files --cached --others --exclude-standard`), with
+    the repository's own ignore rules only (`core.excludesFile=`: a user's global ignore
+    file must not change the verdict on another machine). Names are decoded leniently -
+    a Latin-1 file name crashed the whole check. No repository, or no git: the walk alone.
+    """
+    files = set(repo_files(root))
+    try:
+        r = subprocess.run(["git", "-C", str(root), "-c", "core.excludesFile=", "ls-files", "-z",
+                            "--cached", "--others", "--exclude-standard"],
+                           capture_output=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        r = None
+    if r is not None and r.returncode == 0:
+        files.update(f for f in r.stdout.decode("utf-8", "surrogateescape").split("\0") if f)
+    return sorted(files)
+
+
 def claude_md_path(root: Path) -> Path:
     """The project CLAUDE.md: `./CLAUDE.md` or `./.claude/CLAUDE.md`, both official.
 
@@ -155,12 +182,15 @@ def tracked_paths(root: Path) -> list[str]:
     # Git absent or failing falls back to the walk: it raised FileNotFoundError, and the
     # checks that list the tree crashed on a machine without git (external audit 3, 2026-10-08).
     try:
-        r = subprocess.run(["git", "-C", str(root), "ls-files", "--cached", "--others",
-                            "--exclude-standard"], capture_output=True, text=True, timeout=30)
+        # `-z`: without it git quotes and octal-escapes a non-ASCII name when core.quotePath
+        # is true (its default) - `"apps/caf\303\251/package.json"` - and the file could not
+        # be opened (external audit of 0.24.0, se-02).
+        r = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--cached", "--others",
+                            "--exclude-standard"], capture_output=True, timeout=30)
     except (OSError, subprocess.SubprocessError):
         r = None
     if r is not None and r.returncode == 0:
-        return r.stdout.splitlines()
+        return [f for f in r.stdout.decode("utf-8", "surrogateescape").split("\0") if f]
     return [str(p.relative_to(root)) for p in root.rglob("*")
             if p.is_file() and ".git" not in p.parts]
 

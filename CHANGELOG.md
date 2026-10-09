@@ -1,5 +1,83 @@
 # Changelog
 
+## 0.24.0 — 2026-10-09
+
+**`audit.py` changed: floors set with 0.23.0 no longer compare** (`34-floor` refuses two auditors). Run `audit.py --set-floor` once and commit `floor.json`. What can **raise** a count: a `Read(...)` or `Edit(...)` permission rule that starts with `$HOME/` (new `42-permissions-rule` WARN: `$HOME` is not expanded). What can **lower** one: the false positives below (`22-rule-glob-match` on tracked files under a folder named like build output), a whole-tool `Agent` allow rule moving from a `50-security-broad-allow` WARN to a `42-permissions-rule` NOTICE, one WARN fewer on a `MultiEdit(<path>)` rule, and no findings at all for a `--root` inside the user configuration directory unless `--layout` is given. Measured on the 22 folders of one workspace (21 private repositories, and this one) with the published 0.23.0 auditor and this one on the same files: errors 0 → 0, warnings 62 → 61 (the `22-rule-glob-match` false positive below, on one repository), notices 107 → 107. The heuristics this release first added to `28-skill-anchors` and `50-security-headless-isolation` were withdrawn before release (see Known limits): on the same folders their six WARNs are back, as in 0.23.0.
+
+### Fixed
+
+- **`22-rule-glob-match`: a glob is tested against the files on disk and the files git lists.** The
+  walk prunes every folder named `build`, `dist`, `out`..., so a rule scoped to configuration committed
+  under a folder called build was reported as matching nothing (13 tracked files under its glob, on one
+  repository). Git's list (tracked files and new files the repository's own ignore rules keep) is now
+  added to the walk. *Review*: the first version of this fix used git's list alone, and reported as
+  inert the rules on files git ignores but Claude reads, on checked-out submodules, on nested
+  repositories and in a folder its enclosing repository ignores; it also crashed the check on a
+  non-UTF-8 file name and let a user's global git excludes file change the verdict. None of these
+  does now: no glob that matched in 0.23.0 can stop matching.
+- **`50-security-broad-allow`: a whole-tool `Agent` allow rule is no longer a security WARN;
+  `42-permissions-rule` reports it as a rule with no measured effect (NOTICE).** `Agent` and `Agent(*)`
+  in `allow` were reported as "runs arbitrary code without a prompt". With no rule at all a sub-agent
+  started and answered in default and in dontAsk mode (`claude -p`, Claude Code 2.1.295), while a deny
+  on `Agent(general-purpose)` refused the call, and the permissions page does not list the Agent tool
+  among those that ask in Manual mode. Auto mode drops `Agent` allow rules, which permission-modes
+  lists among the "broad allow rules that grant arbitrary code execution" (*review*: an earlier wording
+  here said the opposite). `Agent(<name>)` in allow, deny or ask is still not reported; `Bash(*)`,
+  wildcarded interpreters, package-manager runs, `Monitor` and a bare `WebFetch` still are. Sources in
+  `skills/config-auditor/evidence.json`.
+- **`--root` on a missing path or a file** printed a traceback (`FileNotFoundError`,
+  `NotADirectoryError`). It now prints one line and exits with code 2.
+- **`--root` inside the user configuration directory** (`CLAUDE_CONFIG_DIR`, else `~/.claude`) was
+  audited as a project: "nothing to audit" beside a settings.json, a project layout looking for
+  `.claude/.claude/skills`, and `40-skill-not-loaded` advising that skills in `~/.claude/skills` "load
+  nowhere" - they load in every project. This auditor checks projects and plugins only: such a root
+  now gets one `00-layout` line saying so, no findings, and `--set-floor` writes nothing. An installed
+  plugin, under `plugins/` in that directory, is still audited. *Review*: a `--layout` given explicitly
+  is honoured there (`--layout library` on `~/.claude/skills` checks the skills' content, such as a
+  description longer than the listing keeps), and the `00-layout` line says the layout was requested and
+  that a finding assuming project scope may not apply.
+- **Non-ASCII file names (*review*).** The list of the working tree was read without `-z`, so git
+  quoted and octal-escaped a name such as `apps/café/package.json` (`core.quotePath`, on by default):
+  the file could not be opened, its npm scripts were reported undefined by `51-stale-command`, and
+  anchors under it were missed. It is now read NUL-separated.
+- **`42-permissions-rule`: `$HOME` in a rule's path.** The permissions page names `//`, `~/`, `/` and
+  relative paths, and no variable; on Claude Code 2.1.295 a deny on `Read($HOME/probe/secret.txt)`
+  let the file be read, a deny on `Read(~/probe/secret.txt)` refused it (`claude -p`, one run each).
+  `Write($HOME/notes/**)` was told "write it `Edit($HOME/notes/**)`"; it is now told `Edit(~/notes/**)`,
+  and a `Read($HOME/...)` or `Edit($HOME/...)` rule gets a WARN pointing to `~/`.
+- **`42-permissions-rule`: `MultiEdit(<path>)` got two contradictory findings** ("write it
+  `Edit(...)`" and "names no known tool... approves nothing"). Only the first remains.
+
+### Changed
+
+- **`23-agent-frontmatter-keys` names the field a misspelt key was meant to be.** When the key differs
+  from one of the 18 documented fields only by case, `-` or `_` (`disallowed-tools`, `maxturns`,
+  `permission-mode`), the WARN quotes the sub-agents page - field names "must match the table exactly:
+  Claude Code ignores a field it doesn't recognize without reporting an error" - says the restriction is
+  not applied, and names the field. *Review*: in a plugin, a misspelling of a field the plugin loader
+  ignores whatever its spelling (`permissionMode`, `mcpServers`, `initialPrompt`, `hooks`) is not told to
+  "rename it", which would apply nothing; and any other undocumented key keeps the 0.23.0 wording
+  ("nothing guarantees it is read"), since the CLI schema has accepted undocumented keys such as
+  `observer` (anthropics/claude-code#93109). Same count. "Agent '<n>' missing required keys: name" is
+  unchanged.
+- **`08-agent-frontmatter`: what the YAML detector recognises, stated precisely.** 0.23.0 said the
+  check reports a frontmatter that does not parse. It reports eight shapes, each rejected by
+  `claude plugin validate` (2.1.294, and again on 2.1.295): a quoted value never closed; text after a
+  closing quote; a value opening with `- ` or `? `; an unquoted value ending with `:`; inside a `[` or
+  `{` spread over several lines, a line at column 0 or text after the closing bracket; an indented line
+  holding `:` under an unquoted value; a line at column 0 that is not a key. It does not report a `[` or
+  `{` left open (`name: [`, `name: [a3`, `description: {x`), which the 2.1.295 validator does not report
+  either, nor a one-line flow list such as `description: [TODO: explain]`, which it reads as text and
+  the validator reports as an array dropped at runtime. The detector is unchanged; agent-anatomy.md and
+  the checklist now say this.
+
+### Known limits
+
+- `28-skill-anchors` reads a negation or an example path as an anchor, and
+  `50-security-headless-isolation` reads a `claude -p` written inside a test fixture string; an overlay
+  exemption is the remedy. Heuristics for both were written for this release and withdrawn before it:
+  each round of review found new edge cases, and both checks behave as in 0.23.0.
+
 ## 0.23.0 — 2026-10-09
 
 **`audit.py` changed: floors set with 0.22.x no longer compare** (`34-floor` refuses two auditors). Run `audit.py --set-floor` once and commit `floor.json`. Counts move both ways this time: most fixes below remove false positives, and some add findings. What can **raise** a count: skills kept in category folders under `.claude/skills/` (new WARN), a repository with only a root `.mcp.json` (now audited), `17-always-loaded-budget` counting what it missed, an agent whose frontmatter does not parse (new ERROR), sub-agent tools the harness removes, MCP credential variables measured as empty, and a plugin's `hooks/hooks.json`. What **lowers** one: `35-hooks-timeout` and `56-copilot-chatmode` go from WARN to NOTICE, `32-skill-name-shape` from ERROR to WARN in a plugin, `23-agent-model` from WARN to NOTICE outside the documented values, `33-description-overlap` from WARN to NOTICE for a pair neither side separates. Measured on 19 private repositories with the published 0.22.1 auditor and this one on the same files: errors 0 → 0, warnings 87 → 74, notices 86 → 98; no repository gained a WARN once its always-loaded context was trimmed (a rule without `paths:` is now counted by `17-always-loaded-budget`, which put one repository 943 characters over its target).

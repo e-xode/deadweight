@@ -200,12 +200,14 @@ def check_security(ctx: AuditContext, report: Report) -> None:
                      f"allow rule '{rule}' in '{rel}' approves every shell command without a "
                      f"prompt, {reach}. Auto mode drops it as a rule that "
                      "grants arbitrary code execution (permission-modes).", path)
-            # A NAMED subagent (`Agent(Explore)`) is as narrow as that agent: only the bare
-            # rule and `Agent(*)` open every subagent (5 findings of 98 were named ones).
-            elif _SEC_INTERP.match(r) or _SEC_PKG_RUN.match(r) or r in ("Agent", "Agent(*)", "Monitor", "Monitor(*)"):
+            # `Agent` is not here: sub-agents start without any allow rule in default and
+            # dontAsk modes, so a bare `Agent` allow opens nothing - 42-permissions-rule says
+            # it has no effect (claude -p on 2.1.295, 2026-10-09; none of the 20 repositories
+            # measured keeps one). Auto mode still drops it (permission-modes).
+            elif _SEC_INTERP.match(r) or _SEC_PKG_RUN.match(r) or r in ("Monitor", "Monitor(*)"):
                 _sec(report, "medium", "50-security-broad-allow",
                      f"allow rule '{rule}' in '{rel}' runs arbitrary code without a prompt (an "
-                     "interpreter, a package-manager run, Agent or Monitor): auto mode drops it "
+                     "interpreter, a package-manager run or Monitor): auto mode drops it "
                      "for that reason. Narrow it to the exact commands (permission-modes).", path)
             elif r in ("WebFetch", "WebFetch(domain:*)"):
                 _sec(report, "medium", "50-security-broad-allow",
