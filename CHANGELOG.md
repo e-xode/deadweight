@@ -1,5 +1,64 @@
 # Changelog
 
+## 0.25.0 — 2026-10-09
+
+### Added
+
+- **`deadweight --environment`: what a session loads beyond the project's files.** The budget of
+  check 17 counts the repository's share; a session also pays for the user's skills (synced ones
+  included), the plugins they enabled and the MCP servers they connected. Measured on one project
+  (2026-10-09, Claude Code 2.1.295, Haiku): 16,705 first-turn input tokens added by the project, 5,243
+  by the account's synced skills and plugins, 4,648 by 17 MCP servers. The new command reports, by
+  origin (project, account, plugins, MCP), the number of skills, agents and servers, the characters of
+  description and a token **estimate** (characters / 2.85, a rough ratio; on that project −5 % for the
+  project and −0.4 % for the account against the measurement). Mods (a `hooks/hooks.json` naming a
+  hooks module under `modules`) are found and named; their cost is not estimated. `--measure` runs
+  `claude -p` four times on Haiku with `--setting-sources` and `--strict-mcp-config` and prints the
+  measured differences below the estimate (a few cents, the user's own login, one run per condition).
+  It is opening a Claude Code session in that folder without the trust dialog: the project's settings
+  hooks run, its `.mcp.json` servers connect, the enabled plugins' mods load. The question says how many
+  of each, goes to the terminal's error stream and is answered there; without a terminal, and always
+  with `--json`, it needs `--yes`. A separate script (`scripts/environment.py`), like the semantic layer: no finding, no
+  floor, and `audit.py` and `deadweight_audit/` are untouched, so the auditor's sha and every floor
+  stay as they are. It refuses to open the credentials file and `.claude.json`: every open of the
+  report goes through one check, by name, by the name of the resolved real path (symbolic link) and by
+  file identity with the real files (hard link); a refused file is listed, not read. MCP servers added
+  with `claude mcp add` are not counted, and the report says so. The account's memory counts its
+  `@imports` (four hops, as the memory docs say). `--environment` runs alone: with `--semantic`,
+  `--both`, `--fresh`, `--setup-statusline`, `--errors`, `--info` or `--all` it exits 2. See
+  `references/environment.md`.
+  *Review* (external audit before release, 11 findings): the first version checked the file name
+  only, so a symbolic link or a CLAUDE.md import reached `.claude.json`; asked its question on the
+  standard output, where `--json > file` hid it and corrupted the JSON; said nothing of the hooks,
+  servers and mods `--measure` runs; ignored the account's imports; counted a `settings.local.json`
+  plugin on the project side of the split, manifest paths outside the plugin, and a SKILL.md nested
+  in a capitalised subfolder; put `$.model.*` under "context"; and silently dropped other modes given
+  with `--environment`. Each has a test that fails on that version (`tests/test_environment_guard.py`).
+- **`deadweight --environment`: an inventory of mods, read and not run.** For each mod in the
+  enabled and synced plugins: the module, the local files it imports, the events it listens to (the
+  literal names passed to `on(...)`) and categories from a static reading of the source: "may add
+  tokens to the model's context" (`prompt.submit`, `prompt.context`, `session.append`, `$.tool.register`,
+  `$.session.send`...), "calls a model on the user's plan or API key, outside this session's context"
+  (`$.model.complete`, `fork`, `classify`), "draws only" (`ui.*` events and nothing else), "may block or change
+  a tool call" (`tool.call`, `tool.check`), "reaches files, processes or the network" (`$.fs`,
+  `$.process`, `$.http`, `$.mcp`), "waits on a model, a process or the network outside the hook's own
+  time limit" (an awaited `$.process.run` or `$.model.complete`: the mods reference's 10-second limit
+  does not count time inside a mods API call), and "unclassified" (event name computed at run time,
+  dynamic `import()`, `eval`, a package import, minified code, module missing). Each is labelled
+  "static reading of the source; not a measurement", with no time or token figure. Built-in mods
+  (`cc-plugin-agents-md`, `cc-plugin-diff`...) are said not to be counted, and the output points to
+  the `N mods active` line of `/plugin` as the cross-check. Nothing executes a module: a test plants
+  modules that would write a witness file if run, and refuses any process start.
+
+### Known limits
+
+- **`--environment`: the time cost of a mod is not measured.** The only duration source seen
+  (`--debug-file` log lines, `hooks module X tool.call settled in N ms`) is undocumented and includes
+  the tool's own run time; a `ui.render` mod's drawing cost is not measured in `claude -p`.
+- **`--environment`: the mod categories can miss a call** written through an alias of `$`, an event
+  name held in a variable, or code in an imported package (false negatives); the most common of these
+  patterns make the module "unclassified", not all.
+
 ## 0.24.0 — 2026-10-09
 
 **`audit.py` changed: floors set with 0.23.0 no longer compare** (`34-floor` refuses two auditors). Run `audit.py --set-floor` once and commit `floor.json`. What can **raise** a count: a `Read(...)` or `Edit(...)` permission rule that starts with `$HOME/` (new `42-permissions-rule` WARN: `$HOME` is not expanded). What can **lower** one: the false positives below (`22-rule-glob-match` on tracked files under a folder named like build output), a whole-tool `Agent` allow rule moving from a `50-security-broad-allow` WARN to a `42-permissions-rule` NOTICE, one WARN fewer on a `MultiEdit(<path>)` rule, and no findings at all for a `--root` inside the user configuration directory unless `--layout` is given. Measured on the 22 folders of one workspace (21 private repositories, and this one) with the published 0.23.0 auditor and this one on the same files: errors 0 → 0, warnings 62 → 61 (the `22-rule-glob-match` false positive below, on one repository), notices 107 → 107. The heuristics this release first added to `28-skill-anchors` and `50-security-headless-isolation` were withdrawn before release (see Known limits): on the same folders their six WARNs are back, as in 0.23.0.

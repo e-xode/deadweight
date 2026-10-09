@@ -139,6 +139,7 @@ or **none** — a repository with no Claude Code configuration, which gets no fi
 | to measure again after editing | `deadweight --fresh` — measures, updates the status line, shows the result |
 | the raw report | `deadweight --json` |
 | contradictions and duplicates a model reads (sends the files, costs per run) | `deadweight --semantic`; `deadweight --both` for the findings then this |
+| what your account, plugins, mods and MCP servers add to every session, beyond the project | `deadweight --environment` (estimate from file sizes); `--measure` adds a measurement (four `claude -p` runs on Haiku, a few cents; runs the project's hooks, MCP servers and mods) — see below |
 | the counts in your status line | `deadweight --setup-statusline` from the project's root — Claude Code, Copilot CLI or both — then a new session |
 | to stop the configuration from getting worse | `--set-floor` once, `--check-floor` in CI — see [The ratchet](#the-ratchet) |
 | to turn it off in one project | `claude plugin disable deadweight --scope project` |
@@ -156,6 +157,33 @@ print(sorted(rows, key=lambda r: r["version"])[-1]["installPath"])')
   python3 "$p/bin/deadweight" "$@"
 }
 ```
+
+### What your environment adds: `deadweight --environment`
+
+The audit counts what the repository loads. A session also loads your account's skills (synced ones
+included), the plugins you enabled and the MCP servers you connected — the same in every project, and
+different on every machine. `deadweight --environment` reports them by origin (project, account,
+plugins, MCP): how many skills, agents and servers, how many characters of description, and a rough
+token estimate (characters / 2.85, measured on this plugin's own text). It is information, not a
+finding: nothing is counted, nothing reaches a floor, the auditor's sha does not change.
+
+It reads files only, and refuses to open the credentials file and `~/.claude.json` — by name, by the
+real path a symbolic link resolves to, and by file identity (a hard link) — so MCP servers added with
+`claude mcp add` are not counted (it says so). A copy of their content under another name is not
+detected. Mods are listed with the events they listen to
+and sorted, from a static reading of their source (nothing is run), into what they may do: add to the
+model's context, only draw, block or change a tool call, reach files, processes or the network, wait
+outside a hook's time limit, or "unclassified" when the reading cannot conclude; their time and token
+cost is not measured. `--measure` adds a measurement below the estimate: four `claude -p` runs on Haiku
+(a few cents, your own login; one run per condition, so noisy), and prints what the project, your
+settings and MCP add. **It is opening a Claude Code session in that folder without the workspace
+trust dialog**: the hooks of the project's settings run, the servers of its `.mcp.json` connect and
+the mods of your enabled plugins load ("Without `--bare`, a `-p` session runs the hooks in a project's
+`.claude/settings.json` and connects the servers in its `.mcp.json`, even in a folder you've never
+trusted", headless docs). It asks on the terminal, saying how many of each will run, or needs `--yes`
+(always with `--json`). Use it on a folder you trust. Another model: `environment.py --model`, run
+directly.
+Details: [references/environment.md](skills/config-auditor/references/environment.md).
 
 ### Four severities, and which ones are counted
 
