@@ -15,6 +15,8 @@ import io
 import json
 import os
 import select
+import threading
+import time
 import subprocess
 import sys
 import tempfile
@@ -103,7 +105,9 @@ class SecretFilesRefused(Shop):
         d = json.loads(self.run_main("--json")[0])
         self.assertEqual(d["project"]["mcp_servers"], [])
         self.assertNotIn("rules/shop-notes.md", d["account"]["memory_files"])
-        self.assertIn(str(self.root / ".mcp.json"), d["refused"])
+        canon = lambda path: os.path.join(os.path.realpath(os.path.dirname(path)), os.path.basename(path))
+        # the report names the parent folder in its resolved form (/private/var on macOS, the long name on Windows)
+        self.assertIn(canon(str(self.root / ".mcp.json")), {canon(p) for p in d["refused"]})
 
     def test_imports_that_reach_the_state_file(self):
         write(self.root / "CLAUDE.md", "# shop-api\n\n@../home/.claude.json\n@docs/shop-notes.md\n")
@@ -179,29 +183,41 @@ class MeasureConsent(Shop):
 
     def on_terminal(self, *args: str, answer: str = "y\n") -> tuple[int, str, str]:
         """stdin and stderr on a terminal, stdout redirected to a pipe (`> out.json`)."""
+        if sys.platform == "darwin":
+            self.skipTest("macOS discards a pseudo-terminal's output once the child exits; covered on Linux")
         try:
             import pty
             master, slave = pty.openpty()
         except (ImportError, OSError) as e:
             self.skipTest(f"no pseudo-terminal here: {e}")
+        chunks: list[bytes] = []
+        stop = threading.Event()
+
+        def pump() -> None:                                   # read while the command runs
+            while not stop.is_set():
+                if select.select([master], [], [], 0.1)[0]:
+                    try:
+                        chunk = os.read(master, 65536)
+                    except OSError:
+                        break
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+
         try:
             proc = subprocess.Popen([sys.executable, str(ENVIRONMENT), "--root", str(self.root), *args],
                                     stdin=slave, stderr=slave, stdout=subprocess.PIPE, env=self.penv)
-            os.close(slave)
+            reader = threading.Thread(target=pump, daemon=True)
+            reader.start()
             os.write(master, answer.encode())
             out, _ = proc.communicate(timeout=120)
-            seen = b""
-            while select.select([master], [], [], 0.3)[0]:
-                try:
-                    chunk = os.read(master, 65536)
-                except OSError:
-                    break
-                if not chunk:
-                    break
-                seen += chunk
+            time.sleep(0.3)                                   # let the reader drain what is left
+            stop.set()
+            reader.join(2)
         finally:
+            os.close(slave)
             os.close(master)
-        return proc.returncode, out.decode("utf-8", "replace"), seen.decode("utf-8", "replace")
+        return proc.returncode, out.decode("utf-8", "replace"), b"".join(chunks).decode("utf-8", "replace")
 
     def test_json_redirected_refuses_without_yes(self):
         code, out, term = self.on_terminal("--measure", "--json")
