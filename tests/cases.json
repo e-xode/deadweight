@@ -6305,7 +6305,8 @@
      "WARN",
      1
     ]
-   ]
+   ],
+   "needs_exec_bit": true
   },
   {
    "id": "35-dot-slash-in-skill",
@@ -7312,7 +7313,8 @@
      "WARN",
      5
     ]
-   ]
+   ],
+   "needs_exec_bit": true
   },
   {
    "id": "24-scope-warning-undocumented",
@@ -8050,7 +8052,8 @@
      "WARN",
      2
     ]
-   ]
+   ],
+   "needs_exec_bit": true
   },
   {
    "id": "35-command-v-runs-nothing",
@@ -8066,7 +8069,8 @@
      "WARN",
      1
     ]
-   ]
+   ],
+   "needs_exec_bit": true
   },
   {
    "id": "23-model-claude-prefix-any-casing",

@@ -140,7 +140,8 @@ class HomeDirectory(unittest.TestCase):
             (home / ".claude" / "agents").mkdir(parents=True)
             (home / ".claude" / "settings.json").write_text('{"permissions": {"defaultMode": "plan"}}\n')
             r = subprocess.run([sys.executable, str(SCRIPTS / "audit.py"), "--root", str(home), "--json"],
-                               capture_output=True, text=True, env={**os.environ, "HOME": str(home)})
+                               capture_output=True, text=True,
+                               env={**os.environ, "HOME": str(home), "USERPROFILE": str(home)})
             findings = json.loads(r.stdout)["findings"]
             self.assertEqual([f for f in findings if f["severity"] in ("ERROR", "WARN")], [])
             self.assertTrue(any("home directory" in f["message"] for f in findings if f["check"] == "00-layout"))

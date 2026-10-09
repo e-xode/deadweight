@@ -72,6 +72,8 @@ class LabelledCases(unittest.TestCase):
             with self.subTest(case["id"]), tempfile.TemporaryDirectory() as tmp:
                 if case.get("case_sensitive_fs") and not case_sensitive(tmp):
                     continue                          # two names differing by case cannot both exist here
+                if case.get("needs_exec_bit") and sys.platform == "win32":
+                    continue                          # no execute bit on Windows: os.access(X_OK) is always true
                 try:
                     root = build(case, tmp)
                 except OSError as exc:            # symlinks need a privilege on Windows
