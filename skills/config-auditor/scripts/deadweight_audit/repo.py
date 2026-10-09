@@ -216,7 +216,6 @@ def git_ignored(root: Path):
     .gitignore. Only the repository's own rules count - never the user's global
     excludes. Outside a git repository nothing is ignored.
     """
-    import subprocess
     cache: dict[str, bool] = {}
     if not (root / ".git").exists():
         return lambda rel: False
