@@ -490,7 +490,8 @@ def confirm(req: Request, prompt: str, model: str, sources: dict[str, str], stag
     by one run came back in the next (2026-10-07). A finding the model gives once in three is,
     by construction, one that makes the report vary.
     """
-    path = cache_dir() / f"confirm-{_key(model, f'{votes}\0{POLICY}\0{prompt}')}.json"
+    payload = f"{votes}\0{POLICY}\0{prompt}"   # NUL separators: no backslash inside an f-string expression (Python 3.11)
+    path = cache_dir() / f"confirm-{_key(model, payload)}.json"
     if not cache_off("confirm"):
         try:
             d = json.loads(path.read_text(encoding="utf-8"))
