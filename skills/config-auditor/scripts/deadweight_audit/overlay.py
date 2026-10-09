@@ -7,7 +7,7 @@ from pathlib import Path
 from .catalog import CHECK_ID_ALIASES, RETIRED_CHECK_IDS
 from .context import AuditContext, STATE_DIR
 from .limits import ISO_DATE_RE, MECHANISM_THRESHOLDS, OVERRIDABLE_THRESHOLDS
-from .report import Finding, Report
+from .report import SEVERITY_ORDER, Finding, Report
 
 
 def load_local_config(root: Path) -> dict:
@@ -66,6 +66,10 @@ def apply_thresholds(ctx: AuditContext, report: Report) -> None:
     # configuration file that accepts everything and applies part of it is worse
     # than one that refuses.
     local = ctx.local
+    if "__error__" in local:
+        # The loader's sentinel for a file it could not parse, not a key anyone wrote:
+        # 31-overlay-parse reports the file, and there is nothing else to read in it.
+        return
     known = {"exemptions", "thresholds", "profile", "_comment"}
     for k in sorted(set(local) - known):
         report.add("31-overlay-unknown", "WARN",
@@ -121,7 +125,9 @@ UNEXEMPTABLE = frozenset({
     "31-overlay", "31-overlay-parse", "31-overlay-schema", "31-overlay-stale",
     "31-overlay-alias", "31-overlay-unknown-check", "31-overlay-threshold",
     "31-overlay-unused", "31-overlay-retired",
-    "34-audit-sha", "00-layout",
+    # The ratchet's id is `34-floor`, the one it emits, sha mismatch included.
+    # `34-audit-sha` stood here and was never emitted; it is an alias now (catalog).
+    "34-floor", "00-layout",
 })
 
 
@@ -164,6 +170,7 @@ def apply_overlay(ctx: AuditContext, report: "Report", local: dict) -> None:
     if not resolved_links:
         return
     served: set[int] = set()
+    raised: dict[int, tuple[str, str, str]] = {}
     retained: list[Finding] = []
     for f in report.findings:
         target = None
@@ -183,6 +190,12 @@ def apply_overlay(ctx: AuditContext, report: "Report", local: dict) -> None:
         covered_by, i = match
         served.add(i)
         if covered_by is not None:
+            # Lower, never raise: `severity: WARN` on a NOTICE made the excused finding
+            # count against the floor. The finding keeps its own severity, and the entry
+            # is reported once below.
+            if SEVERITY_ORDER.get(covered_by, 0) > SEVERITY_ORDER.get(f.severity, 0):
+                raised.setdefault(i, (f.check, f.severity, covered_by))
+                covered_by = f.severity
             retained.append(Finding(f.check, covered_by, f.message + " [excused by overlay]",
                                    f.location))
     report.findings = retained
@@ -195,6 +208,10 @@ def apply_overlay(ctx: AuditContext, report: "Report", local: dict) -> None:
     # INFO, not WARN: a check that only fires in some runs (a threshold, a layout)
     # can leave an exemption idle legitimately.
     overlay = str(root / STATE_DIR / "audit.local.json")
+    for i, (chk, was, asked) in sorted(raised.items()):
+        report.add("31-overlay-schema", "NOTICE",
+                   f"exemptions[{i}] asks for {asked} on a `{chk}` finding that is {was}. An "
+                   f"exemption may lower a finding, never raise it: it stays {was}.", overlay)
     for chk, _base, _sev, i in resolved_links:
         # A retired check is reported once, by 31-overlay-retired, not again here.
         if i not in served and chk not in RETIRED_CHECK_IDS:

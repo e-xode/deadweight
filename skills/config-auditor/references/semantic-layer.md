@@ -31,7 +31,8 @@ On request (`--also`), with the reason each is not shown by default:
 
 Every quote is checked character for character (whitespace aside) against the file it names; a
 finding with one quote that is not there is rejected and counted. So is a finding whose own
-explanation disowns it ("weak, not a real duplicate").
+explanation disowns it ("weak, not a real duplicate"), and one whose two sides quote the same
+passage — for a duplicate inside one file, a sentence written twice in that file is two passages.
 
 **Not asked: "is this rule beneficial?"** That is a counterfactual — does the project do better with
 the rule than without — and it is answered by running the model with and without it
@@ -86,8 +87,13 @@ another — a recall measured against what maintainers fixed undercounts what it
 
 - **Cost**: about 5 USD for a configuration of 50 skills and agents with the default cap, under a
   minute for a small one. The report prints the cost of the run.
-- **What leaves the machine**: the text of `CLAUDE.md`, the rules, every `SKILL.md` and agent file
-  is sent to the model through your own Claude Code session. Do not run it on a configuration you
-  may not send.
+- **What leaves the machine**: the text of `CLAUDE.md`, the rules, every `SKILL.md` and agent file,
+  and the in-repository Markdown files they point to (one hop: a Markdown link, an `@` import or a
+  backticked `.md` path), is sent to the model through your own Claude Code session; the JSON
+  report lists them in `files_sent`. Do not run it on a configuration you may not send.
+- **What it does not read**: `.claude/commands/`, `CLAUDE.local.md`, the `CLAUDE.md` of
+  subfolders and `AGENTS.md` are reviewed only when a collected file links to them. The report
+  names the others (`instruction_files_not_reviewed`). A `CLAUDE.md` symlinked to `AGENTS.md` is
+  sent as `CLAUDE.md`, and `AGENTS.md` is not listed as left out.
 - **A Claude Code update during a run** replaces the `claude` executable for a few seconds; the
   layer waits and retries, and reports any request that still failed.

@@ -46,9 +46,16 @@ Consequences:
   holding only `skills/shop-probe/SKILL.md`, started with `--plugin-dir`, then the probe looked up
   in the session's skill list. The docs say only that the manifest is optional; that this layout is
   enough on its own is the measured part.
-- **Doc.** Never name a skill folder `synced`, in any capitalization: Claude Code reserves
-  `~/.claude/skills/synced/` for skills downloaded from claude.ai and skips an authored skill of that
-  name ([skills § Choose where skills load](https://code.claude.com/docs/en/skills)).
+- **Doc.** Never name a skill folder `synced`, in any capitalization, outside a plugin: Claude Code
+  reserves `~/.claude/skills/synced/` for skills downloaded from claude.ai and skips an authored skill
+  of that name "in the enterprise, personal, and project locations"
+  ([skills § Choose where skills load](https://code.claude.com/docs/en/skills)). The same holds for a
+  folder or a `name` of `anthropic-skills` or `anthropic-skills:*`: it does not load. A plugin skill
+  of either name loads. `02-skill-md-exists` (ERROR) reports both outside a plugin.
+- **Measured** (2026-10-08, Claude Code 2.1.293): in a project, a `SKILL.md` kept in a category folder,
+  `.claude/skills/<category>/<skill>/SKILL.md`, is not loaded — the documented location is
+  `.claude/skills/<skill-name>/SKILL.md`. `02-skill-md-exists` (WARN) reports it, and such a skill is
+  left out of every other check.
 
 ## Folder layout
 
@@ -96,8 +103,11 @@ trailing or doubled hyphen, must match the parent folder
 `anthropic` or `claude`, which claude.ai and the Skills API reject
 ([platform best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)).
 Checks: `32-skill-name-shape`, `32-skill-name-reserved`, `03-skill-name-matches-folder`,
-`06-skill-duplicate-name`. For a personal or project skill the typed `/command` comes from the
-folder, not from `name` ([skills § How a skill gets its command name](https://code.claude.com/docs/en/skills)).
+`06-skill-duplicate-name`. The command is `/<name>`; for a personal or project skill the folder
+name also invokes it, and a plugin skill is `/<plugin>:<name>`
+([skills § How a skill gets its command name](https://code.claude.com/docs/en/skills)).
+`32-skill-name-shape` is a WARN: the spec's rejection applies when a skill is uploaded or packaged,
+and in a plugin the plugin's own `<name>:` prefix is removed before the test.
 
 **Silent failures** — **doc**: a frontmatter block is read only when the opening `---` is the file's
 first line; if the YAML does not parse, the skill still loads "with no fields set", so `/name` works
@@ -147,7 +157,13 @@ The description is the trigger surface: Claude decides whether to load a skill f
    excluded topics, **with and without** the clause — and it lengthens a description paid on every
    turn. Add it when the collision is observed, not by default. `04-skill-description-antitrigger`
    (NOTICE; WARN under `profile: house`); `33-description-overlap` flags pairs of descriptions that
-   compete, which is where the clause is worth a WARN.
+   compete: a WARN when only one side of the pair excludes the other, a NOTICE when neither does. It
+reads `description` and `when_to_use`, the text the listing shows, and counts an exclusion in its
+own clause: its sentence (past "e.g." and "i.e."), and a bulleted list under it. **Known limit**: an
+exclusion written in the next sentence ("Do not use for refunds. Those go to `shop-refunds`.") is
+not seen, so such a pair can be reported as one-sided. Telling "Those go to X" from "Works with X"
+would take a heuristic on the following sentence whose precision is not measured; until it is,
+write the alternative inside the clause ("Do not use for refunds (→ `shop-refunds`)").
 6. **House convention — 80 to ~500 characters.** Under 80 carries no discriminating term
    (`04-skill-description-length` also enforces the floor); over ~500 is usually knowledge that
    belongs in the body. Every listed description is paid on every turn: `17-always-loaded-budget`
@@ -201,7 +217,8 @@ Why it fails: no trigger terms, no file surface, no anti-trigger, nothing that s
 
 - **Doc — one level deep.** Every reference is linked directly from `SKILL.md`, so Claude reads
   whole files instead of following chains (platform best practices). `25-orphan-reference` flags a
-  reference `SKILL.md` never names.
+  reference `SKILL.md` never names, in `references/`, `reference/` or at the skill's root (other
+  than `SKILL.md`, README, CHANGELOG, LICENSE).
 - **Doc — table of contents past 100 lines** (platform best practices). skill-creator repeats it
   for files over 300 lines: "include a table of contents" — it does not say split.
 - **House convention — split past ~300 lines, one topic per file.** Reason: a reference is read

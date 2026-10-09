@@ -36,12 +36,13 @@ check id is named; when it does not, the rule says so.
 | managed policy settings | organisation | no |
 | plugin `hooks/hooks.json` | while the plugin is enabled | **yes** (plugin layout) |
 | plugin manifest `hooks` field (path, array or inline object — `plugins-reference`) | same | **no** |
-| skill frontmatter `hooks:` | rest of the session once the skill is invoked | **no** |
-| subagent frontmatter `hooks:` | while that subagent runs | **no** |
+| skill frontmatter `hooks:` | rest of the session once the skill is invoked | **yes** (`35-hooks-*`) |
+| subagent frontmatter `hooks:` | while that subagent runs | **yes** (`35-hooks-*`) |
 
-Said plainly: the `35-hooks-*` checks see settings files in a project and `hooks/hooks.json` in a
-plugin. A hook declared in a SKILL.md or agent frontmatter, or inline in `plugin.json`, is invisible
-to them today — read those by hand.
+Said plainly: the `35-hooks-*` checks see settings files in a project, `hooks/hooks.json` in a
+plugin, and the `hooks:` frontmatter of skills and agents. `50-security-remote-exec` reads the
+settings files and, in a plugin, `hooks/hooks.json`. A hook inline in `plugin.json` is invisible to
+both today — read it by hand.
 
 Facts that change what a declaration means:
 
@@ -155,8 +156,10 @@ Silent failures by type [doc]:
 - **`35-hooks-timeout`** — a `command` hook with no explicit `timeout`. Defaults for `command`,
   `http`, `mcp_tool`: 600 s; lowered to 30 s on `UserPromptSubmit`, `PreModelSwitch`,
   `PostModelSwitch`; 10 s on `MessageDisplay`. `SessionEnd` hooks **share** a 1.5 s budget, raised
-  to the longest per-hook `timeout` set, up to 60 s. audit.py warns when the implied default is
-  ≥ 60 s and informs below.
+  to the longest per-hook `timeout` set, up to 60 s. audit.py reports a NOTICE, not a WARN:
+  `timeout` is optional, the docs recommend no value, and no harm from the default is documented or
+  measured. A hook with `async: true` (without `asyncRewake`) is not reported: the timeout is not
+  enforced on it.
 - [doc] A timed-out `command`/`http`/`mcp_tool` hook is cancelled and its output discarded. On
   `PreToolUse` it **does not block**: the call continues through the normal permission flow — a
   stalled gate is an open gate (`hooks § Timeouts`). On `UserPromptSubmit` its `additionalContext`
@@ -268,7 +271,7 @@ hook that works interactively is silently absent in CI. Not checked by audit.py.
 
 ## Not checked by audit.py
 
-Read these by hand: hooks in skill, agent and inline `plugin.json` declarations; `once` outside
+Read these by hand: hooks inline in `plugin.json` (skill and agent frontmatter hooks are read by `35-hooks-*`); `once` outside
 skill frontmatter; `async` on a gate; exit 2 on an event that cannot block; `mcp_tool` on
 `SessionStart`/`Setup`; plugin-scoped MCP names in matchers; `${user_config.*}` in shell form;
 scripts named only in `args`; a handler with no `type`; the output size of context-injecting hooks.

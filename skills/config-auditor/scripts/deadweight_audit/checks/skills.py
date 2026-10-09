@@ -1,15 +1,16 @@
 """Skills: frontmatter, sizes, references, names, where they load."""
 from __future__ import annotations
 
+import json
 import os
 import re
 from pathlib import Path
 
+from ..checks.budget import listing_cap
 from ..checks.descriptions import ANTI_TRIGGER_RE
 from ..context import AuditContext
 from ..layout import claude_signs, root_level_skills
 from ..limits import (
-    DESCRIPTION_LISTING_MAX_CHARS,
     DESCRIPTION_MAX_CHARS,
     REFERENCE_TOC_SCAN_LINES,
     RESERVED_NAME_TOKENS,
@@ -17,7 +18,8 @@ from ..limits import (
     SKILL_NAME_MAX_CHARS,
     SKILL_NAME_RE,
 )
-from ..parsing.frontmatter import frontmatter_keys, parse_frontmatter
+from ..checks.security import _hook_commands
+from ..parsing.frontmatter import frontmatter_hooks, frontmatter_keys, parse_frontmatter
 from ..parsing.markdown import iter_relative_links
 from ..repo import readable_files, git_ignored, is_vendored_skill, exists_from_root
 from ..report import Report, house, house_note
@@ -70,7 +72,22 @@ def check_unloadable_skills(ctx: AuditContext, report: Report) -> None:
 SUPPORT_DIR_NAMES = {"assets", "templates", "scripts", "references", "shared", "common"}
 
 
-def skill_dirs(base: Path, report: Report) -> list[Path]:
+def is_anthropic_skills_name(name: str) -> bool:
+    """`anthropic-skills` or a name inside that namespace: reserved outside a plugin (skills)."""
+    n = (name or "").strip().lower()
+    return n == "anthropic-skills" or n.startswith("anthropic-skills:")
+
+
+def plugin_name(root: Path) -> str:
+    """The plugin's own prefix: the manifest `name`, else the directory name."""
+    try:
+        name = json.loads((root / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8-sig")).get("name")
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, AttributeError):
+        name = None
+    return name if isinstance(name, str) and name else root.name
+
+
+def skill_dirs(base: Path, report: Report, layout: str = "plugin") -> list[Path]:
     """Every directory that holds a SKILL.md, however the author nested them.
 
     A first version assumed exactly one level - `skills/<name>/SKILL.md` - and
@@ -78,6 +95,12 @@ def skill_dirs(base: Path, report: Report) -> list[Path]:
     plugins: 21 of 38 errors came from that assumption alone, against repositories
     that group skills by category (`skills/<category>/<skill>/SKILL.md`) or keep a
     `_shared/` directory beside them. Neither is a defect; both are organisation.
+
+    That measurement was taken on plugins only. In a project, Claude Code reads
+    `.claude/skills/<skill-name>/SKILL.md` (skills), and a skill one level deeper did
+    not load in Claude Code 2.1.293 (external audit, 2026-10-08): auditing it as a
+    loaded skill counted its description in the budget and hid the one defect worth
+    reporting. Plugin layout was not tested, so it keeps the category reading.
 
     A directory is reported only when it holds NEITHER a SKILL.md NOR any descendant
     that does - that is the case where something really is missing.
@@ -90,10 +113,24 @@ def skill_dirs(base: Path, report: Report) -> list[Path]:
             found_items.append(entry)
             continue
         descendants = sorted(p.parent for p in entry.rglob("SKILL.md"))
+        support = entry.name.startswith("_") or entry.name.lower() in SUPPORT_DIR_NAMES
+        if descendants and layout == "project":
+            if support:
+                continue                         # parked or shared material, said so by its name
+            nested = [p.relative_to(base).as_posix() for p in descendants]
+            shown = ", ".join(nested[:3]) + (f" (+{len(nested) - 3})" if len(nested) > 3 else "")
+            report.add("02-skill-md-exists", "WARN",
+                       f"Directory '{entry.name}' under the skills directory holds no SKILL.md, "
+                       f"but {len(nested)} SKILL.md file(s) sit below it: {shown}. Claude Code reads "
+                       "`.claude/skills/<skill-name>/SKILL.md` (skills) and did not load a "
+                       "skill nested one level deeper (measured, 2.1.293): move each up to "
+                       "`.claude/skills/<skill-name>/`. Not audited as loaded skills.",
+                       str(entry))
+            continue
         if descendants:
             found_items.extend(descendants)          # category, not a skill
             continue
-        if entry.name.startswith("_") or entry.name.lower() in SUPPORT_DIR_NAMES:
+        if support:
             continue                             # support material, not a skill
         other_case = [p.name for p in entry.iterdir() if p.name.lower() == "skill.md"]
         report.add("02-skill-md-exists", "WARN",
@@ -138,7 +175,7 @@ def check_skills(ctx: AuditContext, report: Report) -> dict[str, dict]:
                        "— nothing here declares anything.", str(skills_dir))
         return {}
     else:
-        entries = skill_dirs(skills_dir, report)
+        entries = skill_dirs(skills_dir, report, ctx.layout)
     skills: dict[str, dict] = {}
     seen_names: dict[str, str] = {}
     ignored = git_ignored(root)
@@ -197,29 +234,58 @@ def check_skills(ctx: AuditContext, report: Report) -> dict[str, dict]:
                        f"Skill '{entry.name}' description contains '<' or '>': Claude Code loads "
                        "it, but claude.ai upload and skill-creator's quick_validate reject angle "
                        "brackets in a description (platform best practices).", str(skill_md))
-        if entry.name.lower() == "synced":
-            report.add("02-skill-md-exists", "ERROR",
-                       "A skill folder named 'synced' is skipped: the name is reserved for skills "
-                       "synced from claude.ai (skills).", str(skill_md))
+        # Both reservations hold outside a plugin only (skills): "skips a skill you author
+        # at that name in the enterprise, personal, and project locations", and "outside a
+        # plugin, a skill folder or command file whose name is `anthropic-skills` or starts
+        # with `anthropic-skills:` doesn't load". A plugin's skills/synced/ loads as
+        # <plugin>:synced (external audit, 2026-10-08, Claude Code 2.1.293).
+        if ctx.layout != "plugin":
+            if entry.name.lower() == "synced":
+                report.add("02-skill-md-exists", "ERROR",
+                           "A skill folder named 'synced' is skipped: the name is reserved for "
+                           "skills synced from claude.ai (skills).", str(skill_md))
+            reserved = [n for n in (entry.name, name) if is_anthropic_skills_name(n)]
+            if reserved:
+                report.add("02-skill-md-exists", "ERROR",
+                           f"Skill '{entry.name}' does not load: outside a plugin, a skill folder "
+                           f"or frontmatter `name` that is `anthropic-skills` or starts with "
+                           f"`anthropic-skills:` is reserved for skills synced from claude.ai "
+                           f"(skills). Here: `{reserved[0]}`.", str(skill_md))
         wtu = fm.get("when_to_use", "").strip()
-        if desc and wtu and len(desc) + len(wtu) > DESCRIPTION_LISTING_MAX_CHARS:
+        # "the combined `description` and `when_to_use` text is truncated at 1,536
+        # characters in the skill listing" (skills): with no when_to_use, the description
+        # alone is what gets cut. Guarded by `wtu` until 0.23.0. The cap is the project's
+        # `skillListingMaxDescChars` when set ("The cap is configurable with
+        # skillListingMaxDescChars", skills); the constant alone told a project that
+        # raised it that the listing cut text it shows in full.
+        cap = listing_cap(ctx)
+        if len(desc) + len(wtu) > cap:
             report.add("04-skill-description-length", "WARN",
-                       f"Skill '{entry.name}': description + when_to_use is "
-                       f"{len(desc) + len(wtu)} chars (> {DESCRIPTION_LISTING_MAX_CHARS}); the "
+                       f"Skill '{entry.name}': "
+                       + ("description + when_to_use is " if wtu else "description is ")
+                       + f"{len(desc) + len(wtu)} chars (> {cap}); the "
                        "listing cuts the rest (skills).", str(skill_md))
         if name and name != entry.name:
             # "Must match the parent folder" is the Agent Skills spec's: packaging rejects
-            # the skill. In Claude Code the /command comes from the folder and the skill
-            # still loads - two names, not a failure. As an ERROR on projects it was 39 of
-            # 159 ERRORs on a second public sample (2026-09-27), the P2 class again.
+            # the skill. In Claude Code the skill still loads - two names, not a failure. As
+            # an ERROR on projects it was 39 of 159 ERRORs on a second public sample
+            # (2026-09-27), the P2 class again. Which name is the command (skills, "How a
+            # skill gets its command name"): in a project `name` sets it and "the directory
+            # name also invokes the skill"; in a plugin `name` replaces the directory name
+            # in the last segment. Until 0.23.0 this said the command was the folder.
+            if ctx.layout == "library":
+                how = ": the Agent Skills spec requires them equal, and packaging rejects the skill."
+            elif ctx.layout == "plugin":
+                how = (f": the command is /<plugin>:{name}, not the folder name (skills). "
+                       "Packaging under the Agent Skills spec would reject the mismatch.")
+            else:
+                how = (f": the command is /{name}, and /{entry.name} also invokes it (skills) - "
+                       "two names for one skill. Packaging under the Agent Skills spec would "
+                       "reject the mismatch.")
             report.add(
                 "03-skill-name-matches-folder",
                 "ERROR" if ctx.layout == "library" else "WARN",
-                f"Frontmatter name '{name}' does not match folder '{entry.name}'"
-                + (": the Agent Skills spec requires them equal, and packaging rejects the skill."
-                   if ctx.layout == "library" else
-                   f": the command is /{entry.name}, the listing shows '{name}' - two names for "
-                   "one skill. Packaging under the Agent Skills spec would reject it."),
+                f"Frontmatter name '{name}' does not match folder '{entry.name}'" + how,
                 str(skill_md),
             )
 
@@ -248,9 +314,9 @@ def check_skills(ctx: AuditContext, report: Report) -> dict[str, dict]:
                     "WARN",
                     f"Skill '{entry.name}' description is {len(desc)} chars (> {DESCRIPTION_MAX_CHARS}). "
                     "The Agent Skills spec caps 'description' at 1,024 chars "
-                    "(agentskills.io/specification); the 1,536 figure is a "
-                    "different mechanism - the listing cutoff for 'description' + 'when_to_use' "
-                    "combined, not a per-field limit.",
+                    "(agentskills.io/specification), the one upload and packaging validate against. "
+                    f"Claude Code's own limit is the listing cutoff: {cap:,} chars for "
+                    "'description' + 'when_to_use' combined (skills).",
                     str(skill_md),
                 )
             if not ANTI_TRIGGER_RE.search(desc):
@@ -275,7 +341,9 @@ def check_skills(ctx: AuditContext, report: Report) -> dict[str, dict]:
         vendored = is_vendored_skill(entry)
         if size > ctx.limits.SKILL_MD_ERROR_BYTES:
             # A house ceiling (skill-anatomy.md), reported as an ERROR until 2026-09-27. The
-            # documented mechanism - what survives compaction - is 21's, which fires too.
+            # documented mechanism - what survives compaction - is 21's, which fires too:
+            # an `elif` until 0.23.0 kept 21 silent above this ceiling, so a 60 KB skill
+            # got a NOTICE and a 25 KB one a WARN (external audit, 2026-10-08).
             report.add(
                 "05-skill-md-size",
                 "NOTICE" if vendored else house(ctx),
@@ -286,7 +354,7 @@ def check_skills(ctx: AuditContext, report: Report) -> dict[str, dict]:
                               "compaction - checked by 21-skill-md-compaction")),
                 str(skill_md),
             )
-        elif size > SKILL_MD_COMPACTION_WARN_BYTES:
+        if size > SKILL_MD_COMPACTION_WARN_BYTES:
             report.add(
                 "21-skill-md-compaction",
                 "NOTICE" if vendored else "WARN",
@@ -298,18 +366,19 @@ def check_skills(ctx: AuditContext, report: Report) -> dict[str, dict]:
             )
 
         if name and name in seen_names:
-            # In a project the typed command comes from the folder, not from `name`
-            # (skills, 2026-09-23): two folders sharing a `name` stay two commands, and
-            # nothing collides. Reported as an ERROR in a project until 2026-09-27 - 4
-            # false ERRORs in one fresh public repository. In a plugin `name` is the
-            # command, so a duplicate is a real collision.
+            # In a project `name` sets the command "unless another command already uses
+            # that name", and "the directory name also invokes the skill" (skills): both
+            # load, each folder still reaches its own, and only one gets /<name>. Reported
+            # as an ERROR in a project until 2026-09-27 - 4 false ERRORs in one fresh
+            # public repository. In a plugin `name` is the command, so a duplicate is a
+            # real collision.
             project = ctx.layout == "project"
             report.add(
                 "06-skill-duplicate-name",
                 "NOTICE" if project else "ERROR",
                 f"Duplicate skill name '{name}' (also in '{seen_names[name]}')"
-                + (": in a project each folder is its own command, so both load; only the "
-                   "displayed name is shared." if project else ""),
+                + (f": in a project both load and each folder name still invokes its own, but "
+                   f"only one of them gets /{name} (skills)." if project else ""),
                 str(skill_md),
             )
         elif name:
@@ -351,6 +420,11 @@ def check_skills(ctx: AuditContext, report: Report) -> dict[str, dict]:
     return skills
 
 
+_SETTINGS_COMMAND_STRINGS = ("apiKeyHelper", "awsAuthRefresh", "awsCredentialExport",
+                             "gcpAuthRefresh", "otelHeadersHelper")
+_SETTINGS_COMMAND_OBJECTS = ("statusLine", "subagentStatusLine", "fileSuggestion")
+
+
 def check_no_global_scripts(ctx: AuditContext, report: Report) -> None:
     root = ctx.root
     global_scripts = root / ctx.claude_dir / "scripts"
@@ -359,7 +433,45 @@ def check_no_global_scripts(ctx: AuditContext, report: Report) -> None:
     files = [p for p in global_scripts.rglob("*") if p.is_file()]
     if not files:
         return
+    # A script that a settings hook or the statusLine runs belongs to no skill: hooks in
+    # settings run project scripts outside any skill (hooks), so "its owning skill's
+    # scripts/" was wrong advice, and following it broke the configured path (external
+    # audit, 2026-10-08). Such a script is not reported.
+    # Only what runs it counts: the `command` of a command hook and `statusLine.command`.
+    # The whole settings text was searched, so a permission rule or an `env` value naming
+    # the script exempted it too (external audit 3, 2026-10-08).
+    configured = ""
+    for name in ("settings.json", "settings.local.json"):
+        try:
+            data = json.loads((root / ctx.claude_dir / name).read_text(encoding="utf-8-sig"))
+        except (OSError, UnicodeDecodeError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        # The other keys whose value is a command Claude Code runs (settings-reference:
+        # "a shell command line" for the credential helpers, an object with `command` for
+        # fileSuggestion and the two status lines) run a script outside any skill too
+        # (external audit 4, 2026-10-08).
+        runs = [data.get(key) for key in _SETTINGS_COMMAND_STRINGS]
+        runs += [data[key].get("command") for key in _SETTINGS_COMMAND_OBJECTS
+                 if isinstance(data.get(key), dict)]
+        configured += "\n" + "\n".join(_hook_commands(data.get("hooks"))
+                                       + [run for run in runs if isinstance(run, str)])
+    # Hooks also live in agent and skill frontmatter ("Hooks in skills and agents",
+    # hooks): a script one of them runs belongs to no skill either. Only the `hooks:`
+    # block is read - a description or a body that merely mentions the path runs nothing.
+    defs = list((root / ctx.claude_dir / "agents").rglob("*.md")) \
+        + list((root / ctx.skills_dir).glob("*/SKILL.md"))
+    for md in readable_files(defs):
+        try:
+            text = md.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        configured += "\n" + "\n".join(_hook_commands(frontmatter_hooks(text)))
+    prefix = "" if ctx.claude_dir == "." else f"{ctx.claude_dir}/"
     for path in files:
+        if f"{prefix}scripts/{path.relative_to(global_scripts).as_posix()}" in configured:
+            continue
         report.add(
             "13-no-global-scripts",
             house(ctx),
@@ -381,7 +493,9 @@ def check_reference_sizes(ctx: AuditContext, report: Report) -> None:
             text = ref.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        lines = text.count("\n") + 1
+        # `count("\n") + 1` counted a final newline as a line: a 100-line file read as 101
+        # and got the WARN the rule ("longer than 100 lines") does not ask for (0.23.0).
+        lines = len(text.splitlines())
         if lines <= ctx.limits.REFERENCE_TOC_LINES:
             continue
         head = "\n".join(text.splitlines()[:REFERENCE_TOC_SCAN_LINES]).lower()
@@ -432,6 +546,19 @@ def check_reference_sizes(ctx: AuditContext, report: Report) -> None:
             )
 
 
+def _flow_closes_early(value: str) -> bool:
+    """Whether a value opening a flow collection closes it and goes on: `[beta] Deploy`."""
+    depth = 0
+    for i, ch in enumerate(value):
+        if ch in "[{":
+            depth += 1
+        elif ch in "]}":
+            depth -= 1
+            if depth == 0:
+                return bool(value[i + 1:].strip())
+    return False                                # unclosed here: it may go on next line
+
+
 def check_frontmatter_quoting(ctx: AuditContext, report: Report) -> None:
     """Flag plain (unquoted) frontmatter scalars containing ': '.
 
@@ -465,13 +592,30 @@ def check_frontmatter_quoting(ctx: AuditContext, report: Report) -> None:
             if not m:
                 continue
             key, scalar = m.group(1), m.group(2).strip()
-            if scalar[0] in "\"'>|[{":
+            where = path.parent.name if path.name == "SKILL.md" else path.stem
+            # ` #` opens a YAML comment: a ': ' after it is not in the value, and quoting
+            # the line as advised would move the comment into it (external audit, 2026-10-08).
+            value = re.split(r"\s#", scalar, maxsplit=1)[0].rstrip()
+            if scalar[0] in "[{":
+                # A flow collection must close on its own bracket; `[beta] Deploy ...` opens
+                # one and strict YAML (PyYAML) rejects the rest. Skipped until 0.23.0. Only a
+                # collection closed ON THIS LINE with text after it is reported: `[Read,` may
+                # continue on the next line, which this line reader cannot see.
+                if _flow_closes_early(value):
+                    report.add(
+                        "19-frontmatter-quoting",
+                        "WARN",
+                        f"'{key}' in {where} is an unquoted scalar starting with '{scalar[0]}' — strict YAML reads a flow collection and rejects the rest. Wrap the value in double quotes.",
+                        str(path),
+                    )
                 continue
-            if ": " in scalar:
+            if scalar[0] in "\"'>|":
+                continue
+            if ": " in value:
                 report.add(
                     "19-frontmatter-quoting",
                     "WARN",
-                    f"'{key}' in {path.parent.name if path.name == 'SKILL.md' else path.stem} is an unquoted scalar containing ': ' — invalid under strict YAML. Wrap the value in double quotes.",
+                    f"'{key}' in {where} is an unquoted scalar containing ': ' — invalid under strict YAML. Wrap the value in double quotes.",
                     str(path),
                 )
 
@@ -485,6 +629,12 @@ def check_orphan_references(ctx: AuditContext, report: Report) -> None:
     budget. Non-markdown assets are, since they are consumed as data. A file in
     a references/ subdirectory (archives, retired routes) may instead be routed
     from a top-level reference that SKILL.md links — the router pattern.
+
+    Where references live: `references/`, the docs' `reference/`, and markdown files
+    at the skill root (`my-skill/reference.md`, skills; the `advanced.md` ->
+    `details.md` chain of the best practices). Only `references/` was read until
+    0.23.0, so the layouts the docs themselves show were never checked (external
+    audit, 2026-10-08). README, CHANGELOG and LICENSE at the root are for people.
     """
     root = ctx.root
     skills_dir = root / ctx.skills_dir
@@ -492,16 +642,24 @@ def check_orphan_references(ctx: AuditContext, report: Report) -> None:
         return
     for skill_dir in sorted(skills_dir.iterdir()):
         skill_md = skill_dir / "SKILL.md"
-        refs_dir = skill_dir / "references"
-        if not skill_dir.is_dir() or not skill_md.is_file() or not refs_dir.is_dir():
+        if not skill_dir.is_dir() or not skill_md.is_file():
             continue
+        ref_dirs = [d for d in (skill_dir / "references", skill_dir / "reference") if d.is_dir()]
+        top = [p for p in readable_files(skill_dir.glob("*.md"))
+               if p.name != "SKILL.md"
+               and not re.match(r"(?i)(readme|changelog|license|licence)\b", p.name)]
+        for d in ref_dirs:
+            top += readable_files(d.glob("*.md"))
+        if not top:
+            continue
+        top_parents = {skill_dir, *ref_dirs}
         try:
             text = skill_md.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
         linked = {(skill_md.parent / link).resolve() for link, _ in iter_relative_links(text)}
         routers: list[tuple[str, set[Path]]] = []
-        for router in readable_files(refs_dir.glob("*.md")):
+        for router in top:
             router_rel = router.relative_to(skill_dir).as_posix()
             if not (router.resolve() in linked or router_rel in text or router.name in text):
                 continue
@@ -511,11 +669,14 @@ def check_orphan_references(ctx: AuditContext, report: Report) -> None:
                 continue
             router_links = {(router.parent / link).resolve() for link, _ in iter_relative_links(router_text)}
             routers.append((router_text, router_links))
-        for ref in readable_files(refs_dir.rglob("*.md")):
+        candidates = list(dict.fromkeys(
+            [p for p in top if p.parent == skill_dir]
+            + [p for d in ref_dirs for p in readable_files(d.rglob("*.md"))]))
+        for ref in candidates:
             rel = ref.relative_to(skill_dir).as_posix()
             if ref.resolve() in linked or rel in text or ref.name in text:
                 continue
-            if ref.parent != refs_dir and any(
+            if ref.parent not in top_parents and any(
                 ref.resolve() in router_links or ref.name in router_text
                 for router_text, router_links in routers
             ):
@@ -533,26 +694,33 @@ def check_skill_names(ctx: AuditContext, report: Report, skills: dict[str, dict]
     """Shape and reserved words in `name`, per the Agent Skills spec.
 
     A non-conformant name keeps working locally, which is why it survives: nothing
-    fails until the skill is packaged or published. So the severity follows the
-    container. In a plugin the name blocks distribution - ERROR. In a project it is
-    a latent problem that surfaces the day the skill is extracted - WARN, because a
-    ratchet that cries on work nobody is doing today is a ratchet people learn to
-    ignore.
+    fails until the skill is packaged or uploaded. Until 0.23.0 the severity followed
+    the container - ERROR in a plugin, on the belief that the name blocks distribution.
+    Claude Code documents no such rejection for plugins (see below), so it is a WARN
+    everywhere: a latent problem that surfaces the day the skill is packaged.
     """
     root = ctx.root
     skills_dir = root / ctx.skills_dir
-    hard = ctx.layout == "plugin"
+    # Corrected 0.23.0 (external audit, 2026-10-08): the plugin ERROR rested on the spec
+    # alone, and Claude Code scopes that validation to "claude.ai skill uploads, the
+    # Skills API, and packaging with `package_skill.py`" (skills) - not to plugins. No
+    # Claude Code rejection of a plugin skill's name is documented: WARN everywhere.
+    own_prefix = f"{plugin_name(root)}:" if ctx.layout == "plugin" else None
     for name in sorted(skills):
         loc = str(skills_dir / name / "SKILL.md")
         declared = str(skills[name].get("name") or name)
-        if not SKILL_NAME_RE.match(declared):
-            report.add("32-skill-name-shape", "ERROR" if hard else "WARN",
+        # "If the `name` you write already starts with the plugin's own prefix, Claude
+        # Code doesn't add the prefix again on v2.1.246 or later" (skills): documented as
+        # valid, so the shape is read on what follows the prefix.
+        shape = declared[len(own_prefix):] if own_prefix and declared.startswith(own_prefix) else declared
+        if not SKILL_NAME_RE.match(shape):
+            report.add("32-skill-name-shape", "WARN",
                        f"Skill name `{declared}` is not lowercase letters, digits and single "
-                       "hyphens (agentskills.io/specification). The spec rejects it when the "
-                       "skill is packaged.", loc)
-        if len(declared) > SKILL_NAME_MAX_CHARS:
-            report.add("32-skill-name-shape", "ERROR" if hard else "WARN",
-                       f"Skill name `{declared}` is {len(declared)} chars (max "
+                       "hyphens (agentskills.io/specification). Claude Code loads it; the spec "
+                       "rejects it when the skill is packaged or uploaded.", loc)
+        if len(shape) > SKILL_NAME_MAX_CHARS:
+            report.add("32-skill-name-shape", "WARN",
+                       f"Skill name `{declared}` is {len(shape)} chars (max "
                        f"{SKILL_NAME_MAX_CHARS}).", loc)
         # The Agent Skills specification enumerates the `name` constraints in full -
         # 1-64 characters, lowercase alphanumerics and hyphens, no leading, trailing
@@ -570,9 +738,15 @@ def check_skill_names(ctx: AuditContext, report: Report, skills: dict[str, dict]
         # name; claude.ai and the Skills API refuse it. WARN: rejected somewhere real.
         hit = [t for t in RESERVED_NAME_TOKENS if t in declared.lower()]
         if hit:
+            # Outside a plugin, `anthropic-skills` does NOT load (skills): 02-skill-md-exists
+            # reports it as an ERROR; "Claude Code loads it" was false there until 0.23.0.
+            unloaded = ctx.layout != "plugin" and (is_anthropic_skills_name(declared)
+                                                  or is_anthropic_skills_name(name))
             report.add(
                 "32-skill-name-reserved", "WARN",
-                f"Skill name `{declared}` contains `{', '.join(hit)}`: Claude Code loads it, "
-                "but claude.ai and the Skills API reject reserved words in `name` "
+                f"Skill name `{declared}` contains `{', '.join(hit)}`: "
+                + ("outside a plugin Claude Code does not load it (02-skill-md-exists), and "
+                   if unloaded else "Claude Code loads it, but ")
+                + "claude.ai and the Skills API reject reserved words in `name` "
                 "(platform.claude.com, agent-skills best practices).",
                 loc)

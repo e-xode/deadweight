@@ -1,10 +1,18 @@
 """Sub-agents: frontmatter, tools, preloaded skills."""
 from __future__ import annotations
 
+import json
 import re
 
 from ..context import AuditContext
-from ..parsing.frontmatter import YAML_TRUE, frontmatter_keys, frontmatter_list, parse_frontmatter
+from ..parsing.frontmatter import (
+    YAML_TRUE,
+    frontmatter_keys,
+    frontmatter_list,
+    frontmatter_raw_value,
+    frontmatter_yaml_error,
+    parse_frontmatter,
+)
 from ..repo import readable_files
 from ..report import Report
 from ..vocabulary.frontmatter import (
@@ -12,7 +20,31 @@ from ..vocabulary.frontmatter import (
     AGENT_VALIDATED_KEYS,
     PLUGIN_AGENT_IGNORED_KEYS,
 )
-from ..vocabulary.tools import KNOWN_MODEL_TIERS, TOOL_ALIASES, TOOL_DEPRECATED, is_known_tool
+from ..vocabulary.tools import (
+    KNOWN_MODEL_ALIASES,
+    SUBAGENT_REMOVED_TOOLS,
+    TOOL_ALIASES,
+    TOOL_DEPRECATED,
+    is_documented_model,
+    is_known_tool,
+)
+
+
+def _main_thread_agents(ctx: AuditContext) -> set[str]:
+    """Agents named by the `agent` setting: they run as the main thread, not as subagents.
+
+    "To make it the default for every session in a project, set `agent` in
+    `.claude/settings.json`" (sub-agents, on running an agent as the main thread).
+    """
+    names = set()
+    for name in ("settings.json", "settings.local.json"):
+        try:
+            data = json.loads((ctx.root / ctx.claude_dir / name).read_text(encoding="utf-8-sig"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        if isinstance(data, dict) and isinstance(data.get("agent"), str):
+            names.add(data["agent"].strip())
+    return names
 
 
 def check_agents(ctx: AuditContext, report: Report) -> dict[str, dict]:
@@ -36,6 +68,35 @@ def check_agents(ctx: AuditContext, report: Report) -> dict[str, dict]:
             continue
         text = entry.read_text(encoding="utf-8")
         fm, _ = parse_frontmatter(text)
+        rel = entry.relative_to(agents_dir)
+        if not text.startswith("---") and text.lstrip().startswith("---"):
+            # A separate cause in the docs, and a different fix: the YAML may be fine.
+            report.add("08-agent-frontmatter", "ERROR",
+                       f"'{rel}' opens its frontmatter after line 1: Claude Code reads a file whose "
+                       "opening --- is not the first line as having no frontmatter and treats it "
+                       "as documentation, so this agent does not load (sub-agents). Make --- the "
+                       "first line.", str(entry))
+            continue
+        # parse_frontmatter is tolerant and reads fields out of a frontmatter Claude Code
+        # rejects whole: "YAML that doesn't parse: Claude Code reads no fields from the
+        # file, skips it" (sub-agents). Without this, such agents were counted as live.
+        yaml_error = frontmatter_yaml_error(text) if fm else None
+        if ctx.layout == "plugin" and (yaml_error or fm == {}):
+            # "A plugin subagent whose frontmatter has no `name` or doesn't parse still
+            # loads, under its filename" (sub-agents): no ERROR "does not load" here.
+            why = f"does not parse ({yaml_error})" if yaml_error else "is empty"
+            report.add("08-agent-frontmatter", "WARN",
+                       f"Plugin agent '{entry.stem}' has a frontmatter that {why}: it loads under "
+                       "its filename with no field read, so Claude has no description to decide "
+                       "when to delegate to it (sub-agents).", str(entry))
+            agents[entry.stem] = {"name": "", "description": "", "path": str(entry)}
+            continue
+        if yaml_error:
+            report.add("08-agent-frontmatter", "ERROR",
+                       f"'{rel}' has a frontmatter that does not parse as YAML ({yaml_error}): "
+                       "Claude Code reads no fields from it and skips this agent (sub-agents; "
+                       "shape rejected by `claude plugin validate` 2.1.294).", str(entry))
+            continue
         if not fm:
             # No frontmatter at all is a document someone keeps in agents/ (a routing
             # guide, a reference) - not loaded as an agent. A frontmatter that does not
@@ -44,7 +105,7 @@ def check_agents(ctx: AuditContext, report: Report) -> dict[str, dict]:
             report.add(
                 "08-agent-frontmatter",
                 "ERROR" if broken else "WARN",
-                f"'{entry.relative_to(agents_dir)}' " + (
+                f"'{rel}' " + (
                     "has a frontmatter that does not parse: this agent does not load."
                     if broken else
                     "has no frontmatter: it is not loaded as an agent. Documentation kept in "
@@ -76,11 +137,19 @@ def check_agents(ctx: AuditContext, report: Report) -> dict[str, dict]:
                 str(entry),
             )
         desc = fm.get("description", "").strip()
-        if desc and desc[0] in (">", "|"):
+        raw_desc = frontmatter_raw_value(text, "description") or ""
+        if desc and desc[0] in (">", "|") and raw_desc[:1] in (">", "|"):
+            # A quoted "> ..." is a description that starts with '>', and `>2`/`|2-` are
+            # block headers the parser now reads: neither reaches here. What is left is a
+            # header followed by text on the same line - not standard YAML, yet accepted
+            # by `claude plugin validate` 2.1.294. The parser's reading, not the file's fault.
             report.add(
                 "02-frontmatter-block-scalar",
-                "ERROR",
-                f"Agent '{entry.stem}' description parsed as a raw block-scalar indicator — frontmatter parser failed.",
+                "INFO",
+                f"Agent '{entry.stem}' description opens with '{raw_desc[0]}' followed by text on "
+                "the same line: this auditor's parser reads it as text starting with "
+                f"'{raw_desc[0]}', which strict YAML parsers reject. Quote the value to be read "
+                "the same everywhere.",
                 str(entry),
             )
         ident = (fm.get("name") or entry.stem).strip()
@@ -101,17 +170,23 @@ def check_agent_frontmatter_validity(ctx: AuditContext, report: Report, skills: 
         return
     inventory: dict[str, int] = {}
     unvalidated: dict[str, int] = {}
+    main_thread = _main_thread_agents(ctx)
     for entry in readable_files(agents_dir.rglob("*.md")):
         try:
             text = entry.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
         fm, _ = parse_frontmatter(text)
-        if not fm:
+        # A frontmatter Claude Code cannot parse has no field it reads: judging the
+        # fields this tolerant parser still extracts gave "unknown tool 'model: sonnet'".
+        if not fm or frontmatter_yaml_error(text):
             continue
+        ident = (fm.get("name") or entry.stem).strip()
+        as_main = ident in main_thread
 
         declared_tools = frontmatter_list(fm.get("tools", ""))
         unknown = []
+        removed = []
         for tool in declared_tools:
             base = tool.split("(", 1)[0].strip()
             if base in TOOL_DEPRECATED:
@@ -125,17 +200,34 @@ def check_agent_frontmatter_validity(ctx: AuditContext, report: Report, skills: 
                            f"'{TOOL_ALIASES[base]}' - still accepted as an alias.", str(entry))
                 continue
             if is_known_tool(tool):
+                if (base in SUBAGENT_REMOVED_TOOLS and not as_main
+                        and not (base == "ExitPlanMode" and fm.get("permissionMode", "").strip() == "plan")):
+                    removed.append(base)
                 continue
             unknown.append(tool)
         # The harness drops an entry it cannot resolve and launches with the rest; only
-        # an agent left with NO tool "fails to launch". Severity follows that.
+        # an agent left with NO tool "fails to launch". Severity follows that. A tool
+        # removed from every subagent resolves to nothing there either: "names a tool
+        # that isn't available to subagents" is one of the docs' two examples.
+        none_left = bool(declared_tools) and len(unknown) + len(removed) == len(declared_tools)
         for tool in unknown:
             report.add(
                 "23-agent-tools",
-                "ERROR" if len(unknown) == len(declared_tools) else "WARN",
+                "ERROR" if none_left else "WARN",
                 f"Agent '{entry.stem}' grants unknown tool '{tool}'. Unresolvable entries are "
                 "dropped; parameterised forms like 'Bash(git diff *)' and 'mcp__*' names are "
                 "accepted (tools-reference).",
+                str(entry),
+            )
+        for tool in removed:
+            report.add(
+                "23-agent-tools",
+                "ERROR" if none_left else "WARN",
+                f"Agent '{entry.stem}' grants '{tool}', which Claude Code removes from every "
+                "subagent even when listed (sub-agents)" + (
+                    ": no entry is left, and Claude Code usually refuses to launch a subagent "
+                    "with nothing resolvable." if none_left else
+                    ": as a subagent it runs without it."),
                 str(entry),
             )
 
@@ -156,19 +248,31 @@ def check_agent_frontmatter_validity(ctx: AuditContext, report: Report, skills: 
                 report.add(
                     "23-agent-skills-preload",
                     "WARN",
+                    # The flag marks workflows Claude must not start on its own, and Claude
+                    # Code tells Claude "not to reproduce the deploy steps another way"
+                    # (skills): advising to read the file by path got around it.
                     f"Agent '{entry.stem}' preloads '{preload}', which carries "
-                    "'disable-model-invocation: true' and cannot be preloaded. Read it by path instead: "
-                    f".claude/skills/{preload}/SKILL.md.",
+                    "'disable-model-invocation: true': the preload is skipped (sub-agents). "
+                    "Remove the entry, or drop the flag if Claude may invoke that skill on its "
+                    "own (skills).",
                     str(entry),
                 )
 
         model = fm.get("model", "").strip()
-        if model and model not in KNOWN_MODEL_TIERS and not model.startswith("claude-"):
+        if model and not is_documented_model(model):
+            # NOTICE, not WARN: the field takes "the same values as the `--model` flag"
+            # (sub-agents), which include a Foundry deployment name or a Vertex version
+            # name - free-form strings no vocabulary can rule out.
             report.add(
                 "23-agent-model",
-                "WARN",
-                f"Agent '{entry.stem}' declares model '{model}'. Expected one of "
-                f"{', '.join(sorted(KNOWN_MODEL_TIERS))} or a 'claude-*' model id.",
+                "NOTICE",
+                f"Agent '{entry.stem}' declares model '{model}', which is not a documented alias "
+                f"({', '.join(sorted(KNOWN_MODEL_ALIASES))}; [1m] goes on an alias other than inherit) nor a "
+                "'claude-*' model id or Bedrock ARN"
+                + (": model-config calls 'default' \"Not itself a model alias\"."
+                   if model == "default" else
+                   ". Fine if it is a provider deployment or version name, a typo otherwise "
+                   "(model-config)."),
                 str(entry),
             )
 
@@ -187,15 +291,30 @@ def check_agent_frontmatter_validity(ctx: AuditContext, report: Report, skills: 
                        f"Agent '{entry.stem}' declares bypassPermissions: since 2.1.267 a subagent "
                        "that declares it keeps the main conversation's mode instead (sub-agents).",
                        str(entry))
-        if re.search(r"\bAgent\([^)]*\)", fm.get("tools", "")):
+        # `Task(...)` too: the old name of the tool still resolves to Agent (tested 2026-10-08,
+        # 2.1.293: a `deny: ["Task"]` rule removes the Agent tool), and anthropics/claude-code
+        # #28277 restricts a subagent with `Task(a), Task(b)`.
+        spawn = re.search(r"\b(Agent|Task)\([^)]*\)", fm.get("tools", ""))
+        if spawn and not as_main:
             report.add("23-agent-tools", "WARN",
-                       f"Agent '{entry.stem}' restricts spawnable types with 'Agent(...)': that list "
+                       f"Agent '{entry.stem}' restricts spawnable types with '{spawn.group(1)}(...)': that list "
                        "applies only to an agent run as the main thread with `claude --agent`; in "
                        "a subagent definition it is ignored (sub-agents).", str(entry))
         if ":" in fm.get("name", ""):
             report.add("08-agent-frontmatter", "ERROR",
                        f"Agent '{entry.stem}' has a ':' in its name: the file is not loaded "
                        "(sub-agents, 2.1.218).", str(entry))
+        # The two other name rules of the same docs list, for the directories it covers
+        # ("a project, user, or managed `agents` directory").
+        name = fm.get("name", "")
+        if ctx.layout != "plugin" and name.startswith("-"):
+            report.add("08-agent-frontmatter", "ERROR",
+                       f"Agent '{entry.stem}' has a name starting with '-': Claude Code skips "
+                       "the file (sub-agents).", str(entry))
+        if ctx.layout != "plugin" and len(name) > 256:
+            report.add("08-agent-frontmatter", "ERROR",
+                       f"Agent '{entry.stem}' has a name of {len(name)} characters (> 256): "
+                       "Claude Code skips the file (sub-agents).", str(entry))
         if ctx.layout == "plugin":
             for key in sorted(PLUGIN_AGENT_IGNORED_KEYS & set(frontmatter_keys(text))):
                 report.add("23-agent-frontmatter-keys", "WARN",
@@ -207,8 +326,11 @@ def check_agent_frontmatter_validity(ctx: AuditContext, report: Report, skills: 
             if key not in AGENT_VALIDATED_KEYS:
                 unvalidated[key] = unvalidated.get(key, 0) + 1
                 report.add("23-agent-frontmatter-keys", "WARN",
-                           f"Agent '{entry.stem}' sets '{key}', which is not a subagent field: "
-                           "it is ignored without a word (sub-agents lists 18).", str(entry))
+                           # Undocumented is not proven ignored: `observer` is accepted by the
+                           # 2.1.266 bundle (anthropics/claude-code#93109). Say what is known.
+                           f"Agent '{entry.stem}' sets '{key}', which is not a documented subagent "
+                           f"field (sub-agents lists {len(AGENT_VALIDATED_KEYS)}): nothing guarantees it "
+                           "is read, now or after an update.", str(entry))
 
     if inventory:
         seen = ", ".join(f"{k} ({v})" for k, v in sorted(inventory.items()))

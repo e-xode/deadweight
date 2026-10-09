@@ -98,7 +98,9 @@ Custom agents were renamed from custom chat modes: "Custom agents were previousl
 chat modes. The functionality remains the same" (vscode-custom-agents), and "If you have existing
 `.chatmode.md` files, rename them to `.agent.md` and place them in one of the supported custom agent
 locations" (vscode-custom-agents). The supported workspace locations are `.github/agents` and, in
-Claude format, `.claude/agents`; `.github/chatmodes` is not among them (vscode-custom-agents) — the same host also recognizes a Claude-format
+Claude format, `.claude/agents`; `.github/chatmodes` is not among them (vscode-custom-agents), yet
+it is a deprecated location rather than an unread one: the [VS Code 1.106 release notes](https://code.visualstudio.com/updates/v1_106) say existing chat
+modes "continue to work and are automatically treated as custom agents" — the same host also recognizes a Claude-format
 location: "Workspace (Claude format): `.claude/agents` folder" (vscode-custom-agents).
 
 Naming and size limits for the cloud agent's `.agent.md` (create-custom-agents): "the filename may
@@ -184,10 +186,10 @@ These ids are implemented in `audit.py` (0.20.0), measured on public repositorie
 
 | Check | Reads | Fires on |
 | --- | --- | --- |
-| `56-copilot-chatmode` | `.github/chatmodes/*.chatmode.md` | file present in the old location — WARN. The workspace location is now `.github/agents` (vscode-custom-agents); the old path is not read by the renamed agent. |
+| `56-copilot-chatmode` | `.github/chatmodes/*.chatmode.md` | file present in the deprecated location — NOTICE. The workspace location is now `.github/agents` (vscode-custom-agents); VS Code still loads a chat mode as a custom agent (VS Code 1.106 release notes). |
 | `56-copilot-instructions-name` | files under `.github/instructions/` | a file not ending `.instructions.md` — WARN. The extension is part of the documented discovery contract (vscode-instructions); anything else is not read, without an error. |
 | `56-copilot-apply-to` | frontmatter of `.github/instructions/*.instructions.md` | `applyTo` glob matching no file in the repository — NOTICE, measured 4 of 18 real on 98 public repositories, most of the rest in toolkits that distribute instruction files (**House**: evaluated against the working tree, not documented behaviour, a design heuristic only); neither `applyTo` nor `description` present — NOTICE, since the file then requires manual attachment (vscode-instructions). |
-| `56-copilot-reads-claude-md` | `CLAUDE.md`, with Copilot files present | `CLAUDE.md` names a Claude Code-only mechanism (a built-in slash command, the `Task` or `Skill` tool, `.claude/agents`, `.claude/hooks`, `.claude/commands`) that Copilot's agent, CLI and code review read as instructions they cannot follow (NOTICE). Subagents and `.claude/rules/` are not counted: Copilot has custom agents, and VS Code reads `.claude/rules/`. |
+| `56-copilot-reads-claude-md` | `./CLAUDE.md` only, with Copilot files present | `CLAUDE.md` names a Claude Code-only mechanism (`/memory`, `/hooks`, `/doctor`, the `Task` or `Skill` tool, `.claude/commands`, `.claude/hooks`, `.claude/settings.json`) that Copilot's agent, CLI and code review read as instructions they cannot follow (NOTICE). Not counted: subagents and `.claude/rules/` (Copilot has custom agents, VS Code reads `.claude/rules/`), `.claude/agents` (VS Code: "Workspace (Claude format)"), the 13 slash commands the Copilot CLI reference documents, and `.claude/hooks` / `.claude/settings.json` when `.vscode/settings.json` sets `"chat.useClaudeHooks": true` (comments removed first: settings.json is JSON with Comments; VS Code hooks, off by default; a user-level setting is not visible from the repository). |
 
 **Not checked** (read it by hand, or ask the surface directly):
 

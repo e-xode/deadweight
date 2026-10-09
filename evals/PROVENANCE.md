@@ -335,3 +335,22 @@ every time it loaded the skill where it fails without it (19/19), and skipped th
 it judges its need by how simple the question looks. The 0.20.1 description, measured against the
 0.20.0 one with both models pinned, is in the CHANGELOG; the one case it does not fix
 (`permission-rule-inert`, 3/20 loads on Sonnet 5.5) already contains its trigger word for word.
+
+## Cases from public bug reports (2026-10-08)
+
+Three cases are built on the configuration a user posted in an `anthropics/claude-code` issue, with
+paths and names replaced by fictional `shop-*` ones. They are not written from the skill: the
+configuration and the failure come from someone who hit it. Found by reproducing 62 issues against
+`audit.py` 0.22.1, which stayed silent or gave a wrong fix on these.
+
+| Case | Issue | What the user wrote |
+| --- | --- | --- |
+| `absolute-path-deny-anchor` | #98443 (also #6850, #61268, #5140) | `Edit/Write/NotebookEdit(/absolute/path/...)` deny rules in `settings.local.json` |
+| `hook-matcher-permission-syntax` | #82314 | `"matcher": "Bash(git commit*)"` on `PreToolUse` |
+| `hook-script-missing` | #82323 | a guard hook whose script was deleted; the tool call went through |
+
+The documentation moved after #82323: a hook that cannot start is still non-blocking, but the
+transcript now shows a `hook error` notice (hooks, "Other exit codes", read 2026-10-08). The case is
+graded on the current documentation, not on the issue.
+| `user-scope-agent-key` | #93109 | an agent in `~/.claude/agents/` with `observer: true`, a key the 2.1.266 bundle accepts and the docs do not list |
+| `task-alias-spawn-list` | #28277 | a subagent restricted with `Task(a), Task(b)`; `Task` still resolves to `Agent` (tested 2026-10-08, 2.1.293) |

@@ -12,14 +12,18 @@ from ..report import Report, house, house_note
 
 # i18n-data: start — French on purpose, this is the check's own dictionary
 FRENCH_HEURISTIC_WORDS = {
-    "avec", "pour", "dans", "cette", "celui", "celle", "ceux", "celles",
+    "avec", "dans", "cette", "celui", "celle", "ceux", "celles",
     "vous", "nous", "etre", "tres", "donc", "ainsi",
     "depuis", "toujours", "jamais", "ensuite", "alors", "parce", "lorsque",
-    "fichier", "exemple", "doit", "peut", "faut", "selon",
+    "fichier", "exemple", "doit", "peut", "faut", "selon", "pour",
 }
 
 
 # i18n-data: end
+# DISTINCT words of the list, not occurrences. Counted per occurrence, three English
+# sentences opening with "Pour" (the verb) were reported as French (audit externe
+# 2026-10-08). Counted distinct, `pour` adds 1 at most, so it stays in the list: taking it
+# out as well let short French files through (audit externe 3, g4-04).
 FRENCH_HEURISTIC_THRESHOLD = 3
 
 
@@ -35,6 +39,9 @@ ENGLISH_ONLY_SUFFIX_EXEMPT = ".fr.md"
 
 LOCALE_MARKED_RE = re.compile(r"(?:[-_.](?:fr|de|es|it|pt|nl|ja|zh|ru|ar)\.[a-z]+$)"
                               r"|(?:/(?:fr|de|es|it|pt|nl|ja|zh|ru|ar)/)")
+# In a skill, only a FRENCH marking skips the file: the heuristic finds French only, and
+# `ship-it.md` or `use-de.md` are English names, not Italian or German (audit externe 3, g4-05).
+FRENCH_MARKED_RE = re.compile(r"(?:[-_.]fr\.[a-z]+$)|(?:/fr/)")
 
 
 def check_english_only(ctx: AuditContext, report: Report) -> None:
@@ -59,6 +66,11 @@ def check_english_only(ctx: AuditContext, report: Report) -> None:
             for p in readable_files(list(skill.rglob("*.md")) + list(skill.rglob("*.py"))
                             + list(skill.rglob("*.sh"))):
                 if p.name.endswith(ENGLISH_ONLY_SUFFIX_EXEMPT):
+                    continue
+                # The locale marking src/ already honoured: `guide-fr.md` or `fr/guide.md`
+                # in a skill declares its language as plainly as `guide.fr.md`. Prose only,
+                # and read below the skill folder: `run-it.py` is not Italian.
+                if p.suffix == ".md" and FRENCH_MARKED_RE.search("/" + p.relative_to(skill).as_posix()):
                     continue
                 targets.append(p)
     src_dir = root / "src"
@@ -98,12 +110,12 @@ def check_english_only(ctx: AuditContext, report: Report) -> None:
             text = "\n".join(kept)
         stripped = strip_code_fences(text).lower()
         words = re.findall(r"[a-zàâçéèêëîïôûùüÿñæœ']+", stripped)
-        hits = sum(1 for w in words if w in FRENCH_HEURISTIC_WORDS)
+        hits = len(set(words) & FRENCH_HEURISTIC_WORDS)
         if hits >= FRENCH_HEURISTIC_THRESHOLD:
             report.add(
                 "11-english-only",
                 house(ctx),
-                f"File appears to contain French content ({hits} heuristic hits)."
+                f"File appears to contain French content ({hits} distinct heuristic words)."
                 + house_note("English only", "set the language explicitly; nothing requires English"),
                 str(path),
             )
@@ -115,8 +127,9 @@ def check_no_code_comments_in_skills(ctx: AuditContext, report: Report) -> None:
     if not skills_dir.is_dir():
         return
     for skill_md in readable_files(skills_dir.glob("*/SKILL.md")):
-        text = skill_md.read_text(encoding="utf-8")
-        stripped = strip_code_fences(text)
+        # Not valid UTF-8: check_skills says so for the file; this check still reads the rest.
+        text = skill_md.read_text(encoding="utf-8", errors="replace")
+        stripped = strip_code_fences(text, indented=True)
         if re.search(r"^\s*//", stripped, re.MULTILINE):
             report.add(
                 "12-no-code-comments",

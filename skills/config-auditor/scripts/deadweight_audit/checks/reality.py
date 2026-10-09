@@ -6,15 +6,21 @@ import re
 from pathlib import Path
 
 from ..context import AuditContext
-from ..parsing.markdown import fenced_spans, inline_code_spans
+from ..parsing.markdown import fenced_spans, inline_code_spans, memory_imports
 from ..repo import readable_files, git_ignored, nested_prefix, tracked_paths
 from ..report import Report
 
 
 # ancrage
-ANCHOR_SEVERITY = "WARN"   # ratchet: move to "ERROR" once this repository is at zero
+# WARN in a SKILL.md where 28-config-anchors is a NOTICE: measured, not assumed - after the
+# 0.17.0 resolution chain, 10 of 11 dead skill anchors on a public sample were real
+# (CHANGELOG 0.17.0), against ~75% expected false in instruction files. One small sample:
+# re-measure before moving it either way. Ratchet: "ERROR" once this repository is at zero.
+ANCHOR_SEVERITY = "WARN"
 
 
+# Only paths through one of the folders below are read: a skill naming only `docs/` or
+# `config/` paths is not checked at all, and the falsifiability figure says so.
 # The WHOLE path, never its tail. The first version opened on `\b(?:src|...)/`, and
 # `/` is not a word character, so there is a word boundary before every segment:
 # `.claude/skills/<skill>/scripts/measure.mjs` matched as `scripts/measure.mjs`, was
@@ -22,11 +28,14 @@ ANCHOR_SEVERITY = "WARN"   # ratchet: move to "ERROR" once this repository is at
 # 10 dead anchors out of 10 were live paths cut in half - and the bug was there from
 # the first release that shipped this check, not introduced later. Absolute paths
 # are captured too, so they are reported as unverifiable instead of vanishing.
+ANCHOR_DIRS = "src|server|scripts|electron|docker|app|lib|packages|test|tests"
+
+
 ANCHOR_PATH_RE = re.compile(
     # `:` too: `package:other/src/internal.dart` is a Dart import URI, not a path
     # (second public sample, 2026-09-27).
     r"(?<![\w./~$}:-])((?:/|~/|(?:\.{1,2}/)*)(?:[\w.-]+/)*?"
-    r"(?:src|server|scripts|electron|docker|app|lib|packages|test|tests)"
+    rf"(?:{ANCHOR_DIRS})"
     r"/[A-Za-z0-9_./-]+\.[a-z]{2,4})\b(?!\.\w)"   # not the `.yml` of `x.yml.template`
 )
 
@@ -91,7 +100,7 @@ _VERIFY_RE = re.compile(r"\b(?:test|tests|lint|check|typecheck|type-check|build|
 def _repo_commands(root: Path) -> dict:
     """npm scripts, make targets and just recipes the repository defines - None where it has no such file."""
     tracked = [t for t in tracked_paths(root) if "node_modules/" not in t]
-    out: dict = {"npm": None, "make": None, "just": None, "make_pattern": False}
+    out: dict = {"npm": None, "make": None, "just": None, "make_pattern": False, "just_partial": False}
     for t in tracked:
         base = t.rsplit("/", 1)[-1]
         try:
@@ -100,13 +109,21 @@ def _repo_commands(root: Path) -> dict:
                 out["npm"] = (out["npm"] or set()) | set(sc)
             elif base in ("Makefile", "makefile", "GNUmakefile") or base.endswith(".mk"):
                 txt = (root / t).read_text(encoding="utf-8", errors="replace")
-                out["make"] = (out["make"] or set()) | set(re.findall(r"^([A-Za-z0-9_./-]+)\s*:(?!=)", txt, re.M))
+                # "The targets are file names, separated by spaces" (GNU make manual): a rule
+                # `build test: deps` defines both. Until 0.23.0 only a one-name left side was
+                # read, and `make build` / `make test` were reported undefined (external
+                # audit, 2026-10-08).
+                heads = re.findall(r"^([A-Za-z0-9_./-]+(?:[ \t]+[A-Za-z0-9_./-]+)*)[ \t]*:(?!=)", txt, re.M)
+                out["make"] = (out["make"] or set()) | {t for h in heads for t in h.split()}
                 # A pattern rule, or an `include`, defines targets this reading cannot list
                 # (3 false findings on openshift-style boilerplate among 600 repositories).
                 out["make_pattern"] |= bool(re.search(r"^%[^:\n]*:|^-?include\s", txt, re.M))
             elif base.lower() in ("justfile", ".justfile"):
                 txt = (root / t).read_text(encoding="utf-8", errors="replace")
                 out["just"] = (out["just"] or set()) | set(re.findall(r"^@?([A-Za-z0-9_-]+)(?:\s[^:=\n]*)?:(?!=)", txt, re.M))
+                # `import` and `mod` pull recipes from other files (just manual, "Imports",
+                # "Modules"), which this reading does not follow - the `include` of make.
+                out["just_partial"] |= bool(re.search(r"^(?:import|mod)\??[ \t]+\S", txt, re.M))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError, AttributeError):
             continue
     return out
@@ -120,6 +137,39 @@ def _instruction_files(root: Path) -> list[Path]:
         if base.is_dir():
             files += readable_files(base.rglob("*.md"))
     return files
+
+
+def _imported_files(root: Path, start: Path, depth: int = 4) -> list[Path]:
+    """Files `@path`-imported from `start`, recursively.
+
+    "Imported files are expanded and loaded into context at launch alongside the CLAUDE.md
+    that references them", relative to the importing file, "with a maximum depth of four
+    hops"; code spans and fenced blocks are skipped (memory). Until 0.23.0 check 53 read
+    CLAUDE.md alone, so `@AGENTS.md` naming `npm test` gave a false notice (external
+    audit, 2026-10-08). Paths outside the repository are not followed.
+    """
+    seen: list[Path] = []
+    frontier = [start]
+    resolved_root = root.resolve()
+    for _ in range(depth):
+        nxt = []
+        for f in frontier:
+            try:
+                text = f.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            # The shared parser: indented code and escaped spaces as the harness reads them
+            # (audit externe 3, g7-01 and g7-02).
+            for ref in memory_imports(text):
+                if ref.startswith("~/"):
+                    continue
+                target = (f.parent / ref).resolve()
+                if target.is_file() and resolved_root in target.parents and target not in seen \
+                        and target != start.resolve():
+                    seen.append(target)
+                    nxt.append(target)
+        frontier = nxt
+    return seen
 
 
 def check_repository_reality(ctx: AuditContext, report: Report) -> None:
@@ -171,6 +221,12 @@ def check_repository_reality(ctx: AuditContext, report: Report) -> None:
                     if w in ("-C", "-f", "--directory", "--file", "-I", "-o", "-W"):
                         i += 2
                         continue
+                    # `-j [jobs]` and `-l [load]` take an optional number: `make -j 4 build`
+                    # names `build`, not `4` (external audit, 2026-10-08).
+                    if w in ("-j", "--jobs", "-l", "--load-average", "--max-load") \
+                            and i + 1 < len(word_set) and re.fullmatch(r"\d+(?:\.\d+)?", word_set[i + 1]):
+                        i += 2
+                        continue
                     if w.startswith("-") or "=" in w:
                         i += 1
                         continue
@@ -178,7 +234,7 @@ def check_repository_reality(ctx: AuditContext, report: Report) -> None:
                     break
                 if target and target not in cmds["make"]:
                     dead.append(f"make {target}")
-        if cmds["just"] is not None:
+        if cmds["just"] is not None and not cmds["just_partial"]:
             for name in _JUST_RE.findall(code):
                 if name not in cmds["just"] and not name.endswith("-"):
                     dead.append(f"just {name}")
@@ -223,7 +279,8 @@ def check_repository_reality(ctx: AuditContext, report: Report) -> None:
                       if _VERIFY_RE.fullmatch(n.split(":")[0])})
     claude_md = next((root / n for n in ("CLAUDE.md", ".claude/CLAUDE.md") if (root / n).is_file()), None)
     if defines and claude_md is not None:
-        told = " ".join(p.read_text(encoding="utf-8", errors="replace") for p in _instruction_files(root))
+        told = " ".join(p.read_text(encoding="utf-8", errors="replace")
+                        for p in _instruction_files(root) + _imported_files(root, claude_md))
         if not re.search(r"\b(?:test|lint|typecheck|type-check|build|check|verify|pytest|cargo|go test|tsc|eslint|ruff|mypy|vitest|jest)\b",
                          told, re.I):
             report.add("53-no-verification-command", "NOTICE",
@@ -290,9 +347,14 @@ def check_skill_anchors(ctx: AuditContext, report: Report) -> None:
         report.add(
             "28-skill-anchors",
             "INFO",
-            f"Falsifiability: {anchored}/{total} skills name at least one checkable path "
-            f"({100 * anchored / total:.0f}%). Live anchors {alive}, dead {dead}. "
-            "A skill that names nothing verifiable cannot be proven wrong - it can only rot quietly.",
+            f"Falsifiability: {anchored}/{total} skills name at least one path this check reads "
+            f"- one through {ANCHOR_DIRS.replace('|', '/, ')}/ ({100 * anchored / total:.0f}%). "
+            # Scoped to this check: 20-relative-links does verify markdown links into docs/
+            # (audit externe 3, g7-03).
+            f"Live anchors {alive}, dead {dead}. This check does not read paths elsewhere "
+            "(`docs/`, `config/`...); markdown links are verified separately, by 20-relative-links. "
+            "A skill whose paths go unchecked cannot be shown wrong by this check - it can only "
+            "rot quietly.",
             str(skills_dir),
         )
     if unverifiable:

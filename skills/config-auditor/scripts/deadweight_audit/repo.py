@@ -69,6 +69,63 @@ def claude_md_path(root: Path) -> Path:
     return root / "CLAUDE.md"
 
 
+def project_memory_files(root: Path) -> list[Path]:
+    """Every project memory file that exists: ./CLAUDE.md, ./.claude/CLAUDE.md, ./CLAUDE.local.md.
+
+    claude_md_path() picks ONE, for the checks that need the file a table lives in. What
+    loads is all of them: "All discovered files are concatenated into context rather than
+    overriding each other", and CLAUDE.local.md "loads alongside CLAUDE.md and is treated
+    the same way" (memory). Measuring the first only let a 300-line .claude/CLAUDE.md pass
+    beside a one-line ./CLAUDE.md (audit externe 2026-10-08, P2-A--06).
+    """
+    # Each file once, by real path: a .claude/CLAUDE.md linked to ./CLAUDE.md is one file,
+    # and was reported twice by 01 while 17 counted it once (audit externe 3, g4-06).
+    seen: set[str] = set()
+    out: list[Path] = []
+    for p in (root / "CLAUDE.md", root / ".claude" / "CLAUDE.md", root / "CLAUDE.local.md"):
+        real = os.path.realpath(p)
+        if p.is_file() and real not in seen:
+            seen.add(real)
+            out.append(p)
+    return out
+
+
+IMPORT_MAX_HOPS = 4   # "a maximum depth of four hops" (memory)
+
+
+def expand_imports(path: Path) -> list[Path]:
+    """The files a memory file pulls in at launch through `@path` imports, recursively.
+
+    "Imported files are expanded and loaded into context at launch"; "Relative paths
+    resolve relative to the file containing the import, not the working directory";
+    "a maximum depth of four hops" (memory). `~/` and absolute paths are skipped: they
+    depend on the machine. Each file once, by real path; the importing file excluded.
+    """
+    from .parsing.markdown import memory_imports
+    seen = {os.path.realpath(path)}
+    found: list[Path] = []
+    frontier = [path]
+    for _ in range(IMPORT_MAX_HOPS):
+        nxt = []
+        for f in frontier:
+            try:
+                text = f.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            for ref in memory_imports(text):
+                if ref.startswith(("~/", "/")):
+                    continue
+                target = f.parent / ref
+                real = os.path.realpath(target)
+                if real in seen or not target.is_file():
+                    continue
+                seen.add(real)
+                found.append(target)
+                nxt.append(target)
+        frontier = nxt
+    return found
+
+
 def is_vendored_skill(skill_dir: Path) -> bool:
     """A skill shipping its own LICENSE is upstream code vendored verbatim.
 
@@ -95,9 +152,14 @@ def tracked_paths(root: Path) -> list[str]:
     Not `ls-files` alone: a file created and not yet added is there for the model,
     and calling an anchor to it dead was wrong on the first negative control.
     """
-    r = subprocess.run(["git", "-C", str(root), "ls-files", "--cached", "--others",
-                        "--exclude-standard"], capture_output=True, text=True)
-    if r.returncode == 0:
+    # Git absent or failing falls back to the walk: it raised FileNotFoundError, and the
+    # checks that list the tree crashed on a machine without git (external audit 3, 2026-10-08).
+    try:
+        r = subprocess.run(["git", "-C", str(root), "ls-files", "--cached", "--others",
+                            "--exclude-standard"], capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        r = None
+    if r is not None and r.returncode == 0:
         return r.stdout.splitlines()
     return [str(p.relative_to(root)) for p in root.rglob("*")
             if p.is_file() and ".git" not in p.parts]
@@ -106,6 +168,44 @@ def tracked_paths(root: Path) -> list[str]:
 def nested_prefix(rel: str, tracked: list[str]) -> str | None:
     """The directory under which `rel` exists, when it does not exist at the root."""
     return next((t[: -len(rel)] for t in tracked if t.endswith("/" + rel)), None)
+
+
+def git_tracked(root: Path, rel: str) -> str:
+    """What git says of `rel` (relative to `root`): "tracked", "untracked", "outside" (no
+    repository) or "unknown" (git missing, timed out or failing otherwise).
+
+    Asked of git, which finds the enclosing repository even when `root` is a subfolder of
+    it: testing `root / ".git"` read a file committed above the audit root as untracked
+    (external audit 3, 2026-10-08). Each caller decides what "unknown" is worth.
+    """
+    try:
+        r = subprocess.run(["git", "-C", str(root), "ls-files", "--error-unmatch", "--", rel],
+                           capture_output=True, text=True, timeout=10,
+                           env={**os.environ, "LC_ALL": "C", "LANGUAGE": "C"})
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+    if r.returncode == 0:
+        return "tracked"
+    if "not a git repository" in r.stderr:
+        return "outside"
+    return "untracked" if r.returncode == 1 else "unknown"
+
+
+def git_ignores(root: Path, rel: str) -> bool:
+    """Whether the repository's own rules ignore `rel`, whatever folder of it `root` is.
+
+    Outside a repository, or without git, nothing is ignored.
+    """
+    try:
+        # The REPOSITORY's rules only: a user's global excludes file made the
+        # same commit read differently on two machines (measured 2026-09-23 -
+        # `**/.claude/settings.local.json` sat in ~/.config/git/ignore).
+        r = subprocess.run(["git", "-C", str(root), "-c", "core.excludesFile=",
+                            "check-ignore", "-q", "--", rel],
+                           capture_output=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return r.returncode == 0
 
 
 def git_ignored(root: Path):
@@ -123,16 +223,7 @@ def git_ignored(root: Path):
 
     def ignored(rel: str) -> bool:
         if rel not in cache:
-            try:
-                # The REPOSITORY's rules only: a user's global excludes file made the
-                # same commit read differently on two machines (measured 2026-09-23 -
-                # `**/.claude/settings.local.json` sat in ~/.config/git/ignore).
-                r = subprocess.run(["git", "-C", str(root), "-c", "core.excludesFile=",
-                                    "check-ignore", "-q", "--", rel],
-                                   capture_output=True, timeout=5)
-                cache[rel] = r.returncode == 0
-            except (OSError, subprocess.SubprocessError):
-                cache[rel] = False
+            cache[rel] = git_ignores(root, rel)
         return cache[rel]
     return ignored
 

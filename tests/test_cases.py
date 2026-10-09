@@ -35,6 +35,16 @@ def audit(root: Path, *opts: str) -> dict:
     return json.loads(out.getvalue())
 
 
+def case_sensitive(tmp: str) -> bool:
+    """Whether this filesystem keeps `a` and `A` apart: macOS and Windows do not by default."""
+    probe = Path(tmp) / "case-probe"
+    probe.write_bytes(b"")
+    try:
+        return not (Path(tmp) / "CASE-PROBE").exists()
+    finally:
+        probe.unlink()
+
+
 def build(case: dict, tmp: str) -> Path:
     root = Path(tmp) / "shop-api"
     for rel, content in case["files"].items():
@@ -60,6 +70,8 @@ class LabelledCases(unittest.TestCase):
     def test_cases(self) -> None:
         for case in CASES:
             with self.subTest(case["id"]), tempfile.TemporaryDirectory() as tmp:
+                if case.get("case_sensitive_fs") and not case_sensitive(tmp):
+                    continue                          # two names differing by case cannot both exist here
                 try:
                     root = build(case, tmp)
                 except OSError as exc:            # symlinks need a privilege on Windows
@@ -85,6 +97,16 @@ class LabelledCases(unittest.TestCase):
                     continue                      # a known defect: kept to be seen, not to fail
                 self.assertEqual(crashed, [], "a check crashed")
                 self.assertEqual(gaps, [])
+
+    def test_a_check_held_silent_is_also_seen_firing(self) -> None:
+        # A case expecting 0 also passes when the check never fires at all: with 13 such checks
+        # switched off, every test still passed (audit, 2026-10-08). So a check with a zero case
+        # needs a case where it fires - unless it is retired, or is the crash report.
+        from deadweight_audit.catalog import RETIRED_CHECK_IDS
+        firing = {c for case in CASES for c, _s, n in case["expected"] if n > 0}
+        silent = {c for case in CASES for c, _s, n in case["expected"] if n == 0}
+        exempt = set(RETIRED_CHECK_IDS) | {"00-check-crashed"}
+        self.assertEqual(sorted(silent - firing - exempt), [])
 
 
 if __name__ == "__main__":

@@ -44,7 +44,16 @@ def check_doctrine_copy(ctx: AuditContext, report: Report) -> None:
         except (OSError, UnicodeDecodeError):
             continue
         share = sum(1 for t in terms if t in DOCTRINE_CODE_TERMS) / len(terms) if terms else 0.0
-        same_name = f.name in DOCTRINE_REFERENCE_NAMES
+        # The name alone only for names no other subject uses: `skill-anatomy.md` is about
+        # this plugin's subject, `antipatterns.md` or `audit-checklist.md` can be about
+        # anything (a React review skill's antipatterns.md fired, audit externe 2026-10-08).
+        # A copy under a generic name is caught by its terms once it holds
+        # DOCTRINE_COPY_MIN_TERMS of them; a fragment of 25 lines may hold fewer.
+        # `skill-runtime-mechanisms.md` names this subject as plainly as an anatomy does
+        # (external audit 3, g8-01); `semantic-layer.md` and `runtime-data.md` are data
+        # vocabulary too, and stay with the generic names.
+        same_name = f.name in DOCTRINE_REFERENCE_NAMES and (
+            f.name.endswith("-anatomy.md") or f.name == "skill-runtime-mechanisms.md")
         if not (same_name or (len(terms) >= DOCTRINE_COPY_MIN_TERMS and share >= DOCTRINE_COPY_OVERLAP)):
             continue
         why = (f"is named like this plugin's references/{f.name}" if same_name else

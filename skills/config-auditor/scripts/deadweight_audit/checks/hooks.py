@@ -66,9 +66,99 @@ def hook_paths(command: str) -> list[str]:
         # `go vet ./...`, `src/**/*.ts`: a pattern the tool expands, not a file.
         if "..." in clean or any(c in clean for c in "*?["):
             continue
-        if clean.startswith(HOOK_PLUGIN_ROOT_VARS + HOOK_PROJECT_DIR_VARS + ("./",)):
+        if clean.startswith(HOOK_PLUGIN_ROOT_VARS + HOOK_PROJECT_DIR_VARS + ("./",) + HOME_PREFIXES):
+            out.append(clean)
+        # An absolute path, or a bare relative one, is a script only when it looks like one:
+        # `/dev/null`, `src/app` or a jq path are arguments, not files to run. Unchecked before
+        # 2026-10-08 (anthropics/claude-code#82323 asks for exactly this check).
+        elif SCRIPT_RE.search(clean) and not clean.startswith(("-", "$", "{")):
             out.append(clean)
     return out
+
+
+HOME_PREFIXES = ("~/", "$HOME/", "${HOME}/")
+
+
+# Words after which the next word is still the program the shell executes: keywords that
+# open a command list, and wrappers that exec their argument (the execute bit is checked
+# either way: `timeout 10 x.sh`, `exec x.sh`, `{ x.sh; }` fail with 126 when it is missing,
+# measured under sh -c, audit 3 g6-00).
+_SHELL_RESET_WORDS = {"if", "then", "else", "elif", "do", "while", "until", "{", "!", "time"}
+_EXEC_WRAPPERS = {"exec", "command", "nohup", "nice", "env", "timeout", "stdbuf", "xargs"}
+
+
+def _runs_directly(hook: dict, token: str) -> bool:
+    """True when `token` is the program a hook executes, not an argument to one.
+
+    Shell form goes to `sh -c` (hooks): `ruby x.rb` and `uv run x.py` hand the file to an
+    interpreter, which needs no execute bit. Only the first word of a simple command - at
+    the start, after `;`, `&&`, `||`, `|`, `(`, a newline or a keyword such as `then` or
+    `{` - is executed itself, and a wrapper such as `timeout 10` or `exec` passes the word
+    after its options on to be executed. Exec form runs `command`. A fixed list of
+    interpreter names missed ruby, perl, uv, deno, bun, pwsh (audit 2026-10-08), and a
+    substring test on it could hide a direct run.
+    """
+    command = str(hook.get("command", ""))
+    if isinstance(hook.get("args"), list):
+        return command == token
+    try:
+        lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|()<>\n")
+        lexer.whitespace = " \t\r"
+        lexer.whitespace_split = True
+        tokens = list(lexer)
+    except ValueError:
+        return True                       # unparsable: keep the old, cautious verdict
+    first = True
+    wrapped = False                       # after a wrapper: skip its options and numbers
+    target = False                        # the word after a redirect is a file, not the program
+    lookup = False                        # `command -v x` looks x up, it does not run it
+    prev = ""                             # the wrapper the options belong to
+    for tok in tokens:
+        # `./x.sh>/dev/null` is `./x.sh` then a redirect (external audit 4, ag-00): `<` and
+        # `>` split words, and neither they nor their file start a new command.
+        if tok and set(tok) <= set("<>&") and set(tok) & set("<>"):
+            target = True
+            continue
+        if target:
+            target = False
+            continue
+        if tok and set(tok) <= set(";&|()\n"):
+            first, wrapped, lookup = True, False, False
+            continue
+        if lookup:
+            continue
+        if first and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tok):
+            continue                      # `VAR=1 ./x.sh`: an assignment, not the program
+        if first and tok in _SHELL_RESET_WORDS:
+            continue
+        if first and tok in _EXEC_WRAPPERS:
+            wrapped, prev = True, tok
+            continue
+        if first and wrapped and tok in ("-v", "-V") and prev == "command":
+            lookup = True                 # external audit 4, ag-01
+            continue
+        if first and wrapped and re.match(r"^(-.*|\d+(\.\d+)?[smhd]?)$", tok):
+            continue                      # `timeout -k 5 10`, `nice -n 10`
+        if first and tok == token:
+            return True
+        first = wrapped = False
+    return False
+
+
+def _dot_slash_hint(ctx: AuditContext, root: Path, decl: Path, token: str) -> str:
+    """Why a `./` hook path is missing, and the path that works.
+
+    hooks: "Handlers run in the current directory", which "follows Claude": a `./` path
+    in a skill's or agent's frontmatter is NOT read from that file's folder.
+    """
+    hint = (". A `./` path is read from the current directory, which follows Claude's `cd`, "
+            "not from the folder of the file that declares the hook (hooks)")
+    beside = decl.parent / token[2:]
+    if decl.suffix == ".md" and beside.exists() and ctx.layout != "plugin":
+        hint += (f"; the script exists at '{beside.relative_to(root)}': write "
+                 f"\"$CLAUDE_PROJECT_DIR\"/{beside.relative_to(root)}")
+    return hint
+SCRIPT_RE = re.compile(r"\.(sh|bash|zsh|py|js|mjs|cjs|ts|rb|pl|ps1)$")
 
 
 def check_hooks(ctx: AuditContext, report: Report) -> None:
@@ -202,6 +292,24 @@ def _audit_hooks(ctx: AuditContext, report: Report, hooks, rel: str, path: Path,
                            f"{where} matches '{m}', a bare MCP server prefix: it is compared "
                            f"as an exact string and matches no tool. Use '{m}__.*' (hooks).",
                            str(path))
+            # A matcher written as a permission rule, `Bash(git commit*)` (anthropics/claude-code
+            # #82314): it holds parentheses, so it is a regular expression tested against the
+            # TOOL NAME only (hooks, "Matchers"), and `Bash(git commit*)` matches no tool name.
+            # The argument filter belongs in the handler's `if` field. Judged by running the
+            # pattern on the tool it names: `Edit(.*)` does match `Edit` and is left alone.
+            pr = re.fullmatch(r"\s*([A-Za-z_]+)\((.*)\)\s*", m) if isinstance(m, str) else None
+            if (event in HOOK_TOOL_EVENTS and pr
+                    and (pr.group(1) in KNOWN_TOOLS or pr.group(1) in TOOL_ALIASES)):
+                try:
+                    fires = re.search(m, pr.group(1)) is not None
+                except re.error:
+                    fires = False
+                if not fires:
+                    report.add("35-hooks-matcher", "ERROR",
+                               f"{where} in '{rel}' has matcher '{m}', written as a permission rule. "
+                               "A matcher is compared with the tool name only, so this group never "
+                               f"fires on '{event}'. Write the matcher '{pr.group(1)}' and put "
+                               f"'{m.strip()}' in the handler's `if` field (hooks).", str(path))
             # "Matchers are case-sensitive" (hooks-guide), and a matcher made only of
             # letters, digits, `_ - , |` and spaces is compared as exact names (hooks):
             # `bash`, `Create` or `MCP` on a tool event matches no tool, ever.
@@ -297,10 +405,16 @@ def _audit_hooks(ctx: AuditContext, report: Report, hooks, rel: str, path: Path,
                                f"{spot} in '{rel}' is a command hook with no 'command'.",
                                str(path))
                     continue
-                if "timeout" not in hook:
+                # hooks: "Claude Code doesn't enforce it on a command hook you run with
+                # `async: true`" - such a hook blocks nothing, and a timeout does nothing.
+                # `asyncRewake` keeps an enforced timeout, so it stays in.
+                if "timeout" not in hook and not (hook.get("async") is True
+                                                  and not hook.get("asyncRewake")):
                     default = HOOK_EVENT_TIMEOUT.get(event, HOOK_DEFAULT_TIMEOUT)
-                    report.add("35-hooks-timeout",
-                               "WARN" if default >= 60 else "NOTICE",
+                    # NOTICE everywhere: `timeout` is optional and the docs recommend no value;
+                    # no harm of the 600s default is documented or measured here (audit
+                    # 2026-10-08). It was the most frequent finding of the 35 family.
+                    report.add("35-hooks-timeout", "NOTICE",
                                f"{spot} in '{rel}' sets no 'timeout': the default on '{event}' "
                                f"is {default}s"
                                + (" (a budget shared by every SessionEnd hook)."
@@ -318,6 +432,10 @@ def _audit_hooks(ctx: AuditContext, report: Report, hooks, rel: str, path: Path,
                     resolved = token
                     for var in HOOK_PLUGIN_ROOT_VARS + HOOK_PROJECT_DIR_VARS:
                         resolved = resolved.replace(var, str(root))
+                    outside = token.startswith(HOME_PREFIXES) or token.startswith("/")
+                    for pre in HOME_PREFIXES:
+                        if resolved.startswith(pre):
+                            resolved = str(Path.home() / resolved[len(pre):])
                     # removeprefix, not lstrip: lstrip strips a SET of
                     # characters, so "./.claude/x" lost its dot-directory and
                     # a live script was reported dead. Caught by the negative
@@ -325,12 +443,20 @@ def _audit_hooks(ctx: AuditContext, report: Report, hooks, rel: str, path: Path,
                     rel_tok = resolved[2:] if resolved.startswith("./") else resolved
                     target = Path(rel_tok) if rel_tok.startswith("/") else root / rel_tok
                     if not target.exists():
+                        where_txt = (" on this machine: a path outside the repository resolves "
+                                     "per machine, so it is missing for everyone else too unless "
+                                     "they install it" if outside else
+                                     _dot_slash_hint(ctx, root, path, token) if token.startswith("./") else
+                                     "" if token.startswith(HOOK_PLUGIN_ROOT_VARS + HOOK_PROJECT_DIR_VARS) else
+                                     " from the project root. A bare relative path is read from the "
+                                     "current directory, which follows Claude's `cd`: prefer "
+                                     "\"$CLAUDE_PROJECT_DIR\"/... (hooks)")
                         report.add("35-hooks-command", "ERROR",
-                                   f"{spot} in '{rel}' runs '{token}', which does not exist. A "
+                                   f"{spot} in '{rel}' runs '{token}', which does not exist{where_txt}. A "
                                    "dead anchor that executes is worse than one that is read.",
                                    str(path))
                     elif target.is_file() and not os.access(target, os.X_OK) \
-                            and not any(c in command for c in ("python", "node", "bash", "sh ")):
+                            and _runs_directly(hook, token):
                         report.add("35-hooks-command", "WARN",
                                    f"{spot} in '{rel}' runs '{token}' directly, but it is not "
                                    "executable (chmod +x).", str(path))

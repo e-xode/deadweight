@@ -15,10 +15,17 @@ SENSITIVE_ENV_RE = re.compile(r"^(ANTHROPIC_(BASE_URL|API_KEY|AUTH_TOKEN|CUSTOM_
                               r"|.*(_TOKEN|_API_KEY|_SECRET|PASSWORD))$")
 
 
-# "The covered names are" ... credentials read as EMPTY in an MCP url or header (mcp).
+# "The covered names are" ... credentials read as EMPTY in an MCP url or header (mcp). The
+# docs give five as examples ("such as"); the second line is MEASURED on 2.1.294
+# (2026-10-08): each reached a local http server as an empty header, set or unset, with or
+# without a :-default, while AWS_ACCESS_KEY_ID, GITHUB_TOKEN and a name of one's own expanded.
 MCP_EMPTY_CREDENTIAL_VARS = re.compile(
-    r"\$\{(ANTHROPIC_API_KEY|ANTHROPIC_AUTH_TOKEN|AWS_BEARER_TOKEN_BEDROCK|HTTPS_PROXY"
-    r"|NPM_TOKEN)(:-[^}]*)?\}")
+    r"\$\{(ANTHROPIC_API_KEY|ANTHROPIC_AUTH_TOKEN|AWS_BEARER_TOKEN_BEDROCK|HTTPS_PROXY|NPM_TOKEN"
+    r"|AWS_SESSION_TOKEN|AWS_SECRET_ACCESS_KEY|CLAUDE_CODE_OAUTH_TOKEN|ANTHROPIC_FOUNDRY_API_KEY"
+    r"|ANTHROPIC_CUSTOM_HEADERS|AZURE_CLIENT_SECRET|GOOGLE_APPLICATION_CREDENTIALS|NODE_AUTH_TOKEN"
+    r")(:-[^}]*)?\}")
+MCP_DOCUMENTED_EMPTY = frozenset({"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "AWS_BEARER_TOKEN_BEDROCK",
+                                  "HTTPS_PROXY", "NPM_TOKEN"})
 
 
 # --- MCP ----------------------------------------------------------------------
@@ -78,4 +85,7 @@ def check_mcp(ctx: AuditContext, report: Report) -> None:
                     report.add("43-mcp-credential-var", "ERROR",
                                f"MCP server '{srv}' {where} uses ${{{m.group(1)}}}: in a remote "
                                "server's url and headers this name reads as EMPTY, whether set "
-                               "or not, and a :-default is ignored (mcp).", str(path))
+                               "or not, and a :-default is ignored (" + (
+                                   "mcp" if m.group(1) in MCP_DOCUMENTED_EMPTY else
+                                   "measured on Claude Code 2.1.294; the mcp docs list examples") + ").",
+                               str(path))

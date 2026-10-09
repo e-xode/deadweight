@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from .context import AuditContext
@@ -18,6 +19,20 @@ from .context import AuditContext
 # Splitting them is what lets this script audit a plugin, including its own.
 
 LIBRARY_MIN_SKILLS = 3   # 1 or 2 root skills beside a CLAUDE.md were strays on two samples; 30 and 72 were libraries
+
+
+def _memory_file_in_other_case(root: Path) -> bool:
+    """A `claude.md` alone is a project whose instructions Linux never loads, not `none`.
+
+    exists() is case-sensitive on Linux: before this, such a repository was reported as
+    having nothing to audit and nothing missing (2026-10-06).
+    """
+    try:
+        # claude.local.md too: a public repository holding only claude.local.md was reported as
+        # `none` and never audited (sample of 44, 2026-10-08).
+        return any(n.lower() in ("claude.md", "claude.local.md") for n in os.listdir(root))
+    except OSError:
+        return False
 
 
 def claude_signs(root: Path) -> list[str]:
@@ -56,7 +71,8 @@ def detect_layout(root: Path) -> str:
     # Everything below was measured on 15 public repositories created after
     # 2026-09-22: 6 of the 7 errors reported there were this auditor mistaking a
     # shape it did not know for a project missing its CLAUDE.md.
-    if (root / "CLAUDE.md").exists() or (root / ".claude").is_dir() or (root / "AGENTS.md").exists():
+    if (root / "CLAUDE.md").exists() or (root / ".claude").is_dir() or (root / "AGENTS.md").exists() \
+            or _memory_file_in_other_case(root):
         return "project"
     # The manifest is optional: `skills/<name>/SKILL.md` at the root loads under
     # `--plugin-dir`, named after the folder, and `claude plugin validate` passes.
@@ -66,6 +82,11 @@ def detect_layout(root: Path) -> str:
     # worth auditing - they are meant to be copied somewhere that does load them.
     if root_level_skills(root):
         return "library"
+    # A project that shares only MCP servers: "Check `.mcp.json` into version control so
+    # everyone on your team gets the same MCP tools" (mcp). After the plugin tests - a
+    # plugin may ship a root .mcp.json too. Classed `none`, it was never audited.
+    if (root / ".mcp.json").is_file():
+        return "project"
     # A SKILL.md under `.devin/` or `tests/fixtures/` is not a Claude configuration,
     # and "CLAUDE.md not found" there is the auditor's ignorance, not a defect.
     return "none"

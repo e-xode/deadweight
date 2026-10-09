@@ -5,63 +5,130 @@
 [![release](https://img.shields.io/github/v/tag/e-xode/deadweight?filter=deadweight--v*&label=release)](CHANGELOG.md)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-**Audit the Claude Code configuration of a project or a plugin** — `CLAUDE.md`, skills, sub-agents,
-rules, hooks, settings, and the context all of it costs on every turn — and what Cursor, Copilot and
-`AGENTS.md` read from the same repository. One skill, one Python package, no dependencies, no network.
+Your coding agent ignores part of its configuration, and it doesn't tell you.
 
-Deadweight is configuration you carry that does nothing: instructions paid for on every turn that
-nothing reads, rules whose glob matches no file, links to files that are gone, two skills stealing
-each other's requests, a skill that loads nowhere because it sits one folder off. The audit finds
-them and says why each one matters.
+A deny rule that is never checked. A sub-agent that never loads. A Cursor rule that Cursor skips. A
+`CLAUDE.md` that grows on every turn while half of it points at files that are gone. Claude Code,
+Copilot and Cursor accept all of these without an error. Deadweight reads the configuration of a
+repository and lists what the agents ignore, with the reason and the fix.
 
-![The status line in its eight states](docs/statusline.svg)
+## What it finds
+
+Three files that look fine, from a real run:
+
+```
+=== ERROR (1) ===
+  [08-agent-frontmatter] Agent 'reviewer' missing required keys: name
+
+=== WARN (2) ===
+  [55-cursor-rule-ignored] '.cursor/rules/style.md' is a plain .md in .cursor/rules/: "ignored by
+      the rules system because it has no frontmatter" (Cursor rules). Rename it .mdc with a
+      frontmatter, or move it to AGENTS.md.
+  [42-permissions-rule] deny rule 'Bash(git:* push --force)' in 'settings.json': `:*` is recognised
+      only at the end of a pattern; here the colon is literal and the rule matches nothing it seems
+      to (permissions).
+```
+
+- The `reviewer` agent is dropped at load. Calling it gives "Agent type not found", nothing else.
+- Cursor never applies the style rule.
+- The deny rule blocks nothing: `git push --force` runs as if the rule did not exist.
 
 ## Install
 
-```bash
-claude plugin marketplace add e-xode/deadweight --scope project   # where the catalogue is: the GitHub repository
-claude plugin install deadweight@e-xode --scope project           # what to take from it: plugin @ marketplace
-```
-
-The two identifiers read alike and are not the same thing. `e-xode/deadweight` is the
-**repository**, in the `owner/repo` shorthand that `marketplace add` reads as GitHub; the full URL
-`https://github.com/e-xode/deadweight` works too, and is recorded as a different kind of source.
-`deadweight@e-xode` is the **plugin**: `deadweight`, from the marketplace named `e-xode`.
-`plugin install e-xode/deadweight` fails - it is not a plugin name.
-
-`--scope project` on **both** writes the marketplace and the plugin into the project's
-`.claude/settings.json`, so anyone who clones the repository gets them too — the plugin alone would
-name a marketplace their machine does not know. Leave both out to install it for yourself only, in
-every project.
-
-A project that already declares the marketplace in its settings needs no `marketplace add`. If you
-run one anyway, spell the source the way the settings do: a name declared with `e-xode/deadweight`
-refuses `https://github.com/e-xode/deadweight` - *"its network source differs from the one declared
-for it in settings"* - because the two spellings are two sources to Claude Code, even though they
-reach the same repository.
-
-**Installed before 0.16.0?** The marketplace was called `deadweight` then, and your copy keeps that
-name: a marketplace is named on your machine when you add it, and renaming it upstream renames
-nothing downstream. `deadweight@deadweight` goes on working and updating. To move to the new name,
-replace `deadweight@deadweight` and the `extraKnownMarketplaces.deadweight` key with
-`deadweight@e-xode` and `e-xode` in the project's `.claude/settings.json`, then, in this order:
+Claude Code:
 
 ```bash
-claude plugin marketplace remove deadweight      # first: the same source cannot be added under a second name
-claude plugin marketplace add e-xode/deadweight
+claude plugin marketplace add e-xode/deadweight --scope project
 claude plugin install deadweight@e-xode --scope project
 ```
 
-**Then open a new session in that project.** Plugins are read when a session starts: on the first
-one after installing, the skill is loaded and the audit runs silently in the background.
+GitHub Copilot CLI:
 
-**Check that it is active:** in that new session, ask Claude to run `deadweight`. It prints this
-project's findings. (`claude plugin list` shows the installs of every project on the machine, not
-only this one.)
+```bash
+copilot plugin marketplace add e-xode/deadweight
+copilot plugin install deadweight@e-xode
+```
 
-**Requirements: `python3` 3.9+**, standard library only. No `jq`, no Node, no pip install.
+Then open a new session in the project. Requires `python3` 3.9 or later, nothing else: no pip, no
+Node, no network.
+
+With Claude Code, `--scope project` records the plugin in the project's settings, so everyone who
+clones the repository gets it. Leave it out to install it for yourself only. Copilot CLI installs
+plugins for your user, in every project.
 
 ## Use
+
+- In Claude Code the audit runs in the background when a session opens. It prints nothing into
+  the conversation.
+- Ask "run deadweight" to see the findings for this project, errors first.
+- Ask "check my agent configuration" for a review: the auditor explains each finding and its fix.
+- Run `deadweight --setup-statusline` once to see the count in your status line.
+
+All commands and options: [All commands](#all-commands).
+
+## What it checks
+
+- permission rules that never apply, settings in the wrong file, agents and skills that never load;
+- hooks that never fire: unknown events, matchers that match nothing, scripts that are gone;
+- dead links, and rule globs that match no file;
+- text loaded on every turn that nothing uses;
+- two skills close enough to steal each other's requests;
+- tokens and credentials in files that every clone receives;
+- Cursor, Copilot and `AGENTS.md` files placed where their tool doesn't look.
+
+The full list is in [The checks in detail](#the-checks-in-detail).
+
+## Maintainer
+
+Built and maintained by Christophe Bragard at [E-XODE](https://www.e-xode.net/en/products/deadweight),
+who audits coding agent configurations and sets up coding agents for teams. To talk about yours:
+[e-xode.net/en/contact](https://www.e-xode.net/en/contact).
+
+---
+
+# How it works
+
+Everything below is for those who want the detail. None of it is needed to use the plugin.
+
+## Two layers: rules, then a model
+
+The audit itself is deterministic. It parses files and compares them to what the official
+documentation of each tool says: no model, no network, the same result on every run. That is what
+the status line counts.
+
+A second layer is opt-in: `deadweight --semantic` sends the configuration to a model, through your
+own session, to find what no parser sees, such as two instructions that cannot both be followed, or
+one rule copied into two files that have drifted apart. Every quote it returns is checked against
+the files, nothing it finds is counted, and each run has a cost. What it sends and what it is worth,
+measured: [semantic layer](skills/config-auditor/references/semantic-layer.md).
+
+## The checks in detail
+
+Each report ends with the number of check groups it ran. Check ids are stable (see
+[Check ids are a public API](#check-ids-are-a-public-api)).
+
+| Family | What goes wrong | Examples of checks |
+| --- | --- | --- |
+| **What it costs** | text injected on every turn that nothing uses | `CLAUDE.md` size, always-loaded budget, skill listing budget, description length |
+| **What it points at** | references to things that do not exist | dead links, dead path anchors in skills, rule globs matching no file, hooks calling missing scripts |
+| **Whether it loads** | configuration Claude Code never reads | skills outside a loaded location (`40`), withheld skills nothing points at (`15`), `name` not matching its folder |
+| **Whether skills compete** | two descriptions close enough to steal each other's triggers | description overlap, missing anti-triggers |
+| **Whether it can be shown wrong** | claims nothing can refute | skills naming no checkable path, eval suites that cannot fail or cannot run |
+| **What executes** | hooks that never fire, or fire with the wrong budget | unknown events, `if` on a non-tool event, bare `mcp__<server>` matchers, per-event timeouts |
+| **What is silently ignored** | settings and permissions that look active and do nothing | keys outside their scope (most with no documented warning), allow rules naming no tool, a rule both allowed and denied |
+| **What leaks** | credentials in files every clone receives | literal tokens in `.mcp.json`, credential variables read as empty, committed MCP approvals, routing `env` |
+| **Plugin packaging** | a plugin that ships what does not load | components inside `.claude-plugin/`, paths without `./`, fields replacing a default directory, version drift |
+| **What other agents read** | Cursor, Copilot and the `AGENTS.md` family skip misplaced files without a word, and read Claude Code's own | a `.md` in `.cursor/rules/` (only `.mdc` is read), an instructions file without the `.instructions.md` suffix, `AGENTS.override.md` that Claude Code never reads, `CLAUDE.md` lines only Claude Code can follow - Cursor applies that file to every conversation; and, still loaded but deprecated, a chat mode in `.github/chatmodes/` |
+
+| **What a reader sees** (opt-in) | two instructions that cannot both be followed; one rule copied into two files that drift apart | `scripts/semantic.py` asks a model, through your Claude Code session, with every quote checked and nothing counted ([what it is worth, measured, and what it sends](skills/config-auditor/references/semantic-layer.md)) |
+| **What actually loads** (opt-in) | a rule or a nested `CLAUDE.md` that no session needed; a `paths:` the harness did not honour | `--runtime <log>` reads an `InstructionsLoaded` hook log you record yourself ([how](skills/config-auditor/references/runtime-data.md)) |
+
+It recognises the container before judging it: a **project** (`.claude/`), a **plugin** (manifest,
+or `skills/` at the root without one), a **marketplace**, a **library** of skills kept at the root,
+or **none** — a repository with no Claude Code configuration, which gets no finding rather than
+"CLAUDE.md not found". A repository whose only configuration is a root `.mcp.json` is a project.
+
+## All commands
 
 | You want | Do |
 | --- | --- |
@@ -160,32 +227,6 @@ python3 "$PLUGIN/skills/config-auditor/scripts/audit.py" --root .          # tex
 python3 "$PLUGIN/skills/config-auditor/scripts/audit.py" --root . --json   # JSON
 ```
 
-## What it checks
-
-Each report ends with the number of check groups it ran. Check ids are stable (see
-[Check ids are a public API](#check-ids-are-a-public-api)).
-
-| Family | What goes wrong | Examples of checks |
-| --- | --- | --- |
-| **What it costs** | text injected on every turn that nothing uses | `CLAUDE.md` size, always-loaded budget, skill listing budget, description length |
-| **What it points at** | references to things that do not exist | dead links, dead path anchors in skills, rule globs matching no file, hooks calling missing scripts |
-| **Whether it loads** | configuration Claude Code never reads | skills outside a loaded location (`40`), withheld skills nothing points at (`15`), `name` not matching its folder |
-| **Whether skills compete** | two descriptions close enough to steal each other's triggers | description overlap, missing anti-triggers |
-| **Whether it can be shown wrong** | claims nothing can refute | skills naming no checkable path, eval suites that cannot fail or cannot run |
-| **What executes** | hooks that never fire, or fire with the wrong budget | unknown events, `if` on a non-tool event, bare `mcp__<server>` matchers, per-event timeouts |
-| **What is silently ignored** | settings and permissions that look active and do nothing | keys outside their scope, allow rules naming no tool, a rule both allowed and denied |
-| **What leaks** | credentials in files every clone receives | literal tokens in `.mcp.json`, credential variables read as empty, committed MCP approvals, routing `env` |
-| **Plugin packaging** | a plugin that ships what does not load | components inside `.claude-plugin/`, paths without `./`, fields replacing a default directory, version drift |
-| **What other agents read** | Cursor, Copilot and the `AGENTS.md` family skip misplaced files without a word, and read Claude Code's own | a `.md` in `.cursor/rules/` (only `.mdc` is read), a chat mode left in `.github/chatmodes/`, an instructions file without the `.instructions.md` suffix, `AGENTS.override.md` that Claude Code never reads, `CLAUDE.md` lines only Claude Code can follow - Cursor applies that file to every conversation |
-
-| **What a reader sees** (opt-in) | two instructions that cannot both be followed; one rule copied into two files that drift apart | `scripts/semantic.py` asks a model, through your Claude Code session, with every quote checked and nothing counted ([what it is worth, measured, and what it sends](skills/config-auditor/references/semantic-layer.md)) |
-| **What actually loads** (opt-in) | a rule or a nested `CLAUDE.md` that no session needed; a `paths:` the harness did not honour | `--runtime <log>` reads an `InstructionsLoaded` hook log you record yourself ([how](skills/config-auditor/references/runtime-data.md)) |
-
-It recognises the container before judging it: a **project** (`.claude/`), a **plugin** (manifest,
-or `skills/` at the root without one), a **marketplace**, a **library** of skills kept at the root,
-or **none** — a repository with no Claude Code configuration, which gets no finding rather than
-"CLAUDE.md not found".
-
 ## Per-project exceptions
 
 One file, in **your** project, never in the plugin:
@@ -228,7 +269,7 @@ does not fail CI. Prefer it to erasing: an erased finding is one `--check-floor`
 watch grow.
 
 An exemption may not silence the checks that audit the overlay, nor the ratchet itself
-(`31-*`, `34-audit-sha`, `00-layout`). A release valve able to disconnect its own pressure gauge
+(`31-*`, `34-floor`, `00-layout`; the old id `34-audit-sha` is an alias of `34-floor`). A release valve able to disconnect its own pressure gauge
 is not a valve.
 
 ### Thresholds: which ones a project may move
@@ -242,10 +283,6 @@ is not a valve.
 Every applied override prints itself on every run, so a doctrine is never rewritten quietly.
 
 ---
-
-# Reference
-
-Everything below explains why the plugin behaves as it does. None of it is needed to use it.
 
 ## The ratchet
 
@@ -263,7 +300,9 @@ The floor records the **fingerprint of the auditor** — `audit.py` and every mo
 `deadweight_audit/` — and `--check-floor` refuses to compare across two of them. A count taken with a different auditor is not a better or worse state — it is a
 different measurement, and comparing the two silently is how a change of instrument gets read as
 progress. The refusal is a warning, not a failure, so it does not break CI; it prints both counts
-side by side and asks you to re-set deliberately.
+side by side and asks you to re-set deliberately. With the same auditor, a check id at ERROR or
+WARN that the floor did not record is named in a `34-floor` warning even when the counts did not
+rise; that warning does not fail CI either.
 
 This repository runs its own ratchet in CI (`.github/workflows/audit.yml`): a repository that ships
 an auditor and does not run it on itself has the exact defect it exists to catch.
@@ -344,7 +383,7 @@ project has recorded nothing", a valid state.
 ## Check ids are a public API
 
 A consuming project names check ids in its `.claude/audit.local.json`, so ids are **never renamed**.
-An id that must change goes into `CHECK_ID_ALIASES` in `deadweight_audit/catalog.py`, old → new; the old id keeps
+An id that must change goes into `CHECK_ID_ALIASES` in `deadweight_audit/catalog.py`, old to new; the old id keeps
 working for good, and the audit says once that a newer name exists.
 
 ## Inside the auditor
@@ -381,6 +420,9 @@ python3 -m unittest discover -s tests    # labelled cases + the auditor's assump
 `tests/cases.json` holds fictional repositories with the exact findings each must produce, checked
 by hand; most began as a false positive on a real repository. It is generated from the maintainer's
 labelled source — to propose a case, describe the repository and the verdict in an issue or a PR.
+A published case checks the current auditor's counts; it does not prove the case discriminates.
+That proof — the case fails on the version that had the defect — is run outside the plugin before
+each release, because the earlier auditors it needs are kept outside the plugin by design.
 
 ## Where the examples come from
 
@@ -390,18 +432,50 @@ The measurements are real, taken on a private fleet and on public repositories, 
 names are not. The status line image is generated from the real template on that fictional project
 by `docs/render_statusline.py`.
 
+## Install: details and special cases
+
+The two identifiers read alike and are not the same thing. `e-xode/deadweight` is the
+**repository**, in the `owner/repo` shorthand that `marketplace add` reads as GitHub; the full URL
+`https://github.com/e-xode/deadweight` works too, and is recorded as a different kind of source.
+`deadweight@e-xode` is the **plugin**: `deadweight`, from the marketplace named `e-xode`.
+`plugin install e-xode/deadweight` fails - it is not a plugin name.
+
+`--scope project` on **both** writes the marketplace and the plugin into the project's
+`.claude/settings.json`, so anyone who clones the repository gets them too — the plugin alone would
+name a marketplace their machine does not know. Leave both out to install it for yourself only, in
+every project.
+
+A project that already declares the marketplace in its settings needs no `marketplace add`. If you
+run one anyway, spell the source the way the settings do: a name declared with `e-xode/deadweight`
+refuses `https://github.com/e-xode/deadweight` - *"its network source differs from the one declared
+for it in settings"* - because the two spellings are two sources to Claude Code, even though they
+reach the same repository.
+
+**Installed before 0.16.0?** The marketplace was called `deadweight` then, and your copy keeps that
+name: a marketplace is named on your machine when you add it, and renaming it upstream renames
+nothing downstream. `deadweight@deadweight` goes on working and updating. To move to the new name,
+replace `deadweight@deadweight` and the `extraKnownMarketplaces.deadweight` key with
+`deadweight@e-xode` and `e-xode` in the project's `.claude/settings.json`, then, in this order:
+
+```bash
+claude plugin marketplace remove deadweight      # first: the same source cannot be added under a second name
+claude plugin marketplace add e-xode/deadweight
+claude plugin install deadweight@e-xode --scope project
+```
+
+**Then open a new session in that project.** Plugins are read when a session starts: on the first
+one after installing, the skill is loaded and the audit runs silently in the background.
+
+**Check that it is active:** in that new session, ask Claude to run `deadweight`. It prints this
+project's findings. (`claude plugin list` shows the installs of every project on the machine, not
+only this one.)
+
 ## Status
 
 Pre-1.0. The doctrine comes from one private fleet, and has since been measured against samples
 of public repositories the auditor had never seen — each drawn after the previous one, so they could
 not overlap. Each sample found defects in the auditor itself, recorded in the CHANGELOG. Issues and
 counter-examples are the point.
-
-## Maintainer
-
-Built and maintained by Christophe Bragard at [E-XODE](https://www.e-xode.net/en/products/deadweight),
-who audits Claude Code configurations and sets up coding agents for teams. To talk about yours:
-[e-xode.net/en/contact](https://www.e-xode.net/en/contact).
 
 ## License
 

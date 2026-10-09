@@ -11,6 +11,7 @@ import ast
 import contextlib
 import io
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -126,6 +127,87 @@ class OneAuditLeavesNothing(unittest.TestCase):
             lines = lambda fs: [f for f in fs if f["check"] == "01-claude-md-lines"]  # noqa: E731
             self.assertEqual(len(lines(audit(moved))), 1)
             self.assertEqual(lines(audit(plain)), [])
+
+
+
+class HomeDirectory(unittest.TestCase):
+    """The home directory holds USER-scope configuration: project rules are not applied to it
+    (anthropics/claude-code#93109, 2026-10-08: 8 errors and 6 warnings on one machine)."""
+
+    def test_home_is_not_audited_as_a_project(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            (home / ".claude" / "agents").mkdir(parents=True)
+            (home / ".claude" / "settings.json").write_text('{"permissions": {"defaultMode": "plan"}}\n')
+            r = subprocess.run([sys.executable, str(SCRIPTS / "audit.py"), "--root", str(home), "--json"],
+                               capture_output=True, text=True, env={**os.environ, "HOME": str(home)})
+            findings = json.loads(r.stdout)["findings"]
+            self.assertEqual([f for f in findings if f["severity"] in ("ERROR", "WARN")], [])
+            self.assertTrue(any("home directory" in f["message"] for f in findings if f["check"] == "00-layout"))
+
+
+class Overlay(unittest.TestCase):
+    """The overlay's own ids: a renamed id keeps working, and only emitted ids are exemptable."""
+
+    def write(self, root: Path, exemptions: list[dict], thresholds: dict | None = None) -> None:
+        (root / ".claude").mkdir(parents=True, exist_ok=True)
+        (root / "CLAUDE.md").write_bytes(CLAUDE_MD.encode("utf-8"))
+        local = {"exemptions": [{"path": "CLAUDE.md", "reason": "test", "date": "2026-10-08", **e}
+                                for e in exemptions]}
+        if thresholds:
+            local["thresholds"] = thresholds
+        (root / ".claude" / "audit.local.json").write_text(json.dumps(local), encoding="utf-8")
+
+    def test_an_alias_is_reported_and_still_exempts(self) -> None:
+        # An alias added for this test only: patch.dict restores the shipped aliases after it,
+        # which later tests in the same process rely on (audit externe 3, g9-01).
+        from unittest import mock
+        from deadweight_audit.catalog import CHECK_ID_ALIASES
+        with mock.patch.dict(CHECK_ID_ALIASES, {"01-claude-md-lines-old": "01-claude-md-lines"}):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp) / "shop-api"
+                self.write(root, [{"check": "01-claude-md-lines-old"}],
+                           {"CLAUDE_MD_MAX_LINES": {"value": 1, "reason": "test", "date": "2026-10-08"}})
+                found = audit(root)
+        checks = [f["check"] for f in found]
+        self.assertIn("31-overlay-alias", checks)
+        self.assertNotIn("01-claude-md-lines", checks)
+        self.assertNotIn("31-overlay-unknown-check", checks)
+
+    def test_the_alias_test_leaves_the_shipped_aliases_in_place(self) -> None:
+        # Run in-process before or after the labelled cases, the test above must not erase
+        # `34-audit-sha` -> `34-floor` (audit externe 3, g9-01). A test-hygiene guard: it checks
+        # the test suite, not the auditor, and passes on an auditor without the fix; the alias
+        # in a full run is the labelled case 31-alias-34-audit-sha (external audit 4, te-01).
+        from deadweight_audit.catalog import CHECK_ID_ALIASES
+        before = dict(CHECK_ID_ALIASES)
+        self.test_an_alias_is_reported_and_still_exempts()
+        self.assertEqual(CHECK_ID_ALIASES, before)
+        self.assertEqual(CHECK_ID_ALIASES.get("34-audit-sha"), "34-floor")
+
+    @staticmethod
+    def emitted() -> set[str]:
+        """Ids passed literally to `report.add`. known_check_ids() cannot answer this: it reads
+        every quoted id in the package, the lists that name them included."""
+        out = set()
+        for f in instrument_files():
+            for n in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "add" \
+                        and n.args and isinstance(n.args[0], ast.Constant):
+                    out.add(n.args[0].value)
+        return out
+
+    def test_every_unexemptable_id_is_emitted(self) -> None:
+        # Until 0.23.0 the set named `34-audit-sha`, which no code emits (the ratchet is 34-floor).
+        from deadweight_audit.overlay import UNEXEMPTABLE
+        self.assertEqual(sorted(UNEXEMPTABLE - self.emitted()), [])
+
+    def test_no_check_group_reads_as_an_id_nothing_emits(self) -> None:
+        # "43-mcp" in CHECKS made an exemption for `43-mcp` pass the typo guard and excuse nothing.
+        import re
+        from deadweight_audit.catalog import CHECKS
+        ids = [c for c in CHECKS if re.fullmatch(r"\d{2}-[a-z0-9-]+", c)]
+        self.assertEqual(sorted(set(ids) - self.emitted()), [])
 
 
 if __name__ == "__main__":

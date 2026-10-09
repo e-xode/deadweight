@@ -85,15 +85,44 @@ LIBRARY_CHECKS = ("check_skills", "check_skill_names", "check_description_overla
                   "check_unloadable_skills")
 
 
-NONE_CHECKS = ("check_unloadable_skills",)
+# check_mcp: a committed `.mcp.json` alone is configuration Claude Code loads - "storing
+# configurations in a .mcp.json file at your project's root directory" (mcp, Project
+# scope) - and a repository holding only that file was classed `none` and never read.
+NONE_CHECKS = ("check_unloadable_skills", "check_mcp")
+
+
+# Checks that read the skill list check_skills returns. When check_skills dies, that list
+# is empty because nothing was read, not because there are no skills: run on it, these
+# checks reported "skill descriptions 0" and "nothing to compete with" as measurements.
+NEEDS_SKILLS = ("check_skill_index",
+                "check_see_skill_targets", "check_foreign_skill_mentions",
+                "check_listing_budget_derived",
+                "check_plugin_cost", "check_skill_names", "check_description_overlap")
+# Checks that read the skill list for one finding and rules, imports or agents for the
+# rest. Skipping them too dropped an unknown agent tool, a rule's `globs:` and a missing
+# import from the report (external audit 3, g8-00). On the empty list they can only miss
+# their skill findings, never invent one, so they run and the crash message says what is
+# missing. check_cross_refs takes the skill list and does not read it.
+PARTLY_NEEDS_SKILLS = {
+    "check_agent_frontmatter_validity": "an agent preloading a skill that hides itself",
+    "check_companions": "a command shadowed by a skill",
+    # Given None, not the empty list: it reports CLAUDE.md and agents as a lower bound,
+    # skills not measured. Skipped, it hid an over-budget CLAUDE.md behind one unreadable
+    # skill (external audit 3, g--01).
+    "check_always_loaded_budget": "the skill and command descriptions of the always-loaded budget",
+}
 
 
 def run_checks(ctx: AuditContext, report: Report) -> None:
     """Every check, dispatched for one container. Called twice for a dual-role repository."""
+    crashed: set[str] = set()
+
     def run(fn, *a):
         """Dispatch, skipping checks whose subject the current container lacks."""
         name = fn.__name__
         layout = ctx.layout
+        if "check_skills" in crashed and name in NEEDS_SKILLS:
+            return None
         if layout != "project" and name in PROJECT_ONLY:
             return None
         if layout != "plugin" and name in PLUGIN_ONLY:
@@ -117,9 +146,15 @@ def run_checks(ctx: AuditContext, report: Report) -> None:
         except Exception as exc:  # noqa: BLE001 - one check, not the whole report
             # A check that dies took the whole report with it, and the CI step read a
             # traceback as the verdict. Now its findings are missing and it says so.
+            crashed.add(name)
+            rest = ("the rest ran" if name != "check_skills" else
+                    "the checks that measure the skill list did not run either ("
+                    + ", ".join(NEEDS_SKILLS) + "), so no skill count here is a measurement; "
+                    "the rest ran, without what needs the skill list ("
+                    + "; ".join(PARTLY_NEEDS_SKILLS.values()) + ")")
             report.add("00-check-crashed", "WARN",
                        f"{name} stopped on {type(exc).__name__}: {exc}. Its findings are "
-                       "missing from this report; the rest ran. Please report it.", str(ctx.root))
+                       f"missing from this report; {rest}. Please report it.", str(ctx.root))
             return None
 
     run(check_dangling_symlinks, ctx, report)
@@ -134,7 +169,8 @@ def run_checks(ctx: AuditContext, report: Report) -> None:
     run(check_rules, ctx, report)
     run(check_skill_index, ctx, report, skills)
     run(check_reference_sizes, ctx, report)
-    run(check_always_loaded_budget, ctx, report, skills, agents)
+    skills_known = "check_skills" not in crashed
+    run(check_always_loaded_budget, ctx, report, skills if skills_known else None, agents)
     run(check_unreadable, ctx, report)
     run(check_see_skill_targets, ctx, report, skills)
     run(check_foreign_skill_mentions, ctx, report, skills)

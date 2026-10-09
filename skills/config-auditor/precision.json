@@ -1,0 +1,302 @@
+{
+ "_about": "Measured precision per check: findings labelled true by hand / findings labelled. Conservative: 'plausible' counts false. Taken from the most recent labelled sample of each check, with the auditor sha it ran; the published auditor may have changed since. A check absent here has no measured precision.",
+ "checks": {
+  "01-claude-md-case": {
+   "true": 44,
+   "n": 46,
+   "repositories": null,
+   "severity": null,
+   "date": "2026-10-08",
+   "auditor": null,
+   "source": "44 public repositories found by GitHub code search"
+  },
+  "02-skill-frontmatter": {
+   "true": 4,
+   "n": 4,
+   "repositories": 1,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "ff36f2cc",
+   "source": "public sample C (150 repositories, ERROR findings)"
+  },
+  "03-skill-name-matches-folder": {
+   "true": 3,
+   "n": 3,
+   "repositories": 1,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "43b08d90",
+   "source": "public sample G (150 repositories, ERROR findings)"
+  },
+  "06-skill-duplicate-name": {
+   "true": 0,
+   "n": 2,
+   "repositories": 1,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "43b08d90",
+   "source": "public sample G (150 repositories, ERROR findings)"
+  },
+  "07-skill-broken-link": {
+   "true": 2,
+   "n": 2,
+   "repositories": 2,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "a2649175",
+   "source": "public sample F (150 repositories, ERROR findings)"
+  },
+  "08-agent-frontmatter": {
+   "true": 6,
+   "n": 6,
+   "repositories": 2,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "43b08d90",
+   "source": "public sample G (150 repositories, ERROR findings)"
+  },
+  "15-skill-index": {
+   "true": 3,
+   "n": 3,
+   "repositories": 2,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "4e3ebca1",
+   "source": "public sample B (150 repositories, ERROR findings)"
+  },
+  "20-relative-links": {
+   "true": 24,
+   "n": 25,
+   "repositories": 3,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "43b08d90",
+   "source": "public sample G (150 repositories, ERROR findings)"
+  },
+  "23-agent-tools": {
+   "true": 868,
+   "n": 869,
+   "repositories": 3,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "a2649175",
+   "source": "public sample F (150 repositories, ERROR findings)"
+  },
+  "24-settings-parse": {
+   "true": 0,
+   "n": 1,
+   "repositories": 1,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "a2649175",
+   "source": "public sample F (150 repositories, ERROR findings)"
+  },
+  "24-settings-scope": {
+   "true": 2,
+   "n": 3,
+   "repositories": 3,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "a39dc713",
+   "source": "public sample E (150 repositories, ERROR findings)"
+  },
+  "26-evals-schema": {
+   "true": 0,
+   "n": 2,
+   "repositories": 1,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "43b08d90",
+   "source": "public sample G (150 repositories, ERROR findings)"
+  },
+  "29-listing-budget-derived": {
+   "true": 1,
+   "n": 1,
+   "repositories": 1,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "a39dc713",
+   "source": "public sample E (150 repositories, ERROR findings)"
+  },
+  "32-skill-name-shape": {
+   "true": 7,
+   "n": 7,
+   "repositories": 1,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "a2649175",
+   "source": "public sample F (150 repositories, ERROR findings)"
+  },
+  "35-hooks-command": {
+   "true": 2,
+   "n": 2,
+   "repositories": 1,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "43b08d90",
+   "source": "public sample G (150 repositories, ERROR findings)"
+  },
+  "35-hooks-matcher": {
+   "true": 1,
+   "n": 1,
+   "repositories": 1,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "a39dc713",
+   "source": "public sample E (150 repositories, ERROR findings)"
+  },
+  "35-hooks-shape": {
+   "true": 2,
+   "n": 2,
+   "repositories": 2,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "a2649175",
+   "source": "public sample F (150 repositories, ERROR findings)"
+  },
+  "37-documented-flag": {
+   "true": 0,
+   "n": 2,
+   "repositories": 1,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "08762a70",
+   "source": "public sample D (150 repositories, ERROR findings)"
+  },
+  "40-skill-not-loaded": {
+   "true": 1,
+   "n": 1,
+   "repositories": 1,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "43b08d90",
+   "source": "public sample G (150 repositories, ERROR findings)"
+  },
+  "42-permissions-rule": {
+   "true": 4,
+   "n": 4,
+   "repositories": 1,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "43b08d90",
+   "source": "public sample G (150 repositories, ERROR findings)"
+  },
+  "43-mcp-shape": {
+   "true": 1,
+   "n": 1,
+   "repositories": 1,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "43b08d90",
+   "source": "public sample G (150 repositories, ERROR findings)"
+  },
+  "44-plugin-path": {
+   "true": 1,
+   "n": 1,
+   "repositories": 1,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "a2649175",
+   "source": "public sample F (150 repositories, ERROR findings)"
+  },
+  "46-doctrine-copy": {
+   "true": 4,
+   "n": 4,
+   "repositories": null,
+   "severity": null,
+   "date": "2026-09-30",
+   "auditor": null,
+   "source": "frozen vocabulary, labelled by hand"
+  },
+  "50-security-broad-allow": {
+   "true": 1,
+   "n": 1,
+   "repositories": 1,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "43b08d90",
+   "source": "public sample G (150 repositories, ERROR findings)"
+  },
+  "50-security-remote-exec": {
+   "true": 0,
+   "n": 1,
+   "repositories": 1,
+   "severity": "ERROR",
+   "date": "2026-09-27",
+   "auditor": "43b08d90",
+   "source": "public sample G (150 repositories, ERROR findings)"
+  },
+  "55-cursor-rule-ignored": {
+   "true": 10,
+   "n": 10,
+   "repositories": null,
+   "severity": null,
+   "date": "2026-09-28",
+   "auditor": null,
+   "source": "holdout 2"
+  },
+  "56-copilot-chatmode": {
+   "true": 15,
+   "n": 15,
+   "repositories": null,
+   "severity": null,
+   "date": "2026-09-28",
+   "auditor": null,
+   "source": "holdout 1"
+  },
+  "56-copilot-instructions-name": {
+   "true": 2,
+   "n": 2,
+   "repositories": null,
+   "severity": null,
+   "date": "2026-09-28",
+   "auditor": null,
+   "source": "holdout 2"
+  },
+  "58-semantic-contradiction": {
+   "true": 50,
+   "n": 50,
+   "repositories": null,
+   "severity": null,
+   "date": "2026-10-01",
+   "auditor": null,
+   "source": "default configuration, 50 drawn: --method files, semantic layer b473baf4, claude-sonnet-5-5 (an earlier pass the same day gave 47/50)"
+  },
+  "59-semantic-duplicate": {
+   "true": 49,
+   "n": 50,
+   "repositories": null,
+   "severity": null,
+   "date": "2026-10-01",
+   "auditor": null,
+   "source": "default configuration, 50 drawn: --method files, semantic layer b473baf4, claude-sonnet-5-5 (an earlier pass the same day gave 50/50)"
+  },
+  "60-semantic-description-mismatch": {
+   "true": 26,
+   "n": 34,
+   "repositories": null,
+   "severity": null,
+   "date": "2026-10-01",
+   "auditor": null,
+   "source": "all findings of one pass"
+  },
+  "61-semantic-untestable": {
+   "true": 47,
+   "n": 50,
+   "repositories": null,
+   "severity": null,
+   "date": "2026-10-01",
+   "auditor": null,
+   "source": "50 drawn"
+  },
+  "62-semantic-misplaced": {
+   "true": 4,
+   "n": 4,
+   "repositories": null,
+   "severity": null,
+   "date": "2026-10-01",
+   "auditor": null,
+   "source": "all findings of one pass"
+  }
+ }
+}

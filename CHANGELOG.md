@@ -1,5 +1,387 @@
 # Changelog
 
+## 0.23.0 — 2026-10-09
+
+**`audit.py` changed: floors set with 0.22.x no longer compare** (`34-floor` refuses two auditors). Run `audit.py --set-floor` once and commit `floor.json`. Counts move both ways this time: most fixes below remove false positives, and some add findings. What can **raise** a count: skills kept in category folders under `.claude/skills/` (new WARN), a repository with only a root `.mcp.json` (now audited), `17-always-loaded-budget` counting what it missed, an agent whose frontmatter does not parse (new ERROR), sub-agent tools the harness removes, MCP credential variables measured as empty, and a plugin's `hooks/hooks.json`. What **lowers** one: `35-hooks-timeout` and `56-copilot-chatmode` go from WARN to NOTICE, `32-skill-name-shape` from ERROR to WARN in a plugin, `23-agent-model` from WARN to NOTICE outside the documented values, `33-description-overlap` from WARN to NOTICE for a pair neither side separates. Measured on 19 private repositories with the published 0.22.1 auditor and this one on the same files: errors 0 → 0, warnings 87 → 74, notices 86 → 98; no repository gained a WARN once its always-loaded context was trimmed (a rule without `paths:` is now counted by `17-always-loaded-budget`, which put one repository 943 characters over its target).
+
+### Fixed — external audit, 2026-10-08
+
+An external review of the auditor reported findings, each checked by a second reviewer told to refute
+it; 139 were fixed, a few set aside with their reason. Each change of behaviour is locked by a
+labelled case (`tests/cases.json`, 341 cases) or a test; 108 of those cases were checked to fail on
+the earlier auditor.
+
+**Skills (`02`-`07`, `13`, `16`, `19`, `21`, `25`, `32`)**
+- **`02-skill-md-exists`: `synced` is reserved outside a plugin only.** A plugin skill named `synced`
+  is no longer an ERROR (skills: the name is skipped "in the enterprise, personal, and project locations").
+- **`02-skill-md-exists` (ERROR), new case: a skill folder or `name` of `anthropic-skills` or
+  `anthropic-skills:*` outside a plugin** does not load; `32-skill-name-reserved` no longer says Claude
+  Code loads it there.
+- **`02-skill-md-exists` (WARN), new case: a `SKILL.md` in a category folder,
+  `.claude/skills/<category>/<skill>/`.** In a project such a skill is not loaded (measured on Claude
+  Code 2.1.293); it is no longer audited as a loaded skill nor counted in `17` and `29`.
+- **`03`/`06`: the command is the skill's `name`.** In a project the folder name also invokes it; in a
+  plugin the command is `/<plugin>:<name>`. The old messages said the command came from the folder.
+- **`04-skill-description-length`**: the 1,536-character listing cut no longer depends on
+  `when_to_use`, and the 1,024 message no longer says "not a per-field limit". A description over
+  both limits gets two findings.
+- **`04`, `08b`, `33`: an exclusion written with `’` or a backtick** (`Don’t use`) is recognised.
+- **`07`, `25`, `20`: a percent-encoded link target** (`pricing%20guide.md`) is decoded before it is
+  resolved.
+- **`13`: a script in `.claude/scripts/` run by a hook or the `statusLine` of `.claude/settings.json`**
+  is no longer reported as a script no skill uses (narrowed in round 2, below).
+- **`16-reference-size`: line count off by one** on a file ending with a newline.
+- **`19`: a ` #` comment is cut before looking for `': '`**, and a plain value that opens and closes
+  `[...]` or `{...}` and then continues (`[beta] Deploy ...`) is reported.
+- **`21` fires beyond 51,200 bytes alongside `05`**, as its code comment already said.
+- **`25-orphan-reference` reads `reference/` and the `.md` files at the skill's root**, not only `references/`.
+- **`32-skill-name-shape` is WARN, not ERROR, in a plugin**, and the plugin's own `<name>:` prefix is
+  removed before the test: the documentation scopes the spec's rejection to uploads and packaging.
+
+**Agents (`02`, `08`, `09`, `23`)**
+- **`08-agent-frontmatter` (ERROR), new case: a frontmatter that does not parse as YAML.** The
+  detector matches the 15 forms `claude plugin validate` 2.1.294 rejects (63 probes, 63 agree); such
+  an agent is no longer counted as loaded, and `23-agent-tools` no longer reports "unknown tool
+  'model: sonnet'" on it.
+- **`08`**: in a plugin, an empty or unreadable frontmatter is a WARN (the agent loads under its
+  filename); a `---` not on line 1 has its own message; a `name` starting with `-` or over 256
+  characters is an ERROR outside a plugin.
+- **`02` on agents**: a quoted value or an indented block header (`>2`, `|2-`) is no longer a parse
+  error; the one remaining form is INFO and names the auditor's parser.
+- **`09`**: any documented agent name is read from the CLAUDE.md table; the message says "no agent has
+  `name: X`" and gives the real `name` of a file `X.md`.
+- **`23-agent-model` is NOTICE, not WARN, outside the documented values**, which now include `best`,
+  `opusplan`, a `[1m]` suffix, ids with `claude-` and Bedrock ARNs (both narrowed in round 2, below);
+  `default` has its own message.
+- **`23-agent-tools`: tools removed from sub-agents** (documented list) give a WARN per entry, an ERROR
+  when nothing resolves; commas inside parentheses (`Agent(a, b)`) no longer split an entry; the
+  "ignored in a subagent" WARN is silent for the agent named by the `agent` setting.
+- **`23-agent-skills-preload`**: the message no longer advises reading the skill by path.
+
+**Descriptions (`33`)**
+- **`33-description-overlap`** reads `description` and `when_to_use`, the text the listing shows;
+  an exclusion counts only in its own clause (its sentence, past `e.g.`/`i.e.`, and a bulleted list
+  under it); a pair neither side separates is NOTICE, not WARN,
+  and the "or merge them" advice is gone.
+
+**Memory files and budget (`01`, `09`, `12`, `14`, `15`, `17`, `29`, `30`)**
+- **`01-agents-md-unread`** resolves an import from the file that holds it, follows imports four hops,
+  and ignores code spans and fenced blocks; the advice gives `@../AGENTS.md` from `.claude/CLAUDE.md`.
+- **`01-claude-md-import`**: no fallback to the repository root for an import in `.claude/CLAUDE.md`.
+- **`01-claude-md-size` and `-lines`** measure `./CLAUDE.md`, `./.claude/CLAUDE.md` and `./CLAUDE.local.md`.
+- **`12`, `14`: indented code blocks are skipped**; `12` no longer reads a `/*` glob as a comment.
+- **`14-rule-size`: message only.** It gives the line count and cites the documented 200 lines ("may
+  reduce adherence", each rules file counted separately); the 2 KB figure stays this plugin's convention.
+- **`15`**: a listed skill named in the index is a house NOTICE, not a WARN.
+- **`17-always-loaded-budget` counts what the harness loads**: the three memory files, their imports
+  (four hops), rules without `paths:`, `.claude/commands/` descriptions, and `when_to_use` with each
+  entry capped at 1,536 (or `skillListingMaxDescChars`). This plugin's own cost (`30-plugin-cost`) goes
+  from 572 to 1,133 characters: its `when_to_use` was not counted.
+- **`29`** skips skills withdrawn from the listing, reads `SLASH_COMMAND_TOOL_CHAR_BUDGET` from `env`,
+  and reads `skillListingBudgetFraction`, `env` and `skillOverrides` from `settings.local.json` too.
+- **`30`** ignores `skillOverrides` in a plugin ("Plugin skills are not affected by `skillOverrides`").
+
+**Settings, permissions, rules (`22`, `24`, `42`)**
+- **`22`**: a flow list with braces (`[src/**/*.{ts,tsx}]`) is not split inside them; `\[` escapes; an
+  unclosed `[` is reported as matching nothing (memory).
+- **`24-settings-scope`** reads nested keys (`sandbox.*`), gives one finding for one
+  `useAutoModeDuringPlan: false`, and says "with a warning" for the three keys documented as such.
+- **`24-settings-local`, `24-settings-env`: messages only** (the global git excludes are not read; an
+  `env` value applies once the workspace is trusted, or at once with `-p`).
+- **`24-settings-statusline`** resolves `~/`, `$HOME/` and absolute paths; **`24-settings-output-style`**
+  accepts `default`.
+- **`42-permissions-rule`**: the "`:*` only at the end" rule applies to `Bash` and `PowerShell` only.
+
+**Hooks (`35`)**
+- **`35-hooks-timeout` is NOTICE, not WARN**: `timeout` is optional and no harm from the default is
+  documented or measured. A hook with `async: true` is no longer reported.
+- **`35-hooks-command`**: the chmod WARN fires only when the script is run directly, whatever the
+  interpreter; a `./` path in a skill's hook gets the path that works.
+
+**MCP and security (`43`, `50`)**
+- **`43-mcp-credential-var`**: eight more variables measured as arriving empty on Claude Code 2.1.294
+  join the five the documentation names.
+- **`43`, `50`: a repository with only a root `.mcp.json` is audited** (layout `project`), no longer
+  "nothing to audit".
+- **`50-security-mcp-unpinned`**: `docker run` option values are no longer read as the image;
+  `uvx pkg@1.2.3` is pinned (`@latest` is not).
+- **`50-security-headless-isolation`**: bare names in `--disallowedTools`, `--permission-mode dontAsk`
+  and `--permission-prompts none` exempt; `\` continuations are joined.
+- **`50-security-hidden-unicode`**: the three UK subdivision flags are not tag smuggling.
+- **`50-security-broad-allow`**: an untracked `settings.local.json` is a WARN for your own sessions,
+  not an ERROR "for everyone".
+- **`50-security-remote-exec`** reads a plugin's `hooks/hooks.json`.
+- **`50`, broad directories**: the message names the case found; `./../x` is read as `../x`.
+
+**Other agents and runtime (`54`-`57`)**
+- **`55`/`56`**: `.claude/agents` no longer counts as Claude-only (Cursor and VS Code read it), nor
+  `.claude/hooks` and `.claude/settings*.json` for Cursor, nor for Copilot when
+  `.vscode/settings.json` sets `"chat.useClaudeHooks": true`; slash commands each CLI documents are
+  no longer counted; only `./CLAUDE.md` is read.
+- **`56-copilot-chatmode` is NOTICE, not WARN**: a deprecated location VS Code still loads as a custom agent.
+- **`54`**: `AGENTS.local.md` has no documented reader; a variant a `CLAUDE.md` imports is not reported.
+- **`57`**: a session counts only if it loaded a file of this repository or ran in it; `rule-unscoped`
+  judges the latest load; a nested `CLAUDE.md` and a symlinked rule outside the project get their own advice.
+
+**Evals, links, anchors (`18`, `20`, `26`, `28`, `39`, `51`, `53`)**
+- **`18`**: a `.claude/commands/` name is a valid target.
+- **`26-evals-anti-trigger` is a house convention** (NOTICE by default), and a `should_trigger: false`
+  in any JSON of the skill's `evals/` counts. **`26-evals-schema`**: a missing `expected_output` is a
+  NOTICE, not an ERROR.
+- **`28`**: the message names the folders the check reads and says `docs/`, `config/`... are not checked.
+- **`39`**: graders listed in `case.yaml` are read; `39-eval-all-llm` (NOTICE) can now fire on inline
+  judges; `39-eval-judged-fact` is NOTICE for `focus: trace`; `context.add_dirs` counts as a fixture.
+- **`51`**: several targets on one make rule and `-j N` are read; a justfile with `import` or `mod`
+  is not judged. **`53`** expands the `@imports` of `CLAUDE.md`.
+
+**Plugin, overlay, floor (`11`, `31`, `34`, `37`, `44`, `45`, `46`, `00`)**
+- **`34-audit-sha` is an alias of `34-floor`**, the id that cannot be exempted; an overlay naming the
+  old id gets `31-overlay-alias` (NOTICE). Four check families in the catalogue were accepted as ids
+  nothing emits; they now get `31-overlay-unknown-check`.
+- **`34-floor`**: with the same auditor, an ERROR or WARN id the floor did not record is named in a
+  WARN, exit code unchanged; the sha message no longer claims most releases leave the auditor unchanged.
+- **`31`**: an unreadable overlay is reported once; an exemption can no longer raise a finding's
+  severity (`31-overlay-schema` NOTICE).
+- **`00-check-crashed`**: when `check_skills` crashes, the checks that measure the skill list are
+  skipped and named, instead of reporting "0 chars" as a measurement; the checks that also read
+  rules, imports and agents still run, the message names the skill findings they cannot make, and
+  `17-always-loaded-budget` reports CLAUDE.md and agents as a lower bound, skills not measured.
+- **`11-english-only`**: the threshold counts distinct words, and French markers (`.fr.md`, `-fr.md`,
+  `_fr.md`, `fr/`) are honoured inside skills.
+- **`37-documented-flag`**: outside the plugin, only a line naming `config-auditor/scripts/audit.py` is
+  checked; a project's own `scripts/audit.py` is not.
+- **`44`**: the default folders of `workflows`, `themes` and `monitors` are checked with their own
+  file patterns. **`45`**: a command in a subfolder is named `folder:name`.
+- **`46-doctrine-copy`**: a file name alone matches only `*-anatomy.md` references and
+  `skill-runtime-mechanisms.md`.
+
+**Semantic layer (`58`-`62`)**
+- A finding whose two sides quote the same passage is rejected (a sentence written twice in one file
+  is two passages).
+- `--method claims`: a vote counts only when it quotes the same passages; a failed vote is not cached.
+- The report names the instruction files it does not collect (`instruction_files_not_reviewed`).
+- `62` no longer promises a rule "buried in a skill reference", which its request never carries.
+- `--also skill-duplicates` is accepted with "has no effect"; the hint names `--also internal-duplicates`;
+  `--help` says linked Markdown files are sent.
+
+**Tests**: a test file run directly runs all of it; every check held at zero by a case has a case
+where it fires.
+
+### Fixed — external audit, round 2 (2026-10-08)
+
+A second external review looked for regressions in the fixes above, and each finding was checked by
+a reviewer told to refute it. Each change is locked by a labelled case (`tests/cases.json`, 376
+cases) or a unit test that fails on the auditor before this round. Three limits and one risk were
+kept on purpose; they are written in the references named below.
+
+**Skills and descriptions (`04`, `13`, `33`)**
+- **`04-skill-description-length`** honours `skillListingMaxDescChars`: the 1,536 WARN and the 1,024
+  message use the configured listing cap.
+- **`13-no-global-scripts`: only what runs a script exempts it** - the `command` of a hook and
+  `statusLine.command` in `.claude/settings.json` or `settings.local.json`, and a hook in an agent's
+  or a skill's frontmatter. A permission rule, an `env` value or a description that names the script
+  no longer exempts it (the whole settings text was searched).
+- **`33-description-overlap`** reads `description` and `when_to_use` folded as YAML folds them, so an
+  exclusion wrapped over two lines is whole; the clause runs past "e.g." and "i.e.", and over a
+  bulleted list under "Do not use for:". Known limit: an exclusion in the next sentence ("Those go to
+  X") is not seen (`skill-anatomy.md`).
+
+**Agents (`08`, `09`, `23`)**
+- **`08-agent-frontmatter`: comments and multi-line `[`/`{` collections no longer read as "does not
+  parse".** Checked on 66 frontmatters against `claude plugin validate` 2.1.294: 14 false ERRORs
+  before, 0 after. The preloads and descriptions of those agents are audited again.
+- **`09`** reads the cells of the column headed `Agent` (the first column when none is): a `Tools`
+  cell (`Read, Grep`) is no longer taken for an agent, and a table folded into two `Agent | Domain`
+  pairs lists both halves.
+- **`23-agent-model`**: `inherit[1m]`, and a value with `claude-` inside a word, are reported (NOTICE);
+  the message says `[1m]` goes on an alias other than `inherit`.
+
+**Memory files, rules, budget (`01`, `11`, `14`, `17`, `53`)**
+- **`01`**: a `.claude/CLAUDE.md` symlinked to `./CLAUDE.md` is counted once; a memory file that is
+  not UTF-8 no longer crashes the size check.
+- **`@` imports** follow escaped spaces (`Dev\ Guide.md`, memory) and skip indented code blocks
+  (measured on Claude Code 2.1.294, not documented): `01-agents-md-unread`, `17` and `53` change with them.
+- **`11-english-only`**: `pour` is a French marker again, counted once however often it appears; in a
+  skill, only a French marker (`.fr.md`, `-fr.md`, `_fr.md`, `fr/`) exempts a file, so `ship-it.md`
+  and an `it/` folder are read.
+- **`14-rule-english-only`** counts distinct words, like `11`. **`14-rule-size`**: the message no
+  longer says a skill loads by its description only - a skill can keep the rule's `paths:` globs.
+  Known limit: nothing fires past 200 lines under 2 KB (`rules-anatomy.md`).
+- **`17`**: the aggregate cap is worded "Skill and command descriptions" and gives both parts.
+
+**Settings and hooks (`24`, `35`)**
+- **`24-settings-local` asks git**, not `root/.git`: audited from a subfolder of a repository, a
+  committed `settings.local.json` is reported COMMITTED and one the repository ignores is silent;
+  without git, or outside a repository, nothing is said (it crashed without git).
+- **`24-settings-scope`** says "without a word" only for `requiredMinimumVersion` and
+  `requiredMaximumVersion`; a managed-only key "takes effect from managed settings only".
+- **`35-hooks-command`**: a non-executable script run through `timeout`, `exec`, `nohup`, `nice`,
+  `env`, `stdbuf` or `xargs`, after `then`/`do`/`{`, or on a second line, is reported again; an
+  interpreter (`ruby x.sh`) stays silent.
+
+**MCP and security (`50`)**
+- **`50-security-mcp-unpinned`**: a `uvx` `git+URL` with a branch or no ref is reported; a commit hash
+  or a version-shaped tag is pinned. Known risk: a moved tag, or a branch named like a version,
+  passes (`mcp-anatomy.md`).
+- **`50-security-broad-allow`**: a committed `settings.local.json` stays an ERROR when the audit root
+  is a subfolder of the repository, and when git is missing; `check_security` no longer crashes without git.
+- **`50-security-directories`**: parent directories are reported on Windows paths too.
+- **`50-security-headless-isolation`**: a prompt in parentheses after a bare `--disallowedTools` name
+  is no longer read as a scoped rule.
+
+**Other agents and runtime (`54`, `56`, `57`)**
+- **`54-agents-md-variant`**: an imported `AGENTS.override.md` is reported when the `AGENTS.md` of the
+  same folder is imported too (Codex reads only the override, Claude Code both).
+- **`56`**: comments in `.vscode/settings.json` (JSON with Comments) are removed before
+  `chat.useClaudeHooks` is read.
+- **`57-runtime-rule-unscoped`**: a reload after compaction (`compact`) is evidence like `session_start`.
+
+**Evals, links, anchors (`18`, `26`, `28`)**
+- **`18`**: a command in a subfolder is named `folder:name` as a target.
+- **`26-evals-coverage`**: graders declared in `case.yaml` count.
+- **`28`**: the message says markdown links are checked by `20-relative-links`.
+
+**Crash, layout, overlay, doctrine (`00`, `31`, `46`)**
+- **`00-check-crashed`**: see the line above; rule, import and agent findings survive a crash of
+  `check_skills`.
+- **`00-layout`**: with `--layout none` and a `.mcp.json`, the message says security is not checked.
+- **`31-overlay-alias`**: an alias to an id that cannot be exempted no longer says it "still works".
+- **`46-doctrine-copy`**: `skill-runtime-mechanisms.md` is matched by name again. The vocabulary drops
+  generic repository folders, extension globs, credential variable names and fragments caught between
+  two code spans. Known limit: `semantic-layer.md` and `runtime-data.md` are not matched by name,
+  being common names in data repositories (`audit-checklist.md`).
+
+**Semantic layer (`59`)**
+- A sentence written twice in one file is two passages for a duplicate.
+- `--method claims`: votes are grouped through any answer quoting the same passage, so the order of
+  the answers no longer decides; confirmations cached by the earlier grouping are not reused.
+- A `CLAUDE.md` symlinked to `AGENTS.md` no longer lists `AGENTS.md` as not reviewed.
+
+**Tests**: the alias test leaves the shipped aliases in place; `repo.tracked_paths` falls back to the
+file walk when git is missing.
+
+Measured on 19 private repositories, auditor before this round against after (two runs, one at the
+merge of the fixes, one after the last two): errors unchanged; `11-english-only` one WARN and one
+NOTICE more (`pour`, a script matching French text and a skill written in French);
+`31-overlay-unused` one NOTICE less (an exemption used again); `46-doctrine-copy` one NOTICE more (a
+project reference at 51 % of its code terms, the threshold being 50 %).
+
+### Fixed — external audit, round 3 (2026-10-08)
+
+A third external review looked for regressions in round 2; each finding was checked by a reviewer
+told to refute it. Each change is locked by a labelled case (`tests/cases.json`, 389 cases) or a
+unit test that fails on the auditor before this round.
+
+- **`13-no-global-scripts`**: a script run by `apiKeyHelper`, `awsAuthRefresh`,
+  `awsCredentialExport`, `gcpAuthRefresh`, `otelHeadersHelper`, `fileSuggestion.command` or
+  `subagentStatusLine.command` is exempt, like one run by a hook or `statusLine.command`: each is a
+  command Claude Code runs (`settings-reference`). Round 2 reported them, and moving them broke the
+  configured path.
+- **`09`**: the `Agent` header is recognised over delimiter cells of one or two dashes (`|:-|`) and
+  in a table without outer pipes, as GitHub Flavored Markdown allows; the first column alone was
+  read, which lost the WARN for a missing agent and gave a false "not listed".
+- **`24-settings-scope`**: `autoContinueAtUsageLimit` in a project or local file is no longer called
+  ignored: there it "turns the feature off rather than being ignored" while user settings,
+  `--settings` and managed settings leave it unset (`settings-reference`). A `true` is an ERROR that
+  says so; a `false`, and a `false` `bashEditDiffEnabled` ("still turns it off"), is a NOTICE.
+- **`--method claims`**: an answer votes for a finding when one of its own findings holds that
+  finding's quotes. Grouped through any member (round 2), one broad answer linked two narrower
+  findings: a contradiction each narrow answer gave 2 times in 3 came out 3/3, and two unanimous
+  findings became one. Confirmations cached under the earlier grouping are not reused.
+- **`35-hooks-command`**: a redirect written against the script name (`./x.sh>/dev/null`) is read
+  as a redirect again, and its file is not taken for the program; `command -v x` looks `x` up
+  without running it and is no longer reported.
+- **`01-claude-md-size`**: the "HTML comments not injected" figure is measured on the decoded text;
+  a memory file that is not UTF-8 gave a negative count.
+- **`01-claude-md-import`** and the `AGENTS.md` import check use the import parser of the budget:
+  an indented code block imports nothing, and a missing `@docs/Dev\ Guide.md` is reported.
+- **`23-agent-model`**: the `claude-` prefix is read in any casing (`model-config`).
+- **`33-description-overlap`**: `E.g.`, `I.e.`, `vs.` and `cf.` do not end an exclusion, nor does
+  `etc.` unless a capital follows; a blank line inside a plain description is kept as YAML keeps
+  it, so an unpunctuated exclusion no longer runs into the next paragraph.
+- **`50-security-mcp-unpinned`** names a git ref holding `/` (`@feature/orders`) instead of saying
+  "no git ref". **`50-security-broad-allow`**: when git cannot answer (missing, or refusing a
+  repository of another owner), the stricter grade stays but the message says "if git tracks it".
+- **`57-runtime-rule-unscoped`**: when the latest load is `compact`, the message says the rule was
+  likely, not provably, read as unscoped - the docs do not say which load reason a scoped rule gets
+  when a file re-read after compaction matches its glob.
+- References: the per-entry cap of `17` is `skillListingMaxDescChars` (1,536 by default); the
+  README no longer calls every out-of-scope key silent.
+
+Measured on 19 private repositories, auditor before this round against after: no count changed
+(errors 0, warnings 74, notices 102 on both).
+
+### Added
+
+- **Fixes from 62 public `anthropics/claude-code` issues reproduced against 0.22.1**, each locked by a
+  labelled case and an eval built on the issue's configuration (`evals/PROVENANCE.md`):
+  - **`42-permissions-rule` gave a fix that stayed wrong.** `Write(/home/dev/repo/**)` was told to
+    become `Edit(/home/dev/repo/**)`; a single leading `/` is "relative to the settings source", so
+    the advice now gives `Edit(//home/dev/repo/**)` (#98443).
+  - **`42-permissions-path-anchor` (WARN), new.** A `Read(...)` or `Edit(...)` path that starts with one
+    `/` and a system folder (`/home/`, `/Users/`, `/opt/`, `/etc/`...) is anchored at the settings
+    source, not the filesystem root. `Edit(/src/**)`, and a folder that exists in the project, are
+    left alone (#98443, #6850, #61268, #5140).
+  - **`35-hooks-matcher`: a matcher written as a permission rule.** `"matcher": "Bash(git commit*)"`
+    is compared with the tool name only and never fires; the argument filter belongs in `if`. A
+    pattern that does match its tool, such as `Edit(.*)`, is not reported (#82314).
+  - **`35-hooks-command`: hook scripts under `~/`, `$HOME/`, an absolute path or a bare relative path**
+    are now checked for existence; only `$CLAUDE_PROJECT_DIR`, `${CLAUDE_PLUGIN_ROOT}` and `./` were.
+    A hook whose script is missing cannot start and does not block: the guard fails open (#82323).
+  - **The home directory is not audited as a project.** `~/.claude` holds user-scope configuration;
+    project rules gave false errors there. The audit now says so and checks nothing (#93109).
+  - **`23-agent-frontmatter-keys` no longer says "ignored" for an undocumented key**: it says the key
+    is not documented and nothing guarantees it is read (`observer` is accepted by recent builds, #93109).
+  - **`23-agent-tools` also reads `Task(...)`**, the old name of the Agent tool, which still resolves:
+    a `deny: ["Task"]` rule removes the Agent tool on 2.1.293, though the documentation no longer
+    says so (#28277).
+  Checked and set aside: a plugin that declares `hooks/hooks.json` in its manifest runs the hook once,
+  not twice, on Claude Code 2.1.293 (#16288 does not reproduce).
+
+- **`01-claude-md-case` (WARN).** A `claude.md`, `Claude.md` or `claude.local.md` - a memory file
+  whose name differs only by case - is not loaded on Linux: measured with Claude Code 2.1.291, a
+  codeword in `claude.md` was not known to the session, the same file named `CLAUDE.md` was. Users
+  report it is found on macOS and Windows (case-insensitive filesystems); the documentation says
+  nothing about case; neither is tested here. Sources are in `skills/config-auditor/evidence.json`. A repository whose only memory file is `claude.md` was reported as
+  layout `none`, "nothing to audit, and nothing is missing"; it is now a project.
+- **`semantic.py --method claims` (experimental, not the default).** Duplicates and contradictions
+  between files, found through the instructions themselves: each file's instructions are extracted
+  once and cached by content, filed under shared topics, joined for free when two paragraphs share
+  most of their words (a copy) or one code anchor carries opposite polarities (a contradiction),
+  then confirmed with verbatim quotes. Measured before its current form (no vote, no confirmation
+  cache), one pass over 28 repository states holding 24 defects their authors declared - of the 17
+  duplicates, 11 were kept and updated rather than removed: duplicates found 8 of 17 (the default
+  method: 5), 96 % precision on 50 drawn; contradictions 0 of 7, 82 % on 50. Labelled by the
+  assistant that designed the method, not blind. It stays opt-in until it is measured again.
+- **A finding that calls itself weak mid-sentence is rejected** ("This is weak: ... not a true
+  contradiction"); only a leading "Weak" was caught.
+- **The semantic layer reads the files the instruction files point to** (one hop, inside the
+  repository: links, `@` imports, paths in backticks). Each is sent with the file that names it,
+  closest vocabulary first, within 80,000 characters per request; those left out are counted in
+  the report. Pairing is precomputed per file (4 minutes to 10 seconds on 250 references).
+- **`deadweight` shows each check's measured precision**, read from
+  `skills/config-auditor/precision.json`: `precision 24/25 (96 %, 3 repositories, too few to conclude), 2026-09-27,
+  earlier auditor 43b08d90`, or `precision not measured`. The fraction and the number of
+  repositories are always shown (868/869 came from 3 repositories, and reads `too few to
+  conclude`), with the date and the auditor measured, named `earlier` when it is not yours. A
+  precision measured on ERROR findings is not shown for the same check's WARN. The table sits
+  outside the auditor's package: updating it never changes the sha or a floor. 32 checks are
+  measured, on findings labelled by hand by the assistant that wrote the checks, not blind.
+- **Findings are grouped by check.** One header per check with its count (`×15`), the first two
+  findings, then `... 13 more: deadweight --all`. `--all` shows every finding.
+
+### Changed
+
+- **The skill's description says what it brings and when to load it, and its triggers move to
+  `when_to_use`.** The old one listed the right situations, yet the skill loaded in 129 of 160 runs
+  where it should have: asked why a hook never fires or which settings file wins, the model answered
+  from memory and missed release-specific rules. Measured on this plugin's eval suite, same code,
+  only the description changed (Claude Sonnet 5.5): loaded 160 of 160; stayed out of its domain 8 of
+  9, then 10 of 10 on the MCP-setup case once that case was named as an exclusion; answers judged
+  correct 58 of 72 against 56. The listing grows from 1,021 to 1,133 characters (`description` plus
+  `when_to_use`, within the 1,536 cap). Checked on Claude Opus 5.5 on the eight cases that loaded
+  least and the three it must stay out of: loaded 23 of 24, stayed out 9 of 9.
+
 ## 0.22.1 — 2026-10-04
 
 `audit.py` is unchanged: floors set with 0.22.0 still compare.

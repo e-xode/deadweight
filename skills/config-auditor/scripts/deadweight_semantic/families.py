@@ -20,8 +20,10 @@ FAMILIES = {
            "an instruction with no criterion anyone could check (\"be rigorous\", \"clean code\")",
            "the quoted instruction", 1),
     "62": ("62-semantic-misplaced",
-           "method or reference knowledge in CLAUDE.md that belongs in a skill, or a hard rule buried "
-           "in a skill reference that every session needs",
+           # Only the CLAUDE.md side: 62 is asked in the request that carries CLAUDE.md and the
+           # rules, which holds no skill reference unless CLAUDE.md links it - "a hard rule buried
+           # in a skill reference" could not be reported, and was never measured.
+           "method or reference knowledge in CLAUDE.md that belongs in a skill",
            "the quoted passage and where it belongs", 1),
 }
 
@@ -34,8 +36,11 @@ NOT_DEFECTS = (
 )
 
 # Shown by default: the two families measured at 90 % precision or more on defects of real
-# repositories (2026-10-01: contradictions 47/50, duplicates 50/50). The others answer a
-# narrower question or did not reach the bar, and are added on request (--semantic-also).
+# repositories, with --method files (2026-10-01, layer b473baf4, claude-sonnet-5-5, 50 drawn
+# per family: contradictions 50/50, duplicates between files 49/50; an earlier pass of the
+# same day gave 47/50 and 50/50). The layer has changed since; no later measurement is
+# recorded. The others answer a narrower question or did not reach the bar, and are added on
+# request (--also).
 DEFAULT = ("58", "59")
 ON_REQUEST = {
     "internal-duplicates": "59",   # the same rule twice in ONE file - often a rule and its anti-pattern
@@ -43,3 +48,6 @@ ON_REQUEST = {
     "untestable": "61",            # true by definition, often a deliberate charter ("Bold, never noisy")
     "misplaced": "62",             # 4 findings: not measured enough
 }
+# Accepted and ignored: a SKILL.md restating its own reference is shown by default since
+# 2026-10-08 (run.py), so this option changed nothing in either method.
+NO_EFFECT = ("skill-duplicates",)

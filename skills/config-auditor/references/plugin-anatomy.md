@@ -64,7 +64,7 @@ shop-kit/
 | `commands`, `agents`, `workflows`, `outputStyles`, `experimental.themes`, `experimental.monitors` | **replaces** — the default directory is no longer scanned |
 | `hooks`, `mcpServers`, `lspServers` | own merge rules (see each section) |
 
-- Replacing fields: files left in the default folder and not listed **do not load**. Claude Code warns in `claude plugin list` and `/plugin`, not at session start. To keep the default, list it: `"agents": ["./agents/", "./extra-agents/"]`. → `44-plugin-path` WARN (**House:** the check covers `agents` and `commands` only).
+- Replacing fields: files left in the default folder and not listed **do not load**. Claude Code warns in `claude plugin list` and `/plugin`, not at session start. To keep the default, list it: `"agents": ["./agents/", "./extra-agents/"]`. → `44-plugin-path` WARN, for every replacing field above, each with its folder's file pattern (`*.md` for `agents`, `commands`, `outputStyles`; `*.js` for `workflows`; `*.json` for `experimental.themes`; `monitors.json` for `experimental.monitors`).
 - Every path is relative and starts with `./` (`skills` also accepts `"."`, 2.1.221+) → `44-plugin-path` ERROR.
 - A path resolving outside the plugin root (`../shared`, or a symlink out of the marketplace) is rejected with `path escapes plugin directory`; **the plugin loads without that component** (plugins-reference, Path traversal limitations) → `44-plugin-path` ERROR. On macOS/Linux a backslash anywhere in a path rejects it too.
 - Files above the plugin root are not copied into the cache, so a script reading `../` finds nothing after install (same section).
@@ -182,7 +182,7 @@ Blind spots it documents itself: a root `SKILL.md` of a plugin not sitting in a 
 | Check | Fires on |
 | --- | --- |
 | `44-plugin-layout` | component directories inside `.claude-plugin/` |
-| `44-plugin-path` | path without `./`; path escaping the root; files in `agents/` or `commands/` not loaded because the field replaces the folder |
+| `44-plugin-path` | path without `./`; path escaping the root; files in a default folder (`agents/`, `commands/`, `output-styles/`, `workflows/`, `themes/`, `monitors/`) not loaded because the field replaces it |
 | `44-plugin-version` | `version` differing between `plugin.json` and `marketplace.json` |
 | `23-agent-frontmatter-keys` | `hooks`, `mcpServers`, `permissionMode` on a plugin agent |
 | `45-command-shadowed` | command/skill name clash; `name`/`paths` in a command file |
@@ -191,4 +191,4 @@ Blind spots it documents itself: a root `SKILL.md` of a plugin not sitting in a 
 | `36-foreign-skill` | routing text naming a skill the plugin does not ship — absent in a consumer's project |
 | `30-plugin-cost` | always-loaded characters every consumer pays per turn |
 
-**`30-plugin-cost`, why it matters more for a plugin.** Every enabled plugin's skill and agent descriptions enter each consumer's listing, plus the `<plugin>:` prefix. **House, measured 2026-09-22:** `skillOverrides` does not reach a plugin skill, so a consumer can only disable the whole plugin — the cost is not negotiable downstream (the skills page documents `skillOverrides` for personal, project and bundled skills and says nothing of plugin skills).
+**`30-plugin-cost`, why it matters more for a plugin.** Every enabled plugin's skill and agent descriptions enter each consumer's listing, plus the `<plugin>:` prefix. **Doc** (skills, measured first on 2026-09-22): "Plugin skills are not affected by `skillOverrides`", so a consumer can only disable the whole plugin — the cost is not negotiable downstream, and `30-plugin-cost` ignores `skillOverrides` in a plugin. Each skill costs `description` + `when_to_use`, capped at 1,536 characters.

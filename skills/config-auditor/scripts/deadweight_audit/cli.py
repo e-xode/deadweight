@@ -63,6 +63,13 @@ def main(argv: list[str]) -> int:
 
     root = Path(args.root).resolve()
     layout = detect_layout(root) if args.layout == "auto" else args.layout
+    # The home directory is not a project: ~/.claude holds USER-scope configuration, and the
+    # project rules applied to it gave 8 errors and 6 warnings on one machine, such as
+    # `defaultMode` "ignored at project scope" in user settings, where it is honoured
+    # (reported from anthropics/claude-code#93109, 2026-10-08). Said, not guessed at.
+    home = args.layout == "auto" and root == Path.home().resolve()
+    if home:
+        layout = "none"
     # A repository that ships a plugin or a marketplace AND is itself worked on with
     # Claude Code is both. Detection answered one role, and the project it also is went
     # unaudited: 11 of 13 non-project repositories in a 150-repository sample
@@ -86,6 +93,15 @@ def main(argv: list[str]) -> int:
         "none": "no Claude Code configuration here - no CLAUDE.md, no .claude/, no "
                 "skills/, no manifest. Nothing to audit, and nothing is missing.",
     }
+    if layout == "none" and (root / ".mcp.json").is_file():
+        # Project-scoped MCP servers live in a root `.mcp.json` (mcp, Project scope): check
+        # 43 reads it whatever the layout, so "nothing to audit" would be false here. Auto
+        # detection classes such a repository `project`; only a forced `none` lands here,
+        # and there check_security does not run: "are audited" read as a clean security
+        # pass on an unpinned npx server (external audit 3, g8-04).
+        detail["none"] = ("no CLAUDE.md, no .claude/, no skills/, no manifest - only a "
+                          ".mcp.json. Its servers' definitions are checked (43-mcp-*), not "
+                          "their security (50-security-mcp-*): drop `--layout none` for that.")
     if layout in detail:
         msg = f"Layout `{layout}`{'' if args.layout != 'auto' else ' (detected)'}: {detail[layout]}"
     else:
@@ -97,7 +113,12 @@ def main(argv: list[str]) -> int:
                + (" No manifest: the plugin is named after its folder, which the manifest "
                   "is optional for." if layout == "plugin"
                   and not (root / ".claude-plugin" / "plugin.json").is_file() else ""))
-    if layout == "none":
+    if home:
+        msg = ("Layout `none` (detected): this is your home directory. `~/.claude` holds USER-scope "
+               "configuration (settings, agents, skills), whose rules differ from a project's: this "
+               "auditor checks project and plugin configuration only, so nothing here is audited. "
+               "To audit a project, run it from the project's root.")
+    elif layout == "none":
         # "Nothing to audit, and nothing is missing" was said beside a `symfony/CLAUDE.md`:
         # a subdirectory's CLAUDE.md "loads on demand when Claude reads files in those
         # directories" (memory). 1 of 2 `none` repositories on a public sample, 2026-09-27.

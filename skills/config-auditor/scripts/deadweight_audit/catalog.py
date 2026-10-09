@@ -13,7 +13,11 @@ from .identity import instrument_files
 # exemption inert - and the audit then blames the project for an id this script
 # changed. Ids are therefore never renamed: an id that must change is added here,
 # old -> new, and keeps working. Never remove an entry.
-CHECK_ID_ALIASES: dict[str, str] = {}
+CHECK_ID_ALIASES: dict[str, str] = {
+    # Never emitted: the sha mismatch has always been reported as `34-floor`. Listed as
+    # unexemptable until 0.23.0, so an overlay may name it (audit externe 2026-10-08).
+    "34-audit-sha": "34-floor",
+}
 
 
 # Retired checks, same contract seen from the other side: an exemption a project wrote
@@ -31,6 +35,10 @@ RETIRED_CHECK_IDS: dict[str, str] = {
 }
 
 
+# Group descriptions, not ids: known_check_ids() reads every quoted "NN-name" in the package
+# as an id the audit emits, so a family written that way here passed the exemption typo guard
+# (31-overlay-unknown-check) while excusing nothing - 39-eval-quality, 42-permissions, 43-mcp
+# and 44-plugin-manifest did until 0.23.0.
 CHECKS = (
     "dangling symbolic links",
     "instructions against the repository: stale commands, dead anchors, file trees, verification",
@@ -75,11 +83,11 @@ CHECKS = (
     "plugin routing to skills it does not ship",
     "flags the documentation shows must exist in the script",
     "38-unreadable",
-    "39-eval-quality",
+    "eval quality (39-eval-*)",
     "40-skill-not-loaded",
-    "42-permissions",
-    "43-mcp",
-    "44-plugin-manifest",
+    "permission rules (42-permissions-*)",
+    "MCP configuration (43-mcp-*)",
+    "plugin manifest (44-plugin-*)",
     "45-command-shadowed",
     "46-doctrine-copy",
     "other agents: AGENTS.md variants, Cursor rules, Copilot instruction files",

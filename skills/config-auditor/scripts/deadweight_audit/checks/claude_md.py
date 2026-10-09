@@ -7,17 +7,112 @@ import re
 from ..checks.budget import unreachable_skills
 from ..context import AuditContext
 from ..parsing.markdown import injected_memory, strip_code_fences
-from ..repo import claude_md_path
+from ..repo import claude_md_path, expand_imports, project_memory_files
 from ..report import Report, house, house_note
+
+
+MEMORY_NAMES = ("CLAUDE.md", "CLAUDE.local.md")
+
+
+def check_memory_file_case(root, report: Report) -> None:
+    """A memory file whose name differs from CLAUDE.md / CLAUDE.local.md only by case.
+
+    Measured on Linux, Claude Code 2.1.291 (2026-10-06): a `claude.md` holding a codeword was
+    not loaded (the session answered NONE), the same file named `CLAUDE.md` was. macOS and
+    Windows are NOT measured: whether Claude Code loads it there is unknown, so the message
+    says only what was measured. Read from the directory listing, never through exists(),
+    whose answer depends on the filesystem's case handling.
+    """
+    # Where each name is a memory file (memory): CLAUDE.md at the root or in .claude/,
+    # CLAUDE.local.md at the root only - advising `.claude/CLAUDE.local.md` would move the
+    # file to another name that does not load either (found by review, 2026-10-08).
+    for folder, allowed in ((root, MEMORY_NAMES), (root / ".claude", ("CLAUDE.md",))):
+        try:
+            names = os.listdir(folder)
+        except OSError:
+            continue
+        for name in names:
+            wanted = next((m for m in allowed if name.lower() == m.lower() and name != m), None)
+            if not wanted:
+                continue
+            twin = (" A `" + wanted + "` sits next to it: on Linux both exist and only `" + wanted
+                    + "` is read, so the two copies can drift apart unseen.") if wanted in names else ""
+            report.add("01-claude-md-case", "WARN",
+                       f"`{name}` is not read by Claude Code on Linux (tested with 2.1.291), so not in Linux "
+                       f"CI or containers either: only `{wanted}` is. Users report it is found on macOS "
+                       f"and Windows; the documentation says nothing about case.{twin} "
+                       + (f"Merge it into `{wanted}`." if twin else f"Rename it `{wanted}`."),
+                       str(folder / name))
+
+
+def agents_md_imported(root, files) -> bool:
+    """Whether one of these memory files - or a file it imports - pulls in ./AGENTS.md.
+
+    An import resolves "relative to the file containing the import", and "Import parsing
+    skips Markdown code spans and fenced code blocks" (memory). A substring test for
+    `@AGENTS.md` warned on `@./AGENTS.md` and on `@../AGENTS.md` from .claude/CLAUDE.md,
+    and passed `@AGENTS.md` in .claude/CLAUDE.md, which points at .claude/AGENTS.md
+    (audit externe 2026-10-08, P1-A--03 and P2-A--01).
+    """
+    target = os.path.realpath(root / "AGENTS.md")
+    for f in files:
+        if os.path.realpath(f) == target:
+            return True                 # the memory file IS AGENTS.md, through a link
+        if any(os.path.realpath(p) == target for p in expand_imports(f)):
+            return True
+    return False
+
+
+def _import_spelling(root, path) -> str:
+    """The `@` import of ./AGENTS.md as written from `path`'s folder."""
+    rel = os.path.relpath(root / "AGENTS.md", path.parent).replace(os.sep, "/")
+    return "@" + rel
+
+
+def check_claude_md_size(ctx: AuditContext, report: Report, path) -> None:
+    """01-claude-md-size and 01-claude-md-lines for one memory file."""
+    root = ctx.root
+    label = path.relative_to(root).as_posix()
+    # errors="replace": a personal CLAUDE.local.md in Latin-1 stopped the whole check and
+    # hid its other findings (audit externe 3, g4-00). Each undecodable byte then counts
+    # 3 bytes (U+FFFD) instead of 1: the size is approximate for such a file only.
+    raw = path.read_text(encoding="utf-8", errors="replace")
+    size = len(injected_memory(raw).encode("utf-8"))
+    # Measured on the same decoded text: against the on-disk size, each replaced byte took 2
+    # bytes off the comment count, which went negative (external audit 4, cl-01).
+    comments = len(raw.encode("utf-8")) - size
+    if size > ctx.limits.CLAUDE_MD_MAX_BYTES:
+        report.add(
+            "01-claude-md-size",
+            house(ctx),
+            f"{label} is {size} bytes (max {ctx.limits.CLAUDE_MD_MAX_BYTES}). Move knowledge to skills."
+            + house_note(f"at most {ctx.limits.CLAUDE_MD_MAX_BYTES} bytes",
+                         "under 200 lines (memory) - checked by 01-claude-md-lines"),
+            str(path),
+        )
+    else:
+        report.add("01-claude-md-size", "OK", f"{label} size {size} bytes <= {ctx.limits.CLAUDE_MD_MAX_BYTES}"
+                   + (f" ({comments} bytes of HTML comments not injected)." if comments else "."), str(path))
+    injected = injected_memory(raw)
+    lines = injected.count("\n") + (0 if injected.endswith("\n") or not injected else 1)
+    if lines > ctx.limits.CLAUDE_MD_MAX_LINES:
+        report.add("01-claude-md-lines", "WARN",
+                   f"{label} is {lines} lines (> {ctx.limits.CLAUDE_MD_MAX_LINES}). \"Files over 200 lines "
+                   "consume more context and may reduce adherence\" (memory).", str(path))
 
 
 def check_claude_md(ctx: AuditContext, report: Report) -> None:
     root = ctx.root
+    check_memory_file_case(root, report)
+    # Every memory file that loads is measured, not the first one found: "target under
+    # 200 lines per CLAUDE.md file" (memory; audit externe 2026-10-08, P2-A--06).
+    for memory in project_memory_files(root):
+        check_claude_md_size(ctx, report, memory)
     path = claude_md_path(root)
     if not path.exists():
         local = root / "CLAUDE.local.md"
         if (root / "AGENTS.md").is_file() and local.is_file() \
-                and "@AGENTS.md" not in local.read_text(encoding="utf-8", errors="replace"):
+                and not agents_md_imported(root, [local]):
             # "Because CLAUDE.local.md counts, adding one [...] in a project that relies on
             # AGENTS.md stops Claude from reading AGENTS.md for you" (memory, 2026-09-28).
             report.add("01-agents-md-unread", "WARN",
@@ -37,50 +132,34 @@ def check_claude_md(ctx: AuditContext, report: Report) -> None:
                    "No CLAUDE.md: it is optional, and nothing here is read every session.",
                    str(path))
         return
-    raw = path.read_text(encoding="utf-8")
-    size = len(injected_memory(raw).encode("utf-8"))
-    comments = path.stat().st_size - size
-    if size > ctx.limits.CLAUDE_MD_MAX_BYTES:
-        report.add(
-            "01-claude-md-size",
-            house(ctx),
-            f"CLAUDE.md is {size} bytes (max {ctx.limits.CLAUDE_MD_MAX_BYTES}). Move knowledge to skills."
-            + house_note(f"at most {ctx.limits.CLAUDE_MD_MAX_BYTES} bytes",
-                         "under 200 lines (memory) - checked by 01-claude-md-lines"),
-            str(path),
-        )
-    else:
-        report.add("01-claude-md-size", "OK", f"CLAUDE.md size {size} bytes <= {ctx.limits.CLAUDE_MD_MAX_BYTES}"
-                   + (f" ({comments} bytes of HTML comments not injected)." if comments else "."), str(path))
-
-    text = raw
-    injected = injected_memory(raw)
-    lines = injected.count("\n") + (0 if injected.endswith("\n") or not injected else 1)
-    if lines > ctx.limits.CLAUDE_MD_MAX_LINES:
-        report.add("01-claude-md-lines", "WARN",
-                   f"CLAUDE.md is {lines} lines (> {ctx.limits.CLAUDE_MD_MAX_LINES}). \"Files over 200 lines "
-                   "consume more context and may reduce adherence\" (memory).", str(path))
+    text = path.read_text(encoding="utf-8")
     agents_md = root / "AGENTS.md"
     # One file linked to the other is read once, and read: "A CLAUDE.md symlinked to
     # AGENTS.md: nothing [to do]" (memory). Missed, it was 16 of 144 findings on 600
-    # public repositories (2026-09-27).
-    same_file = agents_md.exists() and os.path.realpath(agents_md) == os.path.realpath(path)
-    if agents_md.is_file() and not same_file and "@AGENTS.md" not in text:
+    # public repositories (2026-09-27). The committed files decide: CLAUDE.local.md is
+    # personal, and an import there reads AGENTS.md for its owner only.
+    committed = [p for p in (root / "CLAUDE.md", root / ".claude" / "CLAUDE.md") if p.is_file()]
+    if agents_md.is_file() and not agents_md_imported(root, committed):
+        spelling = _import_spelling(root, path)
         report.add("01-agents-md-unread", "WARN",
                    "AGENTS.md sits beside a CLAUDE.md that does not import it. By default "
                    "(`claude-md-or-agents-md`), Claude Code reads AGENTS.md only when no CLAUDE.md "
-                   "exists - a CLAUDE.md that names it in words is not enough. Add `@AGENTS.md`, or "
+                   "exists - a CLAUDE.md that names it in words is not enough. Add "
+                   f"`{spelling}` to {path.relative_to(root).as_posix()} (an import resolves from "
+                   "the importing file), or "
                    "make one a symlink to the other; the user setting `claude-md-and-agents-md` "
                    "reads both, but only for whoever sets it (memory).",
                    str(agents_md))
-    stripped = strip_code_fences(text)
+    stripped = strip_code_fences(text, indented=True)
     # `/*` after a word is a glob (`lib/*.v`) or bold markdown (`**agent/**`), not a
-    # comment: 9 of 12 findings on a public sample, 2026-09-27.
-    if re.search(r"^\s*//", stripped, re.MULTILINE) or re.search(r"(?:^|\s)/\*(?!!)", stripped, re.M):
+    # comment: 9 of 12 findings on a public sample, 2026-09-27. A `/*` with no closing
+    # `*/` is a root glob (` /*.env`), not a comment (audit externe 2026-10-08, P2-B--05).
+    if re.search(r"^\s*//", stripped, re.MULTILINE) \
+            or re.search(r"(?:^|\s)/\*(?!!)(?:(?!/\*).)*?(?<![*/])\*/", stripped, re.M | re.S):
         report.add(
             "12-no-code-comments",
             house(ctx),
-            "CLAUDE.md contains // or /* */ outside fenced code blocks."
+            "CLAUDE.md contains // or /* */ outside code blocks."
             + house_note("prose only, no code comments", "nothing on this"),
             str(path),
         )
@@ -101,8 +180,34 @@ def check_cross_refs(
     )
     if agents_table_match:
         block = agents_table_match.group(0)
-        for m in re.finditer(r"\|\s*`([a-z0-9-]+)`\s*\|", block):
-            referenced_agents.add(m.group(1))
+        # Any name the harness accepts: it "can't contain `:`" and must not start with `-`
+        # (sub-agents). `[a-z0-9-]+` read `shop_QA` as no entry at all (audit externe
+        # 2026-10-08, P1-B--01). A `/` is kept out: a path in the table is not a name.
+        # The cells of the column headed `Agent` only - the first column when no header
+        # says so: the other cells hold a model (`sonnet`) or a tools list (`Read, Grep`,
+        # the documented spelling), and reading them named agents that do not exist (audit
+        # externe 3, g4-01). A table folded into two `Agent | Domain` pairs has two such
+        # columns; the first cell alone left the second half unlisted (fusion, audit 3).
+        # A GFM delimiter cell is one dash or more with optional colons, and the outer
+        # pipes are optional: `|:--|` or `--- | ---` hid the `Agent` header, and only the
+        # first column was read (external audit 4, cl-00).
+        lines = block.splitlines()
+        cols = [0]
+        for i, line in enumerate(lines):
+            if "|" not in line:
+                cols = [0]
+                continue
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            nxt = lines[i + 1] if i + 1 < len(lines) else ""
+            if "|" in nxt and re.fullmatch(r"\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*", nxt):
+                named = [j for j, c in enumerate(cells)
+                         if re.fullmatch(r"[*_`]*(?:sub-?)?agents?(?: name)?[*_`]*", c, re.IGNORECASE)]
+                cols = named or [0]
+                continue
+            for j in cols:
+                m = re.fullmatch(r"`([^`:|\s/-][^`:|/]*?)`", cells[j]) if j < len(cells) else None
+                if m:
+                    referenced_agents.add(m.group(1))
 
     for agent_name in agents:
         if agent_name not in referenced_agents:
@@ -120,9 +225,21 @@ def check_cross_refs(
             report.add(
                 "09-claude-md-agent-missing",
                 "WARN",   # a table that names a missing agent points at nothing, whatever the profile
-                f"CLAUDE.md references agent '{ref}' but .claude/agents/{ref}.md does not exist",
+                f"CLAUDE.md references agent '{ref}', but no agent has `name: {ref}` - an agent "
+                "is known by its `name` field, not its filename (sub-agents)."
+                + _same_stem(ctx, agents, ref),
                 str(claude_md),
             )
+
+
+def _same_stem(ctx: AuditContext, agents: dict[str, dict], ref: str) -> str:
+    """When a file named after the missing agent exists, the name it actually carries."""
+    from pathlib import Path
+    for ident, data in agents.items():
+        if Path(data.get("path", "")).stem == ref:
+            return (f" {ctx.agents_dir}/{Path(data['path']).name} exists, but its `name` is "
+                    f"'{ident}'.")
+    return f" No file {ctx.agents_dir}/{ref}.md either."
 
 
 def check_skill_index(ctx: AuditContext, report: Report, skills: dict[str, dict]) -> None:
@@ -200,8 +317,11 @@ def check_skill_index(ctx: AuditContext, report: Report, skills: dict[str, dict]
         if ref in skills and ref not in hidden:
             report.add(
                 "15-skill-index",
-                "WARN",
+                house(ctx),     # the index is a house convention (audit externe 2026-10-08, P1-B--05)
                 f"CLAUDE.md 'Skills index' names '{ref}', but that skill is fully listed by the harness. "
-                "Drop the entry: the index carries withheld skills only.",
+                "Drop the entry: the index carries withheld skills only."
+                + house_note("a 'Skills index' that names withheld skills only",
+                             "nothing on a skills index - the listing already carries every "
+                             "visible skill's description (skills)"),
                 str(claude_md),
             )

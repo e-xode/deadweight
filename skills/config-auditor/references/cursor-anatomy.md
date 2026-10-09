@@ -180,7 +180,7 @@ Implemented in `audit.py` (0.20.0), measured on public repositories before relea
 | `55-cursor-rule-manual` | `.mdc` frontmatter | no `alwaysApply`, no `globs`, no `description`: never applied on its own (NOTICE) |
 | `55-cursor-rule-glob` | `.mdc` `globs`, repository tree | a glob pattern matching no file in the repository (NOTICE: 79 % real on 98 public repositories, under the 90 % bar - the rest sat in repositories that distribute rules for others) |
 | `55-cursorrules-legacy` | `.cursorrules` at the root | file present (NOTICE) |
-| `55-cursor-reads-claude-md` | `CLAUDE.md`, with `.cursor/` present | `CLAUDE.md` names a Claude Code-only mechanism (a built-in slash command, the `Task` or `Skill` tool, `.claude/agents`, `.claude/hooks`, `.claude/commands`) that Cursor applies to every conversation (NOTICE). Subagents and `.claude/skills/` are not counted: Cursor has both. |
+| `55-cursor-reads-claude-md` | `./CLAUDE.md` only, with `.cursor/` present | `CLAUDE.md` names a Claude Code-only mechanism (a built-in slash command Cursor CLI does not document, the `Task` or `Skill` tool, `.claude/commands`) that Cursor applies to every conversation (NOTICE). Not counted, because Cursor has them: subagents, `.claude/skills/`, `.claude/agents/` (cursor.com/docs/context/subagents, Claude compatibility), `.claude/hooks/` and `.claude/settings*.json` (third-party hooks, on by default), and `/model`, `/clear`, `/resume`, `/rewind`, `/mcp`, `/plugin`, `/config` (Cursor CLI slash commands). |
 
 **Not checked**: a `globs` value written as a YAML list rather than a comma-separated string —
 its behavior is untested, so nothing is flagged as wrong either way; the content of a rule, a

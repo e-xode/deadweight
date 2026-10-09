@@ -6,6 +6,7 @@ import re
 from ..checks.budget import listing_hidden_skills
 from ..context import AuditContext
 from ..limits import CHARS_PER_TOKEN
+from ..parsing.frontmatter import frontmatter_raw_value, parse_frontmatter
 from ..report import Report, house, house_note
 
 
@@ -61,11 +62,72 @@ def check_agent_descriptions(ctx: AuditContext, report: Report, agents: dict[str
 # clause there fires this check on precisely the projects that already declared their
 # exception, which is how a criterion becomes unsatisfiable and then ignored. The list
 # is not a translation table - it holds the openers actually observed on the fleet.
+# The apostrophe may be typographic (U+2019) or a backtick: `Don’t use` and `N’utilisez
+# pas` were read as no clause at all until 0.23.0 (external audit, 2026-10-08).
 ANTI_TRIGGER_RE = re.compile(
-    r"Do ?n'?o?t use|Never use|Not for:|Out of scope|Anti-?trigger"
-    r"|Ne pas utiliser|N'utilisez? pas|Hors périmètre",
+    r"Do ?n['’`]?o?t use|Never use|Not for:|Out of scope|Anti-?trigger"
+    r"|Ne pas utiliser|N['’`]utilisez? pas|Hors périmètre",
     re.IGNORECASE,
 )
+
+
+def _listing_text(sk: dict) -> str:
+    """What the listing shows for a skill: `description`, then `when_to_use`.
+
+    "when_to_use ... Appended to `description` in the skill listing" (skills). Scoring
+    the description alone missed pairs that compete through when_to_use, and missed
+    anti-triggers written there.
+    """
+    desc = sk.get("description") or ""
+    try:
+        with open(sk["path"], encoding="utf-8") as fh:
+            raw = fh.read()
+        fm, _ = parse_frontmatter(raw)
+    except (OSError, UnicodeDecodeError, KeyError):
+        raw, fm = "", None
+    desc = _yaml_folded(desc, raw, "description")
+    wtu = _yaml_folded((fm or {}).get("when_to_use", "").strip(), raw, "when_to_use")
+    return f"{desc} {wtu}".strip() if wtu else desc
+
+
+def _yaml_folded(value: str, raw: str, key: str) -> str:
+    """The value as YAML reads it: a plain or quoted scalar wrapped over lines is one line.
+
+    parse_frontmatter keeps the line breaks of a wrapped plain scalar; YAML folds them
+    into spaces. Kept, a break in the middle of an anti-trigger cut the clause before
+    the name it excludes. Only a literal block (`|`) keeps its breaks.
+    """
+    header = frontmatter_raw_value(raw, key) or ""
+    if header.startswith("|"):
+        return value
+    # A blank line is kept as a line break, as YAML keeps it: folded into a space, it ran an
+    # unpunctuated anti-trigger into the next paragraph (external audit 4, sk-02).
+    value = re.sub(r"[ \t]*\n(?:[ \t]*\n)+[ \t]*", "\0", value)
+    return re.sub(r"[ \t]*\n[ \t]*", " ", value).replace("\0", "\n")
+
+
+# Where an anti-trigger clause stops: the end of its sentence - the dot of `e.g.`/`i.e.`
+# ends nothing (audit 3, g3-01) - or, in a literal block, the only text that keeps its
+# line breaks, the end of its line, unless list items follow it (`Don't use for:` then
+# `- shop-returns`): they are the clause (audit 3, g1-00, g3-01).
+# `E.g.`, `I.e.`, `vs.` and `cf.` end nothing either, and `etc.` ends a sentence only before a
+# capital (external audit 4, do-01).
+_SENTENCE_END = re.compile(r"(?<!\b[eE]\.[gG])(?<!\b[iI]\.[eE])(?<!\b[vV]s)(?<!\b[cC]f)(?<!\betc)[.!?](?=\s|$)"
+                           r"|(?<=\betc)\.(?=\s+[A-Z]|\s*$)")
+_LIST_ITEM = re.compile(r"^\s*(?:[-*+•]|\d+[.)])\s")
+
+
+def _clause(text: str, start: int, opener_end: int) -> str:
+    lines = text[start:].split("\n")
+    end = _SENTENCE_END.search(lines[0], opener_end - start)
+    if end:
+        return lines[0][:end.start()]
+    items = []
+    for line in lines[1:]:
+        if not _LIST_ITEM.match(line):
+            break
+        items.append(line)
+    return "\n".join([lines[0], *items])
 
 
 # --- Confusable descriptions -------------------------------------------------
@@ -98,8 +160,8 @@ def check_description_overlap(ctx: AuditContext, report: Report, skills: dict[st
     from collections import Counter
 
     hidden = listing_hidden_skills(ctx, skills)
-    listed = {n: (sk.get("description") or "") for n, sk in skills.items()
-              if n not in hidden and (sk.get("description") or "").strip()}
+    listed = {n: _listing_text(sk) for n, sk in skills.items()
+              if n not in hidden and _listing_text(sk).strip()}
     if len(listed) < 2:
         report.add("33-description-overlap", "INFO",
                    f"{len(listed)} listed description(s): nothing to compete with.",
@@ -136,11 +198,15 @@ def check_description_overlap(ctx: AuditContext, report: Report, skills: dict[st
     # 2026-09-23 on one repository: 8 of 9 flagged pairs already excluded each other
     # both ways, all 16 references inside a "Don't use for" clause, and the ninth was
     # the only real gap. Only an exclusion counts: a name mentioned as "see also"
-    # separates nothing.
+    # separates nothing - so the name is searched in the anti-trigger's own sentence,
+    # not anywhere after it.
     def excludes(a: str, b: str) -> bool:
-        m = ANTI_TRIGGER_RE.search(listed[a])
-        return bool(m) and re.search(rf"(?<![\w-]){re.escape(b)}(?![\w-])",
-                                     listed[a][m.start():]) is not None
+        text = listed[a]
+        for m in ANTI_TRIGGER_RE.finditer(text):
+            clause = _clause(text, m.start(), m.end())
+            if re.search(rf"(?<![\w-]){re.escape(b)}(?![\w-])", clause):
+                return True
+        return False
 
     declared = 0
     for score, x, y in pairs:
@@ -159,10 +225,15 @@ def check_description_overlap(ctx: AuditContext, report: Report, skills: dict[st
                        f"line: `{src}` does not exclude `{dst}`. Add `{dst}` to `{src}`'s "
                        "anti-trigger clause.", str(root / ctx.skills_dir / src / "SKILL.md"))
         else:
-            report.add("33-description-overlap", "WARN",
+            # NOTICE: the score is a lexical proxy whose only calibration found 2 real
+            # confusions in 13 flagged pairs (limits.py), and shared project wording
+            # raises it on skills that do different things. A selection eval decides.
+            report.add("33-description-overlap", "NOTICE",
                        f"`{x}` and `{y}` overlap at {score:.2f} (threshold "
-                       f"{ctx.limits.OVERLAP_THRESHOLD:.2f}). They compete for the same requests: give each an "
-                       "anti-trigger naming the other, or merge them.", where)
+                       f"{ctx.limits.OVERLAP_THRESHOLD:.2f}): their listing texts share much of "
+                       "their wording, which may make them compete for the same requests. If "
+                       "they do, give each an anti-trigger naming the other; a selection eval "
+                       "on the pair would settle it.", where)
     report.add("33-description-overlap", "INFO",
                f"{len(pairs)} confusable pair(s) among {n} listed description(s) at threshold "
                f"{ctx.limits.OVERLAP_THRESHOLD:.2f}, {declared} of them separated by mutual exclusion. "

@@ -83,7 +83,7 @@ Syntax: `${VAR}` and `${VAR:-default}`. Expanded in `command`, `args`, `env`, `u
 
 Protected names: Claude Code's own credentials (`ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`), cloud-provider credentials (`AWS_BEARER_TOKEN_BEDROCK`), and others the environment carries (`HTTPS_PROXY`, `NPM_TOKEN`) — the page lists these *as examples* ("such as"), so the set is wider than the list (mcp, Credential variables that read as empty). `ANTHROPIC_BASE_URL` still expands. The fix is to copy the value into a variable with a name of your own.
 
-→ `43-mcp-credential-var` ERROR on the five documented names in a remote `url` or `headers`. **House:** the check matches only those five; a name the docs cover without listing it passes unflagged.
+→ `43-mcp-credential-var` ERROR on the five documented names in a remote `url` or `headers`, and on eight more **measured** to arrive empty, set or not, with or without `:-default` (2026-10-08, Claude Code 2.1.294, `claude mcp list` against a local server logging its headers): `AWS_SESSION_TOKEN`, `AWS_SECRET_ACCESS_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_FOUNDRY_API_KEY`, `ANTHROPIC_CUSTOM_HEADERS`, `AZURE_CLIENT_SECRET`, `GOOGLE_APPLICATION_CREDENTIALS`, `NODE_AUTH_TOKEN`. `AWS_ACCESS_KEY_ID`, `GITHUB_TOKEN` and a name of your own expanded in the same probe. Any other name the docs cover without listing it passes unflagged; the measured list can change with a release.
 
 `/mcp` and `claude mcp list/get` show a `${VAR}` reference by name, never resolved (mcp, How references appear, 2.1.268+ for `/mcp`). So a screenshot of `/mcp` does not prove the variable is set.
 
@@ -158,10 +158,16 @@ Callable name: `mcp__<server>__<tool>` (permissions, MCP; hooks, Match MCP tools
 
 | Check | Reads | Fires on |
 | --- | --- | --- |
-| `43-mcp-shape` | `.mcp.json` at the root | invalid JSON (ERROR); `url` without `type` (ERROR); `type: sse` (NOTICE) |
+| `43-mcp-shape` | `.mcp.json` at the root (a repository with only that file is audited as a project) | invalid JSON (ERROR); `url` without `type` (ERROR); `type: sse` (NOTICE) |
 | `43-mcp-secret` | same, `url`/`headers`/`env`/`args` | literal-looking token without `${` (ERROR) |
-| `43-mcp-credential-var` | same, `url`/`headers` | one of the five documented protected names (ERROR) |
+| `43-mcp-credential-var` | same, `url`/`headers` | one of the five documented protected names, or the eight measured on 2.1.294 (ERROR) |
 | `43-mcp-approval` | shared `.claude/settings.json` | `enableAllProjectMcpServers` / `enabledMcpjsonServers` committed (WARN) |
 | `35-hooks-matcher` | hook configs | matcher shapes, including a bare `mcp__<server>` |
+| `50-security-mcp-unpinned` | `.mcp.json` at the root, stdio `command` + `args` | a server fetched at start with no pinned version (WARN): `npx`, `bunx`, `pnpx`, `pnpm dlx` or `yarn dlx` without `package@<version>`, or with `@latest`; `uvx` without `package==x.y.z` or `package@x.y.z`; a `docker run` image with no tag or `:latest`, and no `@sha256` digest. A `uvx` `git+URL@ref` source is pinned only by a commit hash or a version-shaped tag (`@v1.2.0`); a branch (`@main`) or no ref is reported, since a branch "pull[s] the latest commit" (uv, guides/tools) |
+
+**Known risk (`50-security-mcp-unpinned`)** [limit]: a version-shaped tag counts as pinned, yet a git
+tag can be moved, and a branch named like a version (`@2.x`, `@v2`) passes too; neither is reported.
+Requiring a commit hash would close it, and would report every configuration that pins by tag; the
+check keeps the tag by choice, not on a measurement; when the server matters, pin `git+URL@<commit>` yourself.
 
 **Not checked** (read it by hand, or run the tool that sees it): servers in `~/.claude.json` (outside the repository); servers inline in `plugin.json`; hook matchers or permission rules written against a plugin server's bare key; allow rules of the form `mcp__*`; `alwaysLoad` cost; whether a `${VAR}` is actually set (`claude mcp list` says so).

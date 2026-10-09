@@ -52,6 +52,16 @@ def check_see_skill_targets(ctx: AuditContext, report: Report, skills: dict[str,
     root = ctx.root
     if not skills:
         return
+    # "A file at `.claude/commands/deploy.md` and a skill at `.claude/skills/deploy/SKILL.md`
+    # both create `/deploy` and work the same way" (skills): a command file is a valid
+    # target. Until 0.23.0 only skill folders were, and a pointer to a command was an
+    # ERROR (external audit, 2026-10-08).
+    commands = root / ctx.claude_dir / "commands"
+    # A nested command is named by its path: `commands/ops/lint-all.md` is `/ops:lint-all`
+    # (skills, "How a skill gets its command name"), never `lint-all` (audit externe 3, g7-00).
+    command_names = ({p.relative_to(commands).with_suffix("").as_posix().replace("/", ":")
+                      for p in readable_files(commands.rglob("*.md"))}
+                     if commands.is_dir() else set())
     targets: list[Path] = []
     for sub in ("skills", "agents", "rules"):
         base = root / ctx.claude_dir / sub
@@ -76,7 +86,7 @@ def check_see_skill_targets(ctx: AuditContext, report: Report, skills: dict[str,
             # claiming it is broken states an opinion the auditor cannot hold.
             if ":" in name:
                 continue
-            if name not in skills:
+            if name not in skills and name not in command_names:
                 report.add(
                     "18-see-skill-target",
                     "ERROR",

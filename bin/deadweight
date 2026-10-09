@@ -14,6 +14,7 @@ declare and which fails silently where it is missing.
     deadweight                   cached findings for this project, errors first
     deadweight --errors          errors only
     deadweight --info            also the measurements (INFO), which the default leaves out
+    deadweight --all             every finding of a check, not the first two
     deadweight --fresh           measure now, rewrite the cache the status line reads, show it
     deadweight --json            the raw cached report
     deadweight --semantic        only the semantic layer: a model reads the configuration (sends it, costs)
@@ -38,6 +39,8 @@ sys.path.insert(0, str(AUDIT.parent))
 # The auditor's identity is computed in one place, so this line and the floor cannot disagree.
 from deadweight_audit.identity import audit_sha  # noqa: E402
 TEMPLATE = PLUGIN_ROOT / "skills" / "config-auditor" / "templates" / "statusline.py"
+PRECISION = PLUGIN_ROOT / "skills" / "config-auditor" / "precision.json"
+SHOWN_PER_CHECK = 2   # a check with more findings than this is folded: `--all` unfolds it
 LAUNCHER = PLUGIN_ROOT / "skills" / "config-auditor" / "templates" / "statusline-launcher.py"
 
 RED, YEL, GRN, DIM, OFF = "\033[31m", "\033[33m", "\033[32m", "\033[2m", "\033[0m"
@@ -185,7 +188,45 @@ def setup_statusline(root: Path) -> int:
     return max(hosts)
 
 
-def show(root: Path, only_errors: bool, as_json: bool, with_info: bool = False) -> int:
+def precision_table() -> dict[str, dict]:
+    """Measured precision per check (precision.json), or nothing: never a default value.
+
+    Outside the auditor's package on purpose: it changes no finding, so it must not change
+    the auditor's sha and break every floor (identity.py).
+    """
+    try:
+        return json.loads(PRECISION.read_text(encoding="utf-8")).get("checks", {})
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
+def precision_label(table: dict[str, dict], check: str, severity: str | None = None,
+                    current_auditor: str | None = None) -> str:
+    """`precision 24/25 (96 %, 21 repositories), 2026-09-27, earlier auditor 43b08d90`, or
+    `precision not measured`.
+
+    The fraction is always shown, and the number of repositories beside it: 868/869 came from
+    3 repositories. A precision measured on ERROR findings says nothing of the same check's WARN.
+    An auditor other than the one running is named as earlier, so the reader does not have to
+    compare two shas.
+    """
+    m = table.get(check)
+    if not m or not m.get("n"):
+        return "precision not measured"
+    if severity and m.get("severity") and m["severity"] != severity:
+        return f"precision not measured at {severity} (measured at {m['severity']} only)"
+    pct = round(100 * m["true"] / m["n"])
+    repos = f", {m['repositories']} repositories" if m.get("repositories") else ""
+    small = ", too few to conclude" if m["n"] < 10 or (m.get("repositories") or 99) < 5 else ""
+    by = ""
+    if m.get("auditor"):
+        by = (f", auditor {m['auditor']}" if m["auditor"] == current_auditor
+              else f", earlier auditor {m['auditor']}")
+    return f"precision {m['true']}/{m['n']} ({pct} %{repos}{small}), {m['date']}{by}"
+
+
+def show(root: Path, only_errors: bool, as_json: bool, with_info: bool = False,
+         show_all: bool = False) -> int:
     src = cache_path(root)
     if not src.is_file() or src.stat().st_size == 0:
         print(f"No cached measurement for {root}.\n"
@@ -219,11 +260,21 @@ def show(root: Path, only_errors: bool, as_json: bool, with_info: bool = False) 
     mesures = sum(f.get("severity") == "INFO" for f in every)
     if not found:
         print("  (nothing to report)")
+    # One header per check, with its measured precision: "23 skills miss X" is one fact,
+    # not 23, and a finding whose precision nobody measured must say so.
+    groups: dict[tuple[str, str], list[dict]] = {}
     for f in sorted(found, key=lambda x: rang.get(x.get("severity"), 4)):
-        c = {"ERROR": RED, "WARN": YEL}.get(f.get("severity"), DIM)
-        print(f"  {c}[{f.get('severity')}]{OFF} {f.get('check')}")
-        print(f"      {f.get('message')}")
-        print(f"      {DIM}{f.get('location')}{OFF}")
+        groups.setdefault((f.get("severity"), f.get("check")), []).append(f)
+    table = precision_table()
+    for (sev, check), fs in groups.items():
+        c = {"ERROR": RED, "WARN": YEL}.get(sev, DIM)
+        count = f" ×{len(fs)}" if len(fs) > 1 else ""
+        print(f"  {c}[{sev}]{OFF} {check}{count}  {DIM}{precision_label(table, check, sev, d.get('audit_sha'))}{OFF}")
+        for f in fs if show_all else fs[:SHOWN_PER_CHECK]:
+            print(f"      {f.get('message')}")
+            print(f"      {DIM}{f.get('location')}{OFF}")
+        if not show_all and len(fs) > SHOWN_PER_CHECK:
+            print(f"      {DIM}... {len(fs) - SHOWN_PER_CHECK} more: `deadweight --all`{OFF}")
     if mesures and not with_info and not only_errors:
         print(f"\n  {DIM}{mesures} measurement(s) not shown: `deadweight --info`{OFF}")
     return 0
@@ -242,11 +293,12 @@ def main(argv: list[str]) -> int:
     cwd = Path.cwd().resolve()
     named = os.environ.get("CLAUDE_PROJECT_DIR")
     root = Path(named) if named else Path(statusline_module().project_of(str(cwd)))
-    fresh = errors = as_json = setup = with_info = semantic = both = False
+    fresh = errors = as_json = setup = with_info = semantic = both = show_all = False
     for a in argv:
         if a == "--fresh":                   fresh = True
         elif a == "--errors":                errors = True
         elif a == "--info":                  with_info = True
+        elif a == "--all":                   show_all = True
         elif a == "--json":                  as_json = True
         elif a == "--setup-statusline":      setup = True
         elif a == "--semantic":              semantic = True
@@ -278,7 +330,7 @@ def main(argv: list[str]) -> int:
     # costs per run, where the cached findings cost nothing. A separate script, so the
     # auditor that counts, its sha and every floor stay untouched (references/semantic-layer.md).
     # Its own options (--also, --model, --max-requests) stay on semantic.py itself.
-    code = 0 if semantic else show(root, errors, as_json, with_info)
+    code = 0 if semantic else show(root, errors, as_json, with_info, show_all)
     if semantic or both:
         if both:
             print()

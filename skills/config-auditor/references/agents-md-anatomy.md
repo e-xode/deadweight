@@ -105,17 +105,22 @@ In a settings file, the value sits under the built-in plugin's ID:
 ```json settings.json
 {
   "pluginConfigs": {
-    "agents-md@builtin": {
+    "cc-plugin-agents-md@builtin": {
       "options": { "instructionFiles": "claude-md-and-agents-md" }
     }
   }
 }
 ```
 
-"Add it under the built-in `agents-md` plugin's ID in `pluginConfigs`, in
-`~/.claude/settings.json`, a `--settings` file, or managed settings. Claude Code ignores it in
-project and local settings files." — the shop repository's own shared `.claude/settings.json` or
-an untracked `.claude/settings.local.json` cannot set this key; only user or managed settings can.
+"Add it to `pluginConfigs` under `cc-plugin-agents-md@builtin`, the ID of the built-in plugin that
+reads `AGENTS.md`. Claude Code reads the entry from `~/.claude/settings.json`, a `--settings` file,
+or managed settings, and ignores it in project and local settings files." — the shop repository's
+own shared `.claude/settings.json` or an untracked `.claude/settings.local.json` cannot set this
+key; only user or managed settings can. The ID changed: "Before v2.1.285, the plugin's ID was
+`agents-md@builtin`, and Claude Code ignored an entry under `cc-plugin-agents-md@builtin`... Claude
+Code v2.1.285 and later reads an entry under either ID." A shop repository's old entry under
+`agents-md@builtin` is therefore still read by recent versions and ignored in a project file all
+the same.
 
 Reading `AGENTS.md` directly "requires Claude Code v2.1.277 or later." Where that support is
 unavailable — an older version, the built-in `agents-md` plugin disabled, or "some cases" of the
@@ -154,9 +159,9 @@ telemetry disabled, read `CLAUDE.md` files only."
 
 | Check | Reads | Fires on |
 | --- | --- | --- |
-| `01-agents-md-unread` | root `AGENTS.md` and `CLAUDE.md` | WARN — an `AGENTS.md` sits beside a `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` that does not import it |
-| `54-agents-md-variant` | file names on the repository path | NOTICE — an `AGENTS.override.md` or `AGENTS.local.md` is present: read by Codex, never by Claude Code |
-| `24-settings-scope` | shared `.claude/settings.json`, `.claude/settings.local.json` | ERROR — `pluginConfigs["agents-md@builtin"]` is set in a project or local settings file, a scope Claude Code ignores for that key |
+| `01-agents-md-unread` | root `AGENTS.md` and `CLAUDE.md` | WARN — an `AGENTS.md` sits beside a `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` that does not import it; the import path resolves from the importing file, imports are followed four hops, an `@` inside code does not count |
+| `54-agents-md-variant` | file names on the repository path | NOTICE — an `AGENTS.override.md` (read by Codex, never by Claude Code) or an `AGENTS.local.md` (read by Claude Code never, and no agent documents reading it) is present. Silent when a `CLAUDE.md` or `CLAUDE.local.md` imports the file with `@` (followed four hops, inside the repository), unless the `AGENTS.md` of the same folder is imported too: Codex then reads only the override, Claude Code both (NOTICE) |
+| `24-settings-scope` | shared `.claude/settings.json`, `.claude/settings.local.json` | ERROR — a `pluginConfigs` entry (under `cc-plugin-agents-md@builtin` or the older `agents-md@builtin`) is set in a project or local settings file, a scope Claude Code ignores for that key |
 
 **Not checked** (read it by hand): content divergence between a `CLAUDE.md` and an `AGENTS.md`
 that coexist for other tools' sake — no diff of what each one instructs; Codex's cumulative 32 KiB

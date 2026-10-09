@@ -204,12 +204,18 @@ Contents: [A. `CLAUDE.md`](#a-claudemd) · [B. Skills](#b-skills) · [C. Sub-age
 
 ## E. Layout
 
-### E1. Global script pool (`.claude/scripts/`) — House convention (`13-no-global-scripts`, WARN)
+### E1. Global script pool (`.claude/scripts/`) — House convention (`13-no-global-scripts`, NOTICE; WARN under `profile: house`)
 
 - **Symptom.** Scripts in a top-level `.claude/scripts/` folder, attached to no skill.
 - **Why bad.** A script with no owning skill has no documentation that loads with it and no
   trigger; nobody knows when it is safe to delete. Claude Code itself does not forbid the folder.
-- **Fix.** Move each script under its owner: `.claude/skills/<owner>/scripts/<script>`.
+- **Fix.** Move each script under its owner: `.claude/skills/<owner>/scripts/<script>`. A script a
+  hook or the `statusLine` of `.claude/settings.json` (or `settings.local.json`) runs, or a hook in
+  an agent's or a skill's frontmatter, has no owning skill and is not reported. Only what runs it
+  counts: the `command` of a hook, of `statusLine`, `subagentStatusLine` and `fileSuggestion`, and
+  the credential helpers `apiKeyHelper`, `awsAuthRefresh`, `awsCredentialExport`, `gcpAuthRefresh`
+  and `otelHeadersHelper` (each "a shell command line", `settings-reference`). A permission rule, an
+  `env` value or a description that merely names the script runs nothing and does not exempt it.
 
 ## F. Rules (`.claude/rules/`)
 
@@ -231,7 +237,9 @@ Contents: [A. `CLAUDE.md`](#a-claudemd) · [B. Skills](#b-skills) · [C. Sub-age
 ### F3. Rule over 2 KB — House convention (`14-rule-size`)
 
 - **Why bad.** A rule has no description to decide by and loads whole; past ~2 KB it is usually
-  a skill's body. The 2 KB figure is the plugin's, not Anthropic's.
+  a skill's body. The 2 KB figure is the plugin's, not Anthropic's; the documentation's bound is
+  200 lines per rules file, past which it "may reduce adherence" (memory). `14-rule-size` counts
+  bytes only: a rule over 200 lines and under 2 KB is not reported [limit].
 - **Fix.** Extract the knowledge into a skill; keep the constraint in the rule.
 
 ### F4. Path-scoped rule meant to guard file creation — Universal

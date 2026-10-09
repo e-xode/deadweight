@@ -43,7 +43,12 @@ All doc, [sub-agents]:
   documented precedence. `[08-agent-frontmatter]` warns.
 - **A `:` in `name`** is reserved for plugin-scoped identifiers: since 2.1.218 the file is not loaded,
   and the error goes only to the debug log. `[08-agent-frontmatter]` reports it as ERROR.
-- A frontmatter that does not parse can be found with `claude plugin validate .claude/agents`.
+- A frontmatter that does not parse can be found with `claude plugin validate .claude/agents`, which
+  says the agent then does not load. `[08-agent-frontmatter]` reports it as ERROR for the forms
+  `claude plugin validate` 2.1.294 rejects (measured on 63 probes); other rejected forms may pass
+  unflagged. A `name` that starts with `-` or exceeds 256 characters is an ERROR too, and a `---` not
+  on line 1 makes the file documentation, not an agent. In a plugin an unparsable frontmatter is a
+  WARN: the agent still loads, under its filename.
 
 `[08-agents-dir]` notes a missing `.claude/agents/`; `[08-agent-frontmatter]` requires valid YAML with
 `name` and `description` (the only two required fields).
@@ -61,8 +66,11 @@ model: sonnet
 
 ### The eighteen fields
 
-Doc, [sub-agents]. A key outside this list is **ignored without an error** — `[23-agent-frontmatter-keys]`
-reports it, because a typo such as `tool:` silently widens the agent to every tool.
+Doc, [sub-agents]: the list below. The documentation says only that `color` and `experimental` "aren't
+accepted here and are ignored rather than rejected". Any other key is **undocumented, not proven
+ignored**: `observer` is accepted by recent builds (reported in anthropics/claude-code#93109), so
+nothing guarantees whether it is read, now or after an update. `[23-agent-frontmatter-keys]` reports
+it, because a typo such as `tool:` silently widens the agent to every tool.
 
 | Field | What the doc says | Note |
 | --- | --- | --- |
@@ -70,7 +78,7 @@ reports it, because a typo such as `tool:` silently widens the agent to every to
 | `description` | Required. When Claude should delegate here. | Combined custom descriptions over **15,000 tokens** trigger a startup warning. `[08b-agent-description]`: 80–900 chars and an anti-trigger clause (house convention: the description is the only routing signal, and it is paid every turn). |
 | `tools` | Optional; inherits every tool available to sub-agents if omitted. | See [Tools](#tools). `[23-agent-tools]` |
 | `disallowedTools` | Removed from the inherited or listed set. | An entry with a specifier (`Bash(git push *)`) still removes the **whole** tool. |
-| `model` | `sonnet`, `opus`, `haiku`, `fable`, `inherit`, or a full model id. | See [Model resolution](#model-resolution). `[23-agent-model]` |
+| `model` | `sonnet`, `opus`, `haiku`, `fable`, `best`, `opusplan`, `inherit` (an alias other than `inherit`, or a full model name, may take `[1m]`), a full model id, or a provider value (Bedrock ARN, a Vertex or Foundry deployment name). | See [Model resolution](#model-resolution). `[23-agent-model]`: NOTICE outside these values, since a provider deployment name is free-form. |
 | `permissionMode` | `default`, `acceptEdits`, `auto`, `dontAsk`, `bypassPermissions`, `plan`, or `manual`. | See [Permission mode](#permission-mode). `[23-agent-permission-mode]` |
 | `maxTurns` | Hard stop; output marked partial (2.1.246+), resumable. | The cheapest guard on a loop that can fail to converge. |
 | `skills` | Preloads the **full content** of the named skills at startup. | Controls preloading, **not access** — see [Tools](#tools). `[23-agent-skills-preload]` |
@@ -106,7 +114,8 @@ way, do not grant it. `[23-agent-tools]` reports it as deprecated (NOTICE).
 `EnterPlanMode`, `ScheduleWakeup`, `WaitForMcpServers`, `Workflow`; `ExitPlanMode` **unless**
 `permissionMode: plan`; `Agent` at the spawn-depth limit (3 layers by default,
 `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`). A sub-agent cannot ask the user anything: its prompt must be
-self-sufficient.
+self-sufficient. `[23-agent-tools]` gives a WARN per removed tool listed, an ERROR when nothing in
+the list resolves.
 
 **Background set.** A background sub-agent keeps every MCP tool but only these built-ins: `Read`,
 `Grep`, `Glob`, `LSP` (2.1.280+), `Bash`, `PowerShell`, `Edit`, `Write`, `NotebookEdit`, `WebFetch`,
@@ -238,10 +247,14 @@ post measures multi-agent runs at **about 15× the tokens of a chat** — the fa
 These are this plugin's rules, not the harness's. Each is reported as WARN at most.
 
 **1. An `## Agents directory` table in CLAUDE.md** — `[09-agent-in-claude-md]` (agent file with no row),
-`[09-claude-md-agent-missing]` (row with no file). The harness does **not** need it: it already lists
+`[09-claude-md-agent-missing]` (row with no agent of that `name`). The harness does **not** need it: it already lists
 every agent's description to the model. The table is therefore **paid twice** in the always-loaded
 budget. Its reason: a human entry point — one place where a reader sees the roster and the delegation
 triggers without opening each file. A repository that does not want that trade can ignore both checks.
+The agent's name goes in backticks in a column headed `Agent` (or `Agents`, `Sub-agent`, `Agent name`);
+with no such header, the first column is read. The table may use delimiter cells of a single dash, or
+no outer pipes, as GitHub Flavored Markdown allows. The other columns (`Tools`, `Delegate when`) are not
+read, so `Read, Grep` in a tools column is not taken for an agent name.
 
 ```markdown
 ## Agents directory

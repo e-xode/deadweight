@@ -1,0 +1,50 @@
+{
+ "_about": "What each check stands on, in the order it is looked for: the editor's documentation, public reports, a local test. A level left out is not claimed. Measured precision is in precision.json.",
+ "checks": {
+  "01-claude-md-case": {
+   "documented": null,
+   "documented_note": "The memory page names CLAUDE.md and CLAUDE.local.md and says nothing about case (read 2026-10-08).",
+   "reported": [
+    "https://github.com/SundarReguraman/PROJECT.MD/issues/5",
+    "https://github.com/ok/mirall/issues/228",
+    "https://github.com/KyleMit/Splotch/pull/2686",
+    "https://claudelint.com/rules/claude-md/claude-md-filename-case-sensitive"
+   ],
+   "reported_note": "Users report the lowercase file is found on macOS and Windows (case-insensitive filesystems) and not on Linux.",
+   "tested": {
+    "date": "2026-10-06",
+    "claude_code": "2.1.291",
+    "system": "Linux",
+    "how": "A codeword in claude.md, then in CLAUDE.md; a session asked for it without reading files.",
+    "result": "claude.md: not known; CLAUDE.md: known."
+   },
+   "precision_note": "44 of 46 findings were instruction files that Linux does not load; 2 were a personal cheatsheet and user documentation. 44 public repositories, 2026-10-08, labelled by the assistant, not blind."
+  },
+  "23-agent-tools": {
+   "documented": "https://code.claude.com/docs/en/sub-agents (an Agent(...) list applies only to an agent run as the main thread)",
+   "documented_note": "The alias Task -> Agent was documented on the sub-agents page and is no longer (read 2026-10-08).",
+   "reported": [
+    "https://github.com/anthropics/claude-code/issues/28277"
+   ],
+   "tested": {
+    "date": "2026-10-08",
+    "claude_code": "2.1.293",
+    "system": "Linux",
+    "how": "deny [\"Task\"], deny [\"Agent\"] and no rule, each in a fresh project; a session asked to spawn a subagent.",
+    "result": "Task and Agent rules both remove the Agent tool; without a rule the subagent runs."
+   }
+  },
+  "43-mcp-credential-var": {
+   "documented": "https://code.claude.com/docs/en/mcp (Credential variables that read as empty: five names, given as examples)",
+   "documented_note": "The page lists ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, AWS_BEARER_TOKEN_BEDROCK, HTTPS_PROXY and NPM_TOKEN after \"such as\"; the other eight names the check matches are measured, not documented.",
+   "reported": [],
+   "tested": {
+    "date": "2026-10-08",
+    "claude_code": "2.1.294",
+    "system": "Linux",
+    "how": "claude mcp list with a disposable CLAUDE_CONFIG_DIR, against a local HTTP server that logs the headers it receives; each name set and unset, with and without :-default.",
+    "result": "AWS_SESSION_TOKEN, AWS_SECRET_ACCESS_KEY, CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_FOUNDRY_API_KEY, ANTHROPIC_CUSTOM_HEADERS, AZURE_CLIENT_SECRET, GOOGLE_APPLICATION_CREDENTIALS and NODE_AUTH_TOKEN arrive empty in every case; AWS_ACCESS_KEY_ID, GITHUB_TOKEN and a name of the project's own expand, and :-DEF gives DEF."
+   }
+  }
+ }
+}

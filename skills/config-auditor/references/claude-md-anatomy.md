@@ -64,7 +64,8 @@ and "How CLAUDE.md files load"). All files are concatenated, none overrides anot
   or `CLAUDE.local.md` in the working directory or above it. The user and managed `CLAUDE.md`
   and `.claude/rules/` do not count for that test.
 - A repository with both files and no import gets `CLAUDE.md` only. To keep one shared file,
-  put `@AGENTS.md` at the top of the `CLAUDE.md` beside it.
+  import it at the top of the `CLAUDE.md`: the path resolves from the importing file, so
+  `@AGENTS.md` from `./CLAUDE.md`, `@../AGENTS.md` from `.claude/CLAUDE.md`.
 - Adding a `CLAUDE.local.md` to a project that relies on `AGENTS.md` silently stops Claude from
   reading `AGENTS.md`.
 - Some sessions cannot read `AGENTS.md` directly (third-party providers, telemetry disabled,
@@ -103,7 +104,7 @@ and "How CLAUDE.md files load"). All files are concatenated, none overrides anot
   target.** Checked by `01-claude-md-lines` (WARN).
 - **Doc** (same page, "How it works"): "Claude Code loads a CLAUDE.md file of up to 4 MiB in full
   and skips a larger file." Above 4 MiB the file is **ignored entirely**, not truncated.
-- **House convention**: `01-claude-md-size` raises an ERROR above **12 KB**. Reason: a line count
+- **House convention**: `01-claude-md-size` raises a NOTICE above **12 KB** (WARN under `profile: house`). Reason: a line count
   does not cap tokens — 150 long lines cost more than 200 short ones — and the always-loaded
   budget (`17-always-loaded-budget`) needs a byte figure. It is doctrine, not a platform limit:
   a project may move it with a reason and a date in its `.claude/audit.local.json` overlay.
@@ -177,7 +178,7 @@ for a listed skill pays twice and rots on the next rename.
 - **Doc** ([memory](https://code.claude.com/docs/en/memory), "Write effective instructions"):
   concrete enough to verify ("Use 2-space indentation", not "Format code properly"); headers and
   bullets over dense paragraphs; no contradictions — "Claude may pick one arbitrarily."
-- **House convention** (`12-no-code-comments`, NOTICE; WARN under `profile: house`): no `//` or `/* */` outside fenced code in
+- **House convention** (`12-no-code-comments`, NOTICE; WARN under `profile: house`): no `//` or `/* */` outside code blocks (fenced or indented) in
   `CLAUDE.md`. Reason: a comment-style line in prose is almost always a pasted code fragment or a
   maintainer note; the documented place for the latter is an HTML comment, which is stripped.
 
@@ -210,13 +211,13 @@ for a listed skill pays twice and rots on the next rename.
 | Id | Level | What it asserts | Register |
 | --- | --- | --- | --- |
 | `01-claude-md-exists` | ERROR (INFO when an `AGENTS.md` stands in) | `./CLAUDE.md` or `./.claude/CLAUDE.md` exists | Doc |
-| `01-claude-md-lines` | WARN | ≤ 200 lines | Doc |
-| `01-claude-md-size` | ERROR | ≤ 12 KB, overridable per project | House convention |
-| `01-agents-md-unread` | WARN | An `AGENTS.md` beside a `CLAUDE.md` is imported with `@AGENTS.md` | Doc |
+| `01-claude-md-lines` | WARN | ≤ 200 lines, for each of `./CLAUDE.md`, `./.claude/CLAUDE.md`, `./CLAUDE.local.md` | Doc |
+| `01-claude-md-size` | NOTICE; WARN under `profile: house` | ≤ 12 KB per memory file, overridable per project | House convention |
+| `01-agents-md-unread` | WARN | An `AGENTS.md` beside a `CLAUDE.md` is imported, the path resolved from the importing file (`@../AGENTS.md` from `.claude/CLAUDE.md`), imports followed four hops, code excluded | Doc |
 | `01-claude-local` | WARN | `CLAUDE.local.md` is ignored by the repository's git rules | Doc |
 | `01-claude-md-import` | WARN | Each in-repo `@path` import resolves, relative to the importing file | Doc |
-| `12-no-code-comments` | NOTICE; WARN under `profile: house` | No `//` or `/* */` outside code fences | House convention |
-| `15-skill-index` | NOTICE, WARN under `profile: house` (withheld skill not indexed; `/name` still runs it) / ERROR (withheld from the model and `user-invocable: false`: nobody can run it) | The skills index names withheld skills, and only them | House convention; the ERROR is doc |
-| `17-always-loaded-budget` | INFO / WARN / ERROR | `CLAUDE.md` + skill and agent descriptions under budget | House convention |
+| `12-no-code-comments` | NOTICE; WARN under `profile: house` | No `//` or `/* */` outside code blocks (fenced or indented) | House convention |
+| `15-skill-index` | NOTICE, WARN under `profile: house` (withheld skill not indexed; `/name` still runs it) / ERROR (withheld from the model and `user-invocable: false`: nobody can run it) | The skills index names withheld skills, and only them (a listed skill in the index is a NOTICE too) | House convention; the ERROR is doc |
+| `17-always-loaded-budget` | INFO / WARN / ERROR | Memory files (`./CLAUDE.md`, `./.claude/CLAUDE.md`, `./CLAUDE.local.md`, their imports, rules without `paths:`) + skill and command descriptions (`description` + `when_to_use`, capped each at `skillListingMaxDescChars`, 1,536 by default) + agent descriptions under budget | House convention |
 
 Path-scoped rules have their own page: [rules-anatomy.md](./rules-anatomy.md).

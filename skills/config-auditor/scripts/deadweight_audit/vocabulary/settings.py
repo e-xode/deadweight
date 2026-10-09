@@ -132,9 +132,28 @@ SETTINGS_OBJECT_FIELDS = {
 }
 
 
+# Keys whose Scope line says Claude Code ignores them outside managed settings "with a
+# warning" (availableModelsMatch, deniedModels) or "drops the key with a warning"
+# (managedMcpServers): settings-reference, read 2026-10-08. The others are not said silent
+# or loud, except requiredMinimumVersion / requiredMaximumVersion ("gives no warning").
+SETTINGS_KEYS_IGNORED_WITH_WARNING = frozenset({"availableModelsMatch", "deniedModels",
+                                                "managedMcpServers"})
+# "Claude Code gives no warning when it ignores the key elsewhere" (settings-reference,
+# Scope of each, read 2026-10-08). For every other barred key the docs say neither, and
+# the message says neither (audit 3, g6-01).
+SETTINGS_KEYS_IGNORED_SILENTLY = frozenset({"requiredMinimumVersion", "requiredMaximumVersion"})
+
+
 # "a `false` in .claude/settings.json is ignored" for these opt-outs (settings).
 SETTINGS_PROJECT_IGNORED_FALSE = {"useAutoModeDuringPlan", "syncClaudeAiSkills",
                                   "syncClaudeAiPlugins"}
+
+# User-or-managed keys that a project or local file is not silent about (settings-reference,
+# Scope): any value of `autoContinueAtUsageLimit` there "turns the feature off rather than
+# being ignored" while user settings, `--settings` and managed settings leave it unset, and a
+# `false` `bashEditDiffEnabled` there "still turns it off". The value is the one that acts
+# (None: any value). External audit 4, se-03.
+SETTINGS_PROJECT_TURNS_OFF = {"autoContinueAtUsageLimit": None, "bashEditDiffEnabled": False}
 
 
 BUILTIN_OUTPUT_STYLES = {"Default", "Explanatory", "Learning", "Proactive", "Concise"}

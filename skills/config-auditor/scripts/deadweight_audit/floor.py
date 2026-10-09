@@ -73,9 +73,24 @@ def check_floor(root: Path, report: Report) -> int:
                    f"`{audit_sha()}`. Counts across two instruments are not comparable, "
                    f"so nothing is compared: now {err} error(s), {warn} warning(s), the "
                    f"floor said {f_err}/{f_warn}. Read them side by side, then re-set "
-                   f"deliberately: `--set-floor`. A plugin release only reaches here when "
-                   f"it changed the auditor itself - most releases do not.", str(path))
+                   f"deliberately: `--set-floor`. Until then this run detects no regression "
+                   f"of the counts: any change to the auditor's code moves its sha.", str(path))
         return 0
+    # The ids the floor recorded, compared too. Counts alone let a new defect in whenever
+    # an unrelated one of the same level was fixed in the same change: "At the floor",
+    # exit 0. A WARN, not a regression: the documented contract is a ratchet on counts.
+    # A floor written before the ids were recorded has none, and nothing is compared.
+    new_ids = []
+    for sev, key in (("ERROR", "error_ids"), ("WARN", "warning_ids")):
+        known = data.get(key)
+        if isinstance(known, list):
+            new_ids += sorted({f.check for f in report.findings if f.severity == sev} - set(known))
+    if new_ids:
+        report.add("34-floor", "WARN",
+                   f"{len(new_ids)} check id(s) at ERROR or WARN that the floor of "
+                   f"{data.get('date')} did not have: {', '.join(new_ids)}. The counts alone do "
+                   "not show it when another finding went away in the same change: read these "
+                   "before re-setting the floor.", str(path))
     if err > f_err or warn > f_warn:
         report.add("34-floor", "ERROR",
                    f"Regression against the floor of {data.get('date')}: {err} error(s) / "

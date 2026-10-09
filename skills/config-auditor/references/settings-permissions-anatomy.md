@@ -77,7 +77,17 @@ A key outside its scope is ignored; the table is not reproduced here, audit.py c
     settings file.
   - `useAutoModeDuringPlan`, `syncClaudeAiSkills`, `syncClaudeAiPlugins`: a **`false` in the shared
     `settings.json` is ignored** — the opt-out is honoured from user, local, managed or
-    `--settings` only (`settings § Exceptions to managed settings precedence`).
+    `--settings` only (`settings § Exceptions to managed settings precedence`). One such line
+    gives one finding.
+  - `autoContinueAtUsageLimit` — *User or managed*, but not ignored in a project or local file:
+    while user settings, `--settings` and managed settings leave it unset, a project or local file
+    that sets it "turns the feature off rather than being ignored" (`settings-reference §
+    autoContinueAtUsageLimit`). A `true` there turns it off (ERROR); a `false` there does what it
+    says until a higher scope sets the key (NOTICE). A `false` `bashEditDiffEnabled` in a repository
+    file "still turns it off" the same way (NOTICE); its `true` is ignored.
+  Nested keys are read too: a dotted path (`sandbox.bwrapPath`, `sandbox.network.strictAllowlist`)
+  is compared with the scope table like a top-level key. `availableModelsMatch`, `deniedModels` and
+  `managedMcpServers` are ignored outside their scope *with a warning*, as their Scope line says.
 - **`24-settings-default-mode`** (WARN) — `permissions.defaultMode` set to `auto` or
   `bypassPermissions` in project or local settings: ignored there since v2.1.257; set it in user
   settings or pass `--permission-mode` (`settings-reference § permissions.defaultMode`). Other modes
@@ -121,7 +131,8 @@ first match decides, and specificity does not reorder them. `Bash(aws *)` in den
   trailing ` *` also matches the bare command. The space counts: `Bash(ls *)` misses `lsof`,
   `Bash(ls*)` hits it. `:*` is an equivalent trailing wildcard, **recognised only at the end**:
   in `Bash(git:* push)` the colon is literal and the rule matches nothing it seems to →
-  **`42-permissions-rule`** (WARN).
+  **`42-permissions-rule`** (WARN), for `Bash` and `PowerShell` patterns only: in
+  `WebFetch(domain:*.x)` or `Agent(model:*)` the `param:` prefix is not a command wildcard.
 - **Bash — compound commands.** An allow rule must match each subcommand (`&&`, `||`, `;`, `|`,
   newlines); deny and ask match any subcommand, including inside `$()`. A small fixed set of
   wrappers is stripped (`timeout`, `nice`, `nohup`…); runners like `npx`, `docker exec`,
@@ -204,7 +215,9 @@ folder`; `settings § A committed key doesn't reach teammates`.
   commands the team runs (`Bash(npm test)`, `Bash(npm run lint)`) and the domains it fetches
   (`WebFetch(domain:docs.shop.example)`); a person who wants broader approvals keeps them in their
   own `settings.local.json` or user settings. A named subagent (`Agent(Explore)`) or a folder of
-  scripts (`Bash(pwsh scripts/*)`) is narrower and not reported.
+  scripts (`Bash(pwsh scripts/*)`) is narrower and not reported. In a `settings.local.json` git does
+  not track, the same rule is a WARN about your own sessions of the project, not an ERROR for
+  everyone.
 
 ## `settings.local.json` and git
 
@@ -218,8 +231,11 @@ folder`; `settings § A committed key doesn't reach teammates`.
   rules wait for trust (`permissions § When your local settings file needs trust`).
 - **`24-settings-local`** (WARN) — the file exists and the **repository's own** ignore rules do not
   cover it. audit.py disables `core.excludesFile` on purpose [house]: a global exclude protects one
-  machine, and the same repository reads differently on the next clone. Limit: whether the file is
-  already tracked is not checked.
+  machine, and the same repository reads differently on the next clone. The message says the global
+  exclude is not counted, and that a file created by hand must be added to `.gitignore`. A file already
+  tracked by git is reported as COMMITTED, even when an ignore rule covers it since. Both answers come
+  from git itself, so a package audited from a subfolder of its repository is judged by that
+  repository; outside a repository, or when git is missing, nothing is said.
 
 ## Status line and output style
 

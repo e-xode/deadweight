@@ -20,7 +20,7 @@ Every other check reads files. Three questions have no answer in them:
 - a `.claude/rules/*.md` whose `paths:` match real files **nobody opens** — `22-rule-glob-match`
   sees the glob match, and the rule still never loads;
 - a nested `CLAUDE.md` in a folder nobody works in;
-- a rule the audit reads as path-scoped that the harness **loads at session start anyway**.
+- a rule the audit reads as path-scoped that the harness **loads at session start, or reloads after compaction, anyway**.
 
 ## The sources, and which one the audit reads
 
@@ -53,7 +53,8 @@ maintainer's decision (core rule 10). Add this to the project's `.claude/setting
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -c \"import json,os,sys,time; d=json.load(sys.stdin); d['ts']=time.strftime('%Y-%m-%dT%H:%M:%S'); p=os.path.join(os.environ.get('XDG_CACHE_HOME') or os.path.expanduser('~/.cache'), 'claude-audit', 'loads'); os.makedirs(p, exist_ok=True); open(os.path.join(p, os.path.basename(os.path.normpath(os.environ.get('CLAUDE_PROJECT_DIR') or d['cwd'])) + '.jsonl'), 'a', encoding='utf-8').write(json.dumps(d) + chr(10))\""
+            "command": "python3 -c \"import json,os,sys,time; d=json.load(sys.stdin); d['ts']=time.strftime('%Y-%m-%dT%H:%M:%S'); p=os.path.join(os.environ.get('XDG_CACHE_HOME') or os.path.expanduser('~/.cache'), 'claude-audit', 'loads'); os.makedirs(p, exist_ok=True); open(os.path.join(p, os.path.basename(os.path.normpath(os.environ.get('CLAUDE_PROJECT_DIR') or d['cwd'])) + '.jsonl'), 'a', encoding='utf-8').write(json.dumps(d) + chr(10))\"",
+            "timeout": 10
           }
         ]
       }
@@ -83,9 +84,9 @@ python3 ${CLAUDE_SKILL_DIR}/scripts/audit.py --runtime ~/.cache/claude-audit/loa
 
 | Check | Says |
 | --- | --- |
-| `57-runtime-log` (INFO) | sessions, dates and files of this repository in the log; lines it skipped |
-| `57-runtime-never-loaded` (NOTICE) | a rule with `paths:`, or a nested `CLAUDE.md`, that loaded in none of the recorded sessions |
-| `57-runtime-rule-unscoped` (NOTICE) | a rule with `paths:` that loaded at `session_start`: the harness did not read it as path-scoped |
+| `57-runtime-log` (INFO) | sessions, dates and files of this repository in the log; lines it skipped. A session counts only if it loaded a file of this repository or its `cwd` is inside it: two clones with the same folder name can share one log |
+| `57-runtime-never-loaded` (NOTICE) | a rule with `paths:`, or a nested `CLAUDE.md`, that loaded in none of the recorded sessions. For a nested `CLAUDE.md` the advice is that it loads when Claude reads, writes or edits a file in its folder (memory); for a rule with `paths:` symlinked from outside the project, that the harness does not load it (memory: only the ones without a `paths` field load) |
+| `57-runtime-rule-unscoped` (NOTICE) | a rule with `paths:` whose latest load (an `include` aside) was at `session_start` or `compact`: the harness did not read it as path-scoped — after compaction only unscoped rules are re-injected (context-window). When the latest load is `compact`, the message says it is likely, not proven: the docs do not say which load reason a scoped rule gets when a file re-read after compaction matches its glob. The message gives how many sessions and the latest date |
 
 Lines about files outside the audited repository are ignored. Without `--runtime`, none of
 these runs and the report is unchanged.

@@ -34,7 +34,9 @@ def parse(text: str) -> list[dict] | None:
 # explanation and were emitted anyway, with valid quotes - the quotes cannot catch them.
 DISOWNED_RE = re.compile(r"^\s*(weak\b|minor\b|borderline\b|arguably\b|not a real\b|no (real )?defect\b)"
                          r"|not reported as a real|no defect is asserted|arguably not a|probably not a real"
-                         r"|\bweak,? (borderline|candidate)\b|\bthis is a minor mismatch\b|\bborderline mismatch\b",
+                         r"|\bweak,? (borderline|candidate)\b|\bthis is a minor mismatch\b|\bborderline mismatch\b"
+                         # 2026-10-06, claims method: "This is weak: ... so it is not a true contradiction."
+                         r"|\bthis is (weak|minor|borderline)\b|\bnot a (true|real|genuine) (contradiction|duplicate|defect)\b",
                          re.IGNORECASE)
 
 
@@ -59,6 +61,24 @@ def check(finding: dict, req: Request) -> str | None:
             return f"invented quote: not found in {path}"
     if req.focus and not any(str(q.get("file")) == req.focus for q in quotes):
         return f"does not quote the file under review ({req.focus})"
-    if fam in ("58", "59") and len({q["file"] for q in quotes} | {_norm(q["text"]) for q in quotes}) < 2:
+    if fam in ("58", "59") and not _two_passages(quotes, sent if fam == "59" else None):
         return "the two sides are the same passage"
     return None
+
+
+def _two_passages(quotes: list[dict], sent: dict[str, str] | None = None) -> bool:
+    """Whether two of the quotes are different passages: another file, or, in the same file,
+    neither text inside the other. A sentence quoted twice, or a sentence and a fragment of
+    it, is one passage - it cannot contradict or repeat itself. With `sent` (duplicates only),
+    the shorter text written twice in that file is two passages: a rule copied word for word
+    repeats itself (audit externe 3, g9-00)."""
+    sides = [(str(q.get("file", "")), _norm(str(q.get("text", "")))) for q in quotes]
+
+    def distinct(fa: str, ta: str, fb: str, tb: str) -> bool:
+        if fa != fb or (ta not in tb and tb not in ta):
+            return True
+        short = min(ta, tb, key=len)
+        return bool(sent) and bool(short) and sent.get(fa, "").count(short) >= 2
+
+    return any(distinct(fa, ta, fb, tb)
+               for i, (fa, ta) in enumerate(sides) for fb, tb in sides[i + 1:])

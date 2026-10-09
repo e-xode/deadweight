@@ -14,7 +14,10 @@ from ..report import Report, house, house_note
 # Not `expectations`: skill-creator saves evals.json with "just the prompts" and drafts
 # the assertions while the first runs go (skill-creator SKILL.md, "Don't write assertions
 # yet"). Requiring them gave 20 ERRORs to a suite at that step (public sample, 2026-09-27).
-EVALS_REQUIRED_KEYS = ("id", "prompt", "expected_output")
+# Not `expected_output` either (external audit, 2026-10-08): skill-creator's schemas.md
+# describes it as it describes `expectations`, without marking it required, and no
+# skill-creator code reads it. A suite without it runs; its absence is a NOTICE.
+EVALS_REQUIRED_KEYS = ("id", "prompt")
 
 
 EVALS_ANTI_NAME_TOKENS = ("anti-trigger", "not-trigger", "should-not", "defer", "negative", "near-miss")
@@ -24,7 +27,10 @@ EVALS_ANTI_EXPECTATION_TOKENS = ("defer", "does not trigger", "should not")
 
 
 def looks_like_anti_trigger(case: dict) -> bool:
-    label = f"{case.get('id', '')} {case.get('name', '')}".lower()
+    # skill-creator's trigger-eval format: `{"query": ..., "should_trigger": false}`.
+    if case.get("should_trigger") is False:
+        return True
+    label =f"{case.get('id', '')} {case.get('name', '')}".lower()
     if any(token in label for token in EVALS_ANTI_NAME_TOKENS):
         return True
     expectations = case.get("expectations")
@@ -44,6 +50,77 @@ def looks_like_anti_trigger(case: dict) -> bool:
 JUDGED_FACT_RE = re.compile(
     r"must (?:not |NOT )?(?:load|call|invoke|use) ", re.IGNORECASE
 )
+
+
+def _scalar(value: str) -> str:
+    value = re.sub(r"\s+#.*$", "", value).strip()
+    return value[1:-1] if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"" else value
+
+
+def case_yaml_graders(text: str) -> list[tuple[str, str, str]]:
+    """The `graders:` list of a case.yaml, as (type, focus, raw text of the entry)."""
+    return [(k.get("type", ""), k.get("focus", ""), raw) for k, raw in case_yaml_grader_keys(text)]
+
+
+def case_yaml_grader_keys(text: str) -> list[tuple[dict[str, str], str]]:
+    """The `graders:` list of a case.yaml, as (type, focus, raw text of the entry).
+
+    "Give each case at least one grader, as a `graders/<name>.md` file or a `graders:`
+    entry in `case.yaml`", and "`graders/*.md` are added after any graders listed in
+    `case.yaml`" (plugin-evals). Until 0.23.0 only the files were read: an inline
+    `tool_used` grader was reported missing (external audit, 2026-10-08). Standard
+    library only: the block list is cut into entries by indentation, and only each
+    entry's own one-line scalar keys are read (`type:`, `focus:`, `tool:`, `input_match:`)
+    - a multi-line `criteria` is kept as text, never parsed. A flow list
+    (`graders: [...]`) is not read. Returns (keys, raw text of the entry).
+    """
+    lines = text.splitlines()
+    start = next((i for i, l in enumerate(lines) if re.match(r"^graders:\s*(?:#.*)?$", l)), None)
+    if start is None:
+        return []
+    block: list[str] = []
+    for line in lines[start + 1:]:
+        if line.strip() and not line[0].isspace() and not line.startswith("-") and not line.startswith("#"):
+            break
+        block.append(line)
+    entries: list[tuple[int, list[str]]] = []
+    dash_indent = None
+    for line in block:
+        m = re.match(r"^(\s*)-(\s+|$)", line)
+        if m and (dash_indent is None or len(m.group(1)) == dash_indent):
+            dash_indent = len(m.group(1))
+            entries.append((m.end(), [" " * m.end() + line[m.end():]]))
+        elif entries:
+            entries[-1][1].append(line)
+    out = []
+    for col, entry in entries:
+        keys = {}
+        for line in entry:
+            km = re.match(r"^( *)([\w.-]+):(?:\s+(.*))?$", line)
+            if km and len(km.group(1)) == col:
+                keys[km.group(2)] = _scalar(km.group(3) or "") or "{...}"
+        out.append((keys, "\n".join(entry)))
+    return out
+
+
+def trigger_eval_has_negative(evals_dir: Path) -> bool:
+    """A `{query, should_trigger: false}` entry in a JSON file beside evals.json.
+
+    skill-creator keeps should-not-trigger queries in their own set ("a mix of
+    should-trigger and should-not-trigger. Save as JSON: [{"query": ..., "should_trigger":
+    false}]") and names no path for it, so any JSON file of the skill's `evals/` counts.
+    """
+    for p in readable_files(evals_dir.glob("*.json")):
+        if p.name == "evals.json":
+            continue
+        try:
+            data = json.loads(p.read_text(encoding="utf-8-sig"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        if isinstance(data, list) and any(isinstance(c, dict) and c.get("should_trigger") is False
+                                          for c in data):
+            return True
+    return False
 
 
 def eval_case_dirs(root: Path) -> list[Path]:
@@ -78,12 +155,20 @@ def skills_of_case(case: Path, base: Path, names: list[str]) -> set[str]:
     """
     named: set[str] = set()
     gdir = case / "graders"
+    graders: list[dict] = []
     for g in readable_files(gdir.glob("*.md")) if gdir.is_dir() else []:
         try:
             fm, _ = parse_frontmatter(g.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError):
             continue
-        fm = fm or {}
+        graders.append(fm or {})
+    # An inline `graders:` entry is the other documented form (plugin-evals): read for
+    # check 39 and not here, it made a covered skill count as uncovered (audit externe 3, g7-04).
+    try:
+        graders += [k for k, _ in case_yaml_grader_keys((case / "case.yaml").read_text(encoding="utf-8"))]
+    except (OSError, UnicodeDecodeError):
+        pass
+    for fm in graders:
         if fm.get("type") != "tool_used" or fm.get("tool") != "Skill" or not fm.get("input_match"):
             continue
         try:
@@ -117,7 +202,17 @@ def check_eval_quality(ctx: AuditContext, report: Report) -> None:
     without_fixture = 0
     for folder in case_dirs:
         types: list[str] = []
-        headings: list[str] = []
+        headings: list[tuple[str, str]] = []      # (focus, rubric) of each llm grader
+        case_text = ""
+        if (folder / "case.yaml").is_file():
+            try:
+                case_text = (folder / "case.yaml").read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                case_text = ""
+        for t, focus, raw_text in case_yaml_graders(case_text):
+            types.append(t)
+            if t == "llm":
+                headings.append((focus, raw_text))
         gdir = folder / "graders"
         if gdir.is_dir():
             for g in readable_files(gdir.glob("*.md")):
@@ -132,19 +227,35 @@ def check_eval_quality(ctx: AuditContext, report: Report) -> None:
                 t = str((fm or {}).get("type", ""))
                 types.append(t)
                 if t == "llm":
-                    headings.append(raw_text)
+                    headings.append((str((fm or {}).get("focus", "") or ""), raw_text))
         if not types:
             continue
         mechanical = [t for t in types if t != "llm" and t != "baseline"]
-        judged_fact = any(JUDGED_FACT_RE.search(r) for r in headings)
-        if judged_fact and not any(t == "tool_used" for t in types):
+        judged = [focus.strip() or "last_message" for focus, r in headings if JUDGED_FACT_RE.search(r)]
+        if judged and not any(t == "tool_used" for t in types):
+            # What the judge sees depends on its `focus:` key (plugin-evals, "What a grader can
+            # look at"): `last_message` by default, `trace` = the session, of which an llm
+            # judge sees the first 12 and the last 12 messages. The 3-in-5 blind passes were
+            # measured on a last-message judge; a trace judge is only partly blind - NOTICE.
+            if all(f == "trace" for f in judged):
+                severity, why = "NOTICE", (
+                    "The judge reads the trace (`focus: trace`), but an llm judge sees only its "
+                    "first 12 and last 12 messages, so in a longer run the call can sit in the "
+                    "part it never reads - and it votes where `tool_used` counts.")
+            else:
+                other = next(f for f in judged if f != "trace")
+                severity, why = "WARN", (
+                    "The judge reads Claude's final response (`focus: last_message`, the "
+                    "default), not the trajectory, so it can pass a run that did the opposite."
+                    if other == "last_message" else
+                    f"The judge reads `focus: {other}`, not the tool calls, so it can pass a "
+                    "run that did the opposite.")
             report.add(
                 "39-eval-judged-fact",
-                "WARN",
+                severity,
                 f"Case '{folder.name}': an llm rubric states a fact about the run "
                 "(\"must load\" / \"must not call\") and the case carries no `tool_used` "
-                "grader. The judge reads the last message, not the trajectory, so it can "
-                "pass a run that did the opposite. Add `type: tool_used` with `tool: Skill` "
+                f"grader. {why} Add `type: tool_used` with `tool: Skill` "
                 "(and `min: 0`, `max: 0`, `arm: both` when absence is the point) and let the "
                 "rubric grade only what has to be judged.",
                 str(folder),
@@ -158,24 +269,22 @@ def check_eval_quality(ctx: AuditContext, report: Report) -> None:
                 "carries a standard deviation near 0.49 where a counter carries 0.000.",
                 str(folder),
             )
-        if not (folder / "case.yaml").is_file():
+        # Two fixtures are documented: `context.scaffold_script` (files written into the
+        # workspace, with --scaffold) and `context.add_dirs` ("Fixture directories Claude
+        # can read during the run", plugin-evals). Not `history_file`: a transcript, not files.
+        if not re.search(r"\b(?:scaffold_script|add_dirs)\s*:", case_text):
             without_fixture += 1
-        else:
-            try:
-                if "scaffold_script" not in (folder / "case.yaml").read_text(encoding="utf-8"):
-                    without_fixture += 1
-            except (OSError, UnicodeDecodeError):
-                without_fixture += 1
     if without_fixture == len(case_dirs):
         report.add(
             "39-eval-no-fixture",
             "NOTICE",
-            f"None of the {len(case_dirs)} eval case(s) declares a `scaffold_script`, so every "
-            "case runs against an empty workspace. A rubric that asks the run to measure a "
+            f"None of the {len(case_dirs)} eval case(s) declares a fixture (`context.scaffold_script` "
+            "or `context.add_dirs`), so every case runs against an empty workspace with nothing "
+            "to read. A rubric that asks the run to measure a "
             "CLAUDE.md, a skill or a budget is asking about files that are not there, and "
             "fails for a reason that has nothing to do with the skill. Either give the case "
-            "a fixture (`case.yaml`, run with --scaffold) or grade doctrine rather than a "
-            "measurement.",
+            "a fixture (`context.add_dirs` for files to read, or `context.scaffold_script` run "
+            "with --scaffold) or grade doctrine rather than a measurement.",
             str(root / "evals"),
         )
 
@@ -297,7 +406,7 @@ def check_evals(ctx: AuditContext, report: Report) -> None:
             continue
 
         ids: list = []
-        without_assertions = 0
+        without_assertions = without_expected = 0
         for position, case in enumerate(cases, start=1):
             if not isinstance(case, dict):
                 report.add("26-evals-schema", "ERROR", f"Eval #{position} in '{name}' is not an object.", str(path))
@@ -310,6 +419,8 @@ def check_evals(ctx: AuditContext, report: Report) -> None:
                     f"Eval #{position} in '{name}' is missing: {', '.join(missing)}.",
                     str(path),
                 )
+            if "expected_output" not in case:
+                without_expected += 1
             if "expectations" not in case:
                 without_assertions += 1
             expectations = case.get("expectations")
@@ -339,6 +450,12 @@ def check_evals(ctx: AuditContext, report: Report) -> None:
             report.add("26-evals-schema", "NOTICE",
                        f"{without_assertions} eval(s) in '{name}' carry no 'expectations' yet: they "
                        "can be run, not graded. skill-creator drafts them during the first runs.",
+                       str(path))
+        if without_expected:
+            report.add("26-evals-schema", "NOTICE",
+                       f"{without_expected} eval(s) in '{name}' carry no 'expected_output': the "
+                       "human-readable description of success skill-creator's schema describes. "
+                       "Nothing reads it to run or grade the case.",
                        str(path))
         duplicates = sorted({str(i) for i in ids if ids.count(i) > 1})
         if duplicates:
@@ -372,13 +489,23 @@ def check_evals(ctx: AuditContext, report: Report) -> None:
                 f"'{name}' has {len(cases)} eval(s) (official minimum {ctx.limits.EVALS_MIN_COUNT}).",
                 str(path),
             )
-        if cases and not any(looks_like_anti_trigger(c) for c in cases if isinstance(c, dict)):
+        # A house convention (external audit, 2026-10-08): no Anthropic source asks for a
+        # negative case in evals.json. skill-creator keeps evals.json for task prompts and
+        # puts should-not-trigger queries in a separate `{query, should_trigger}` set - so
+        # that set, beside evals.json, counts too.
+        if cases and not any(looks_like_anti_trigger(c) for c in cases if isinstance(c, dict)) \
+                and not trigger_eval_has_negative(skill_dir / "evals"):
             report.add(
                 "26-evals-anti-trigger",
-                "WARN",
-                f"'{name}' has no anti-trigger eval. Heuristic: an id or name containing "
-                f"{', '.join(EVALS_ANTI_NAME_TOKENS)}, or an expectation containing "
-                f"{', '.join(EVALS_ANTI_EXPECTATION_TOKENS)}. A suite that only tests triggering "
-                "never tests the boundary.",
+                house(ctx),
+                f"'{name}' has no anti-trigger eval. Heuristic: in evals.json, an id or name "
+                f"containing {', '.join(EVALS_ANTI_NAME_TOKENS)}, or an expectation containing "
+                f"{', '.join(EVALS_ANTI_EXPECTATION_TOKENS)}; or, in another JSON file of its "
+                "evals/, a `{query, should_trigger: false}` entry. A suite that only tests "
+                "triggering never tests the boundary."
+                + house_note("a should-not-trigger case for every skill",
+                             "in skill-creator, should-not-trigger near-misses in a separate "
+                             "{query, should_trigger} set used to tune the description, and "
+                             "evals.json for task prompts"),
                 str(path),
             )

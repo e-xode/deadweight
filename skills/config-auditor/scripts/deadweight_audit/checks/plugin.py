@@ -7,7 +7,7 @@ import re
 from ..identity import instrument_files
 from ..context import AuditContext
 from ..parsing.frontmatter import frontmatter_keys, parse_frontmatter
-from ..parsing.markdown import FENCE_RE, fenced_spans, in_spans, strip_code_fences
+from ..parsing.markdown import FENCE_RE, fenced_spans, in_spans, memory_imports
 from ..repo import claude_md_path, readable_files, git_ignored
 from ..report import Report
 
@@ -31,8 +31,14 @@ def check_documented_flags(ctx: AuditContext, report: Report) -> None:
     # The audited copy of this auditor when there is one (this plugin auditing itself),
     # otherwise the running one. Its flags are declared in the package, not in audit.py.
     scripts = root / ctx.skills_dir / "config-auditor" / "scripts"
+    own_copy = (scripts / "audit.py").is_file()
     sources = ([scripts / "audit.py"] + sorted((scripts / "deadweight_audit").rglob("*.py"))
-               if (scripts / "audit.py").is_file() else instrument_files())
+               if own_copy else instrument_files())
+    # Elsewhere, `audit.py` alone may be the project's own script, which this check never
+    # reads: its real flags were reported against this auditor's. Only a line naming this
+    # auditor's path (`config-auditor/scripts/audit.py`) is checked there.
+    invoke_re = (r"(?<![\w.-])audit\.py\b" if own_copy
+                 else r"config-auditor/scripts/audit\.py\b")
     try:
         src = "".join(f.read_text(encoding="utf-8") for f in sources)
     except OSError:
@@ -64,7 +70,7 @@ def check_documented_flags(ctx: AuditContext, report: Report) -> None:
         for i, line in enumerate(content.splitlines(keepends=True), 1):
             start, pos = pos, pos + len(line)
             if not in_spans(start, blocks) or FENCE_RE.match(line.rstrip("\r\n")) \
-                    or not re.search(r"(?<![\w.-])audit\.py\b", line):
+                    or not re.search(invoke_re, line):
                 continue
             for flag in re.findall(r"(?<![\w-])(--[a-z0-9-]+)", line):
                 if flag not in declared_flags:
@@ -160,11 +166,19 @@ def check_plugin_manifest(ctx: AuditContext, report: Report) -> None:
                 report.add("44-plugin-path", "ERROR",
                            f"plugin.json '{key}': '{v}' escapes the plugin directory, and that "
                            "component does not load (plugins-reference).", str(manifest))
-    for key, folder in (("agents", "agents"), ("commands", "commands"),
-                          ("outputStyles", "output-styles"), ("workflows", "workflows"),
-                          ("themes", "themes"), ("experimental.themes", "themes")):
-        vals = (data.get("experimental") or {}).get("themes") if key == "experimental.themes" \
+    # Each default folder holds its own kind of file (plugins-reference, standard layout):
+    # Markdown for agents, commands and output styles, `.js` workflows, JSON themes. Every
+    # folder was globbed for `*.md`, so the workflow and theme branches could never fire.
+    experimental = data.get("experimental") if isinstance(data.get("experimental"), dict) else {}
+    for key, folder, pattern in (("agents", "agents", "*.md"), ("commands", "commands", "*.md"),
+                                 ("outputStyles", "output-styles", "*.md"),
+                                 ("workflows", "workflows", "*.js"), ("themes", "themes", "*.json"),
+                                 ("experimental.themes", "themes", "*.json"),
+                                 ("experimental.monitors", "monitors", "monitors.json")):
+        vals = experimental.get(key.split(".", 1)[1]) if key.startswith("experimental.") \
             else data.get(key)
+        if key == "experimental.monitors" and isinstance(vals, list):
+            vals = []       # the inline array: the default file is not read either
         if isinstance(vals, dict):
             # `commands` "also accepts an object map" (plugins-reference): its sources count.
             vals = [x.get("source") if isinstance(x, dict) else x for x in vals.values()]
@@ -172,7 +186,7 @@ def check_plugin_manifest(ctx: AuditContext, report: Report) -> None:
             continue
         listed = {(root / v).resolve() for v in (vals if isinstance(vals, list) else [vals])
                   if isinstance(v, str)}
-        stray = [p for p in readable_files((root / folder).glob("*.md"))
+        stray = [p for p in readable_files((root / folder).glob(pattern))
                  if p.resolve() not in listed and p.parent.resolve() not in listed]
         if stray:
             report.add("44-plugin-path", "WARN",
@@ -203,9 +217,13 @@ def check_companions(ctx: AuditContext, report: Report, skills: dict[str, dict])
         for p in readable_files(cmd_dir.rglob("*.md")):
             if not p.exists():
                 continue        # a dangling link: 47-dangling-symlink reports it
-            if p.stem in skills:
+            # `frontend/deploy.md` is `/frontend:deploy` (skills, command names): the
+            # subdirectory is part of the name, so it does not collide with skill `deploy`.
+            rel = p.relative_to(cmd_dir)
+            name = ":".join(rel.with_suffix("").parts)
+            if name in skills:
                 report.add("45-command-shadowed", "WARN",
-                           f"commands/{p.name} and the skill '{p.stem}' share a name: the skill "
+                           f"commands/{rel.as_posix()} and the skill '{name}' share a name: the skill "
                            "wins, and the command never runs (skills).", str(p))
             fm, _ = parse_frontmatter(p.read_text(encoding="utf-8", errors="replace"))
             for key in ("name", "paths"):
@@ -233,19 +251,18 @@ def check_companions(ctx: AuditContext, report: Report, skills: dict[str, dict])
                    "instructions, and committed it becomes everyone's (memory).", str(local))
     md = claude_md_path(root)
     if md.is_file():
-        body = strip_code_fences(md.read_text(encoding="utf-8", errors="replace"))
-        body = re.sub(r"`[^`]*`", "", body)
-        # The `@` must open the token: `@./node_modules/@scope/pkg/AGENTS.md` is one
-        # import, and a second `@` inside the path was read as a second one.
-        for m in re.finditer(r"(?<![\w./@-])@((?:~/|\.{0,2}/)?[\w./@-]+\.[A-Za-z0-9]+)\b", body):
-            ref = m.group(1)
+        # The parser the budget and the reality checks use: an indented code block is no
+        # import, and an escaped space (`Dev\ Guide.md`) is one (external audit 4, sk-03).
+        for ref in memory_imports(md.read_text(encoding="utf-8", errors="replace")):
             if ref.startswith("~/") or ref.startswith("/"):
                 continue                  # outside the repository: approval dialog, unverifiable
             rel = ref[2:] if ref.startswith("./") else ref
             if ign(rel):
                 continue                  # generated or installed (node_modules/): machine-dependent
+            # Relative to the importing file only (memory). The repository-root fallback
+            # hid a broken import in `.claude/CLAUDE.md` whenever the path existed at the root.
             target = (md.parent / ref)
-            if not target.exists() and not (root / ref).exists():
+            if not target.exists():
                 report.add("01-claude-md-import", "WARN",
                            f"CLAUDE.md imports '@{ref}', which does not exist - the import "
                            "resolves relative to the importing file (memory).", str(md))

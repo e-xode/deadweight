@@ -32,7 +32,7 @@ The documented table carries **twenty fields** (skills § Frontmatter reference)
 
 | Field | Effect |
 | --- | --- |
-| `name` | Display label. For a personal or project skill the **typed command comes from the folder name**; only plugin skills take it from `name`. |
+| `name` | The command: `/<name>` (skills § How a skill gets its command name). For a personal or project skill the folder name also invokes it; a plugin skill is `/<plugin>:<name>`. |
 | `description` | The trigger surface. Put the key use case first — the listing truncates. |
 | `when_to_use` | Extra trigger text, appended to `description` in the listing and counted against the **same** 1,536 cap: readability, never budget. |
 | `argument-hint` | Autocomplete hint, e.g. `[order-id]`. |
@@ -195,8 +195,9 @@ stopping at the first token that is not an inline user-invocable skill (skills �
 `context: fork` only makes sense for a skill that states a task; pure guidance forks into an agent
 "without meaningful output". The fork does not see the conversation history. In `-p` mode, and when
 a scheduled task fires it, Claude Code waits for the result even without `background: false`. A
-`disable-model-invocation` skill **cannot** be preloaded via `skills:` — an agent that needs it
-reads its `SKILL.md` by path.
+`disable-model-invocation` skill **cannot** be preloaded via `skills:`: the preload is skipped.
+Remove the entry, or drop the flag if the agent needs the skill; the docs warn against reproducing a
+withheld skill's steps another way (skills).
 
 ## Skills as slash commands
 
@@ -287,8 +288,10 @@ their minimum versions, so a missing command reads as version drift rather than 
 If the runtime figures disagree with the audit's effective total, trust the runtime and reconcile
 the script.
 
-**House convention.** `17-always-loaded-budget` caps `CLAUDE.md` + listed skill descriptions +
-agent descriptions at 43,000 / 47,000 chars. No aggregate of that kind exists upstream — the
+**House convention.** `17-always-loaded-budget` caps the memory files (`./CLAUDE.md`,
+`./.claude/CLAUDE.md`, `./CLAUDE.local.md`, their `@` imports up to four hops, rules without `paths:`) +
+listed skill and command descriptions (`description` + `when_to_use`, each capped at the listing
+cap, `skillListingMaxDescChars`, 1,536 by default) + agent descriptions at 43,000 / 47,000 chars. No aggregate of that kind exists upstream — the
 nearest is the combined agent-description startup warning described in
 [agent-anatomy.md](./agent-anatomy.md). On a 1M-token window it sits near one percent of the
 context: a discipline that keeps the listing reviewable, not a cliff.

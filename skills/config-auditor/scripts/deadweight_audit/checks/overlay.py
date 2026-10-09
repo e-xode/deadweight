@@ -78,9 +78,14 @@ def check_project_overlay(ctx: AuditContext, report: Report, local: dict) -> Non
                     "nobody can review; without a date, one nobody can age out.", str(path))
         chk, pth = e.get("check"), e.get("path")
         if isinstance(chk, str) and chk in CHECK_ID_ALIASES:
+            new = CHECK_ID_ALIASES[chk]
+            # "Still works" next to the WARN below saying the entry is ignored told the
+            # user both, and invited an update to an id ignored too (external audit 3, g8-03).
+            tail = (f"`{new}` cannot be exempted (see the 31-overlay-schema finding on this "
+                    "entry), so the entry has no effect under either id." if new in UNEXEMPTABLE
+                    else "The old id still works and always will; update it when convenient.")
             report.add("31-overlay-alias", "NOTICE",
-                       f"{where} names `{chk}`, renamed to `{CHECK_ID_ALIASES[chk]}`. The old id "
-                       "still works and always will; update it when convenient.", str(path))
+                       f"{where} names `{chk}`, renamed to `{new}`. {tail}", str(path))
             chk = CHECK_ID_ALIASES[chk]
         if isinstance(chk, str) and chk in RETIRED_CHECK_IDS:
             report.add("31-overlay-retired", "NOTICE",

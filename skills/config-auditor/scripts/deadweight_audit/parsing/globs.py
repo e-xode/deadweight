@@ -30,14 +30,21 @@ def glob_to_regex(pattern: str) -> re.Pattern[str]:
         pos = 0
         while pos < len(segment):
             char = segment[pos]
-            if char == "*":
+            if char == "\\" and pos + 1 < len(segment):
+                # memory: "To match a literal `[` in a file name, escape it as
+                # `photos \[2024/**`" - the backslash escapes, it is not a character.
+                pos += 1
+                compiled += re.escape(segment[pos])
+            elif char == "*":
                 compiled += "[^/]*"
             elif char == "?":
                 compiled += "[^/]"
             elif char == "[":
                 close = segment.find("]", pos + 1)
                 if close == -1:
-                    compiled += re.escape(char)
+                    # memory: "A pattern with a `[` that can't be read as a bracket
+                    # expression, such as `photos [2024/**`, is invalid: it matches nothing".
+                    return re.compile(r"(?!)")
                 else:
                     body = segment[pos + 1 : close]
                     compiled += "[" + ("^" + body[1:] if body.startswith("!") else body) + "]"

@@ -93,7 +93,9 @@ paths:
 - Matching also works through a symlinked path to the project (2.1.198).
 
 None of these failures produces a runtime error, which is why `22-rule-glob-match` expands every
-glob, brace branches included, and reports one matching no file in the repository.
+glob, brace branches included, and reports one matching no file in the repository. It reads `\[`
+as a literal bracket, reports an invalid pattern (an unclosed `[`) as matching nothing, and keeps a
+flow list's braces whole (`[src/**/*.{ts,tsx}]` is one pattern).
 
 **House convention** (`22-rule-glob-match`, NOTICE): a glob rooted in a directory the repository's
 git ignores (`dist/**`, `data-exports/**`) can only be checked on machines that hold those
@@ -143,13 +145,20 @@ Each is this plugin's choice. A project can decline it; the auditor says which c
 
 - **Size ≤ 2 KB** (`14-rule-size`, NOTICE; WARN under `profile: house`). Reason: a rule loads whole on every matching read with
   no description to decide by; past ~2 KB it is usually a skill's body wearing a rule's clothes.
+  The documented bound is a different one: 200 lines per file, past which a file "may reduce
+  adherence" and Claude Code warns at startup and in `/status`, each rules file counted separately
+  (memory). `14-rule-size` measures bytes only, so a rules file over 200 lines but under 2 KB gets
+  no finding. When it fires, the message gives both figures and the line count.
+  **Known limit**: the check does not fire past 200 lines. Whether the startup warning also covers
+  a rule with `paths:`, loaded on demand, is not documented and not measured; a finding on it would
+  state more than is known.
 - **A misnamed scope is a defect; no scope is not** (`14-rule-unknown-field`, WARN on `globs:`,
   `glob:`, `path:`). A rule "without a paths field is loaded unconditionally" (memory) - valid, so
   `14-rule-no-paths` is an INFO that says so. It is silent when a misnamed key is there: one
   defect, one finding.
-- **No `//` comment lines outside code fences** (`14-rule-code-comments`, NOTICE; WARN under `profile: house`). Reason: same as
+- **No `//` comment lines outside code blocks, fenced or indented** (`14-rule-code-comments`, NOTICE; WARN under `profile: house`). Reason: same as
   `12-no-code-comments` for `CLAUDE.md`.
-- **Language** (`14-rule-english-only`, WARN, heuristic). Reason: a rule is read by a model and by
+- **Language** (`14-rule-english-only`, NOTICE; WARN under `profile: house`; heuristic on distinct marker words). Reason: a rule is read by a model and by
   every contributor; the check detects one language only and a project writing in another
   language should exempt it in its overlay. It is not a platform requirement.
 - **Naming**: `kebab-case.md`, named for what it guards (`api-error-shape.md`).
@@ -170,9 +179,9 @@ frontmatter parse errors; the
 | --- | --- | --- | --- |
 | `14-rule-unknown-field` | WARN | No frontmatter field other than `paths` | Doc |
 | `22-rule-glob-match` | WARN / NOTICE | Each glob matches a file in the repository (NOTICE, not in the floor, when rooted in a git-ignored path) | Doc + House convention |
-| `14-rule-size` | WARN | ≤ 2 KB | House convention |
+| `14-rule-size` | NOTICE; WARN under `profile: house` | ≤ 2 KB, bytes only (the docs: ≤ 200 lines, not checked) | House convention |
 | `14-rule-no-paths` | INFO | Frontmatter without `paths:` loads every session | Doc |
-| `14-rule-code-comments` | NOTICE; WARN under `profile: house` | No `//` lines outside fences | House convention |
-| `14-rule-english-only` | WARN | No French-language content (heuristic) | House convention |
+| `14-rule-code-comments` | NOTICE; WARN under `profile: house` | No `//` lines outside code blocks (fenced or indented) | House convention |
+| `14-rule-english-only` | NOTICE; WARN under `profile: house` | No French-language content (heuristic, 3 distinct marker words) | House convention |
 
 Anti-patterns for rules: [antipatterns.md § F](./antipatterns.md#f-rules-clauderules).

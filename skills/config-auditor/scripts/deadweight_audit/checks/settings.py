@@ -3,25 +3,28 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
+from pathlib import Path
 
-from ..checks.hooks import hook_paths
+from ..checks.hooks import HOME_PREFIXES, hook_paths
 from ..checks.mcp import SENSITIVE_ENV_RE
 from ..context import AuditContext
 from ..parsing.frontmatter import parse_frontmatter
-from ..repo import readable_files, git_ignored
+from ..repo import readable_files, git_ignores, git_tracked
 from ..report import Report
 from ..vocabulary.hooks import HOOK_PROJECT_DIR_VARS
 from ..vocabulary.settings import (
     BUILTIN_OUTPUT_STYLES,
     PROJECT_SCOPE_IGNORED_MODES,
     SETTINGS_KEYS_GLOBAL,
+    SETTINGS_KEYS_IGNORED_SILENTLY,
+    SETTINGS_KEYS_IGNORED_WITH_WARNING,
     SETTINGS_KEYS_MANAGED,
     SETTINGS_KEYS_USER_LOCAL_MANAGED,
     SETTINGS_KEYS_USER_MANAGED,
     SETTINGS_KNOWN_KEYS,
     SETTINGS_OBJECT_FIELDS,
     SETTINGS_PROJECT_IGNORED_FALSE,
+    SETTINGS_PROJECT_TURNS_OFF,
 )
 from ..vocabulary.tools import KNOWN_TOOLS, TOOL_ALIASES
 
@@ -77,6 +80,18 @@ def check_settings_scope(ctx: AuditContext, report: Report) -> None:
 
 
 # --- Settings and permissions -----------------------------------------------
+def _dotted_keys(prefix: str, value: object) -> list[str]:
+    """Every nested key of a settings object, as the reference spells it: `sandbox.network.x`."""
+    if not isinstance(value, dict):
+        return []
+    out: list[str] = []
+    for sub in sorted(value):
+        dotted = f"{prefix}.{sub}"
+        out.append(dotted)
+        out.extend(_dotted_keys(dotted, value[sub]))
+    return out
+
+
 def _rule_tool(rule: str) -> str:
     return rule.split("(", 1)[0].strip()
 
@@ -119,19 +134,46 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                                str(path))
             barred = (SETTINGS_KEYS_MANAGED | SETTINGS_KEYS_USER_MANAGED | SETTINGS_KEYS_GLOBAL
                       | (SETTINGS_KEYS_USER_LOCAL_MANAGED if shared else frozenset()))
-            if key in barred:
-                where = ("managed settings" if key in SETTINGS_KEYS_MANAGED else
-                         "~/.claude.json" if key in SETTINGS_KEYS_GLOBAL else
-                         "user settings" + ("" if key in SETTINGS_KEYS_USER_MANAGED
-                                            else " or .claude/settings.local.json"))
-                report.add("24-settings-scope", "ERROR",
-                           f"'{key}' in '{name}' is ignored at this scope, without a word: it "
-                           f"takes effect from {where} only (settings-reference, Scope).",
-                           str(path))
             if shared and key in SETTINGS_PROJECT_IGNORED_FALSE and data[key] is False:
+                # One misplaced line, one finding: this one is the more precise of the two.
                 report.add("24-settings-scope", "ERROR",
                            f"'{key}: false' in the shared settings.json is ignored: this opt-out "
                            "applies from user, local or managed settings only (settings).",
+                           str(path))
+                continue
+            acting = SETTINGS_PROJECT_TURNS_OFF.get(key, ...)
+            if acting is None or (acting is not ... and data[key] is acting):
+                value = json.dumps(data[key])
+                if key == "autoContinueAtUsageLimit" and data[key] is not False:
+                    report.add("24-settings-scope", "ERROR",
+                               f"'{key}: {value}' in '{name}' is not ignored: it turns the feature "
+                               "OFF. The value counts from user settings, `--settings` and managed "
+                               "settings only; while none of those sets the key, a project or local "
+                               "file that sets it turns the feature off (settings-reference, Scope).",
+                               str(path))
+                else:
+                    report.add("24-settings-scope", "NOTICE",
+                               f"'{key}: {value}' in '{name}' turns the feature off only while no "
+                               "higher-scope file (user settings, `--settings`, managed settings) "
+                               "sets the key; a `true` in this file would not turn it on "
+                               "(settings-reference, Scope).",
+                               str(path))
+                continue
+            # The scope tables hold dotted entries too (`sandbox.bwrapPath`, Managed): a
+            # nested key is judged by its own path, and a barred parent covers its children.
+            for dotted in [key] + (_dotted_keys(key, data[key]) if key not in barred else []):
+                if dotted not in barred:
+                    continue
+                where = ("managed settings" if dotted in SETTINGS_KEYS_MANAGED else
+                         "~/.claude.json" if dotted in SETTINGS_KEYS_GLOBAL else
+                         "user settings" + ("" if dotted in SETTINGS_KEYS_USER_MANAGED
+                                            else " or .claude/settings.local.json"))
+                loud = (", with a warning" if dotted in SETTINGS_KEYS_IGNORED_WITH_WARNING
+                        else ", without a word" if dotted in SETTINGS_KEYS_IGNORED_SILENTLY
+                        else "")
+                report.add("24-settings-scope", "ERROR",
+                           f"'{dotted}' in '{name}' is ignored at this scope{loud}: it "
+                           f"takes effect from {where} only (settings-reference, Scope).",
                            str(path))
         if shared:
             for key in ("enableAllProjectMcpServers", "enabledMcpjsonServers"):
@@ -147,22 +189,29 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                 for var in sorted(env):
                     if SENSITIVE_ENV_RE.match(var):
                         report.add("24-settings-env", "WARN",
-                                   f"'env.{var}' is set in the shared settings.json: every clone "
-                                   "sends its requests or credentials where this file says "
-                                   "(Check Point Research, CVE-2026-21852). Keep it in user or "
-                                   "local settings.", str(path))
+                                   f"'env.{var}' is set in the shared settings.json: once a clone's "
+                                   "workspace is trusted - or at once in a `-p` run, which shows "
+                                   "no trust dialog - its requests or credentials go where this "
+                                   "file says (settings-reference, env; Check Point Research, "
+                                   "CVE-2026-21852). Keep it in user or local settings.", str(path))
         else:
-            ign = git_ignored(root)
-            if (root / ".git").exists() and not ign(f"{ctx.claude_dir}/settings.local.json"):
-                tracked = subprocess.run(["git", "-C", str(root), "ls-files", "--error-unmatch",
-                                          f"{ctx.claude_dir}/settings.local.json"],
-                                         capture_output=True).returncode == 0
+            # Asked of git, not of `root / ".git"`: audited from a subfolder of a repository,
+            # a committed file read as "not ignored", and a machine without git crashed the
+            # check (external audit 3, 2026-10-08). Outside a repository, or when git cannot
+            # answer, nothing is said.
+            rel_local = f"{ctx.claude_dir}/settings.local.json"
+            state = git_tracked(root, rel_local)
+            tracked = state == "tracked"
+            if tracked or (state == "untracked" and not git_ignores(root, rel_local)):
                 report.add("24-settings-local", "WARN",
                            "settings.local.json " + ("is COMMITTED: everyone who clones gets "
                            "these personal approvals and overrides" if tracked else
-                           "is not ignored by git: it holds personal approvals and overrides")
-                           + ", and Claude Code only adds it to .gitignore when it creates the "
-                           "file itself (settings).", str(path))
+                           "is not ignored by this repository's git rules: it holds personal "
+                           "approvals and overrides. A global git exclude is not counted, on "
+                           "purpose - it protects one machine, not the next clone")
+                           + ". Claude Code adds it to your global git excludes the first time it "
+                           "writes the file; created by hand, it is yours to add to .gitignore "
+                           "(settings).", str(path))
 
         perms = data.get("permissions")
         if isinstance(perms, dict):
@@ -201,17 +250,35 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                     m_path = re.match(r"^(Write|NotebookEdit|Glob|MultiEdit)\((.+)\)$", rule.strip())
                     if m_path:
                         tool_name = "Read" if m_path.group(1) == "Glob" else "Edit"
+                        # The advice must not stay wrong: `Write(/abs/**)` became `Edit(/abs/**)`,
+                        # still anchored at the settings source (anthropics/claude-code#98443).
+                        fixed = _absolute_path(m_path.group(2), root, ctx, name)
                         report.add("42-permissions-rule", "ERROR",
                                    f"{kind} rule '{rule}' in '{name}' is never consulted: file "
                                    f"permissions are checked against Edit(...) and Read(...) only. "
-                                   f"Write it {tool_name}({m_path.group(2)}) (permissions).", str(path))
+                                   f"Write it {tool_name}({fixed or m_path.group(2)})"
+                                   + (" - with `//`: a single leading `/` anchors at the settings "
+                                      "source, not the filesystem root" if fixed else "")
+                                   + " (permissions).", str(path))
                         continue
+                    m_rw = re.match(r"^(Read|Edit)\((.+)\)$", rule.strip())
+                    fixed = _absolute_path(m_rw.group(2), root, ctx, name) if m_rw else None
+                    if fixed:
+                        report.add("42-permissions-path-anchor", "WARN",
+                                   f"{kind} rule '{rule}' in '{name}': a single leading `/` is "
+                                   "\"relative to the settings source\", not the filesystem root - "
+                                   f"'{m_rw.group(2)}' is looked up under {_settings_source(name)}. "
+                                   f"For an absolute path write {m_rw.group(1)}({fixed}) (permissions).",
+                                   str(path))
                     if rule.startswith("mcp__") and "(" in rule:
                         report.add("42-permissions-rule", "ERROR",
                                    f"{kind} rule '{rule}' in '{name}': Claude Code skips any "
                                    "`mcp__` rule that has parentheses when it loads a settings "
                                    "file (permissions).", str(path))
-                    elif re.search(r":\*\s*\S", rule.split("(", 1)[-1].rstrip(")")):
+                    # Command patterns only: `WebFetch(domain:*.example.com)` and
+                    # `Agent(model:*)` use a `param:` prefix where `*` is a plain wildcard.
+                    elif (_rule_tool(rule) in ("Bash", "PowerShell")
+                          and re.search(r":\*\s*\S", rule.split("(", 1)[-1].rstrip(")"))):
                         report.add("42-permissions-rule", "WARN",
                                    f"{kind} rule '{rule}' in '{name}': `:*` is recognised only at "
                                    "the end of a pattern; here the colon is literal and the rule "
@@ -225,14 +292,22 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                            f"statusLine.refreshInterval is {ri} in '{name}': the minimum is 1 "
                            "(statusline).", str(path))
             for token in hook_paths(str(sl.get("command", ""))):
+                # Resolved as the hooks check does: `~/.claude/statusline.sh` is the docs' own
+                # example, and an absolute path is a path - neither lives under the repository.
                 resolved = token
                 for var in HOOK_PROJECT_DIR_VARS:
-                    resolved = resolved.replace(var, "")
-                resolved = resolved[2:] if resolved.startswith("./") else resolved.lstrip("/")
-                if not (root / resolved).exists():
+                    resolved = resolved.replace(var, str(root))
+                outside = token.startswith(HOME_PREFIXES) or token.startswith("/")
+                for pre in HOME_PREFIXES:
+                    if resolved.startswith(pre):
+                        resolved = str(Path.home() / resolved[len(pre):])
+                resolved = resolved[2:] if resolved.startswith("./") else resolved
+                target = Path(resolved) if resolved.startswith("/") else root / resolved
+                if not target.exists():
                     report.add("24-settings-statusline", "WARN",
                                f"statusLine command in '{name}' runs '{token}', which does not "
-                               "exist: a status line that fails goes blank (statusline).",
+                               "exist" + (" on this machine" if outside else "")
+                               + ": a status line that fails goes blank (statusline).",
                                str(path))
         style = data.get("outputStyle")
         if isinstance(style, str) and style:
@@ -244,7 +319,9 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                         fm, _ = parse_frontmatter(p.read_text(encoding="utf-8", errors="replace"))
                         if fm and fm.get("name"):
                             custom.add(fm["name"].strip())
-            if style not in BUILTIN_OUTPUT_STYLES | custom:
+            # `default` in any case gives the Default style, which is what it asks for
+            # (output-styles: "`default` appears in the `/output-style` list").
+            if style not in BUILTIN_OUTPUT_STYLES | custom and style.lower() != "default":
                 near = [x for x in BUILTIN_OUTPUT_STYLES | custom if x.lower() == style.lower()]
                 if near or not custom:
                     report.add("24-settings-output-style", "WARN" if near else "NOTICE",
@@ -253,3 +330,28 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                                   "match exactly gives the Default style (output-styles)."
                                   if near else "matches no built-in or project style - fine if "
                                   "it is a user or plugin style."), str(path))
+
+
+# Top-level folders of an absolute path on macOS, Linux or WSL. A rule that starts with one of
+# them after a SINGLE slash almost always meant the filesystem root (permissions: "A pattern like
+# `/Users/alice/file` isn't an absolute path ... Use `//Users/alice/file`").
+SYSTEM_ROOTS = ("Users", "home", "opt", "tmp", "private", "var", "etc", "mnt", "srv", "root",
+                "Volumes", "usr", "Library", "Applications")
+
+
+def _settings_source(name: str) -> str:
+    return "~/.claude/" if name.startswith("~") else "the project root"
+
+
+def _absolute_path(spec: str, root, ctx, name: str) -> str | None:
+    """`//<path>` when `spec` is a single-slash path that names a system folder, else None.
+
+    `Edit(/src/**)` in project settings is legitimate, and so is `/home/**` in a project that has
+    a `home/` folder: a folder that exists under the settings source is never flagged.
+    """
+    m = re.match(r"^/([A-Za-z]+)(/|$)", spec)
+    if not m or spec.startswith("//") or m.group(1) not in SYSTEM_ROOTS:
+        return None
+    if (root / m.group(1)).exists():
+        return None
+    return "/" + spec

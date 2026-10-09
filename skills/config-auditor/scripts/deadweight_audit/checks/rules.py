@@ -28,16 +28,26 @@ def check_rules(ctx: AuditContext, report: Report) -> None:
         text = entry.read_text(encoding="utf-8")
         size = entry.stat().st_size
 
+        fm, _ = parse_frontmatter(text)
         if size > RULE_MAX_BYTES:
+            # The documented figure is 200 lines per file, rules files included (memory):
+            # the finding names it, so a rule well under it is not read as over a doc limit.
+            lines = len(text.splitlines())
+            scoped = bool(fm and fm.get("paths", "").strip())
             report.add(
                 "14-rule-size",
                 house(ctx),
-                f"Rule '{entry.name}' is {size} bytes (> {RULE_MAX_BYTES}). Consider converting to a skill."
-                + house_note(f"rules under {RULE_MAX_BYTES} bytes", "one topic per file (memory)"),
+                f"Rule '{entry.name}' is {size} bytes (> {RULE_MAX_BYTES}), {lines} lines. If it "
+                "carries knowledge, move that into a skill and keep the constraint in the rule"
+                # A skill also takes `paths:`, "the same format as path-specific rules"
+                # (skills): saying it loads only by description was false (audit externe 3, g4-02).
+                + ("; the skill can keep the same `paths:` globs (skills)." if scoped else ".")
+                + house_note(f"rules under {RULE_MAX_BYTES} bytes",
+                             "one topic per file, and files over 200 lines \"may reduce adherence\", "
+                             "each rules file counted separately (memory)"),
                 str(entry),
             )
 
-        fm, _ = parse_frontmatter(text)
         if fm is not None:
             paths_val = fm.get("paths", "").strip()
             # "Rules without a paths field are loaded unconditionally" (memory): valid,
@@ -52,7 +62,7 @@ def check_rules(ctx: AuditContext, report: Report) -> None:
                     str(entry),
                 )
 
-        stripped = strip_code_fences(text)
+        stripped = strip_code_fences(text, indented=True)
         if re.search(r"^\s*//", stripped, re.MULTILINE):
             report.add(
                 "14-rule-code-comments",
@@ -63,12 +73,14 @@ def check_rules(ctx: AuditContext, report: Report) -> None:
             )
 
         words = re.findall(r"[a-zàâçéèêëîïôûùüÿñæœ']+", stripped.lower())
-        hits = sum(1 for w in words if w in FRENCH_HEURISTIC_WORDS)
+        # Distinct words, as check 11 counts them: `pour` is back in the shared list, and
+        # counted per occurrence three English "Pour ..." lines reached the threshold alone.
+        hits = len(set(words) & FRENCH_HEURISTIC_WORDS)
         if hits >= FRENCH_HEURISTIC_THRESHOLD:
             report.add(
                 "14-rule-english-only",
                 house(ctx),
-                f"Rule '{entry.name}' appears to contain French content ({hits} heuristic hits).",
+                f"Rule '{entry.name}' appears to contain French content ({hits} distinct heuristic words).",
                 str(entry),
             )
 
@@ -110,9 +122,12 @@ def check_rule_globs(ctx: AuditContext, report: Report) -> None:
                 continue
             if glob_match_count(pattern, files):
                 continue
+            # Only an UNESCAPED `[` earns the advice: `photos \[2024/**` already follows it.
             bracket = (
-                " The unescaped '[' opens a character class — escape it if a literal bracket was meant."
-                if "[" in pattern
+                " The unescaped '[' opens a bracket expression, and one that cannot be read as "
+                "such makes the pattern invalid (memory) — escape it as '\\[' if a literal "
+                "bracket was meant."
+                if re.search(r"(?<!\\)\[", pattern)
                 else ""
             )
             report.add(
