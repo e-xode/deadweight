@@ -2,13 +2,15 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+from pathlib import Path
 
 from ..identity import instrument_files
 from ..context import AuditContext
 from ..parsing.frontmatter import frontmatter_keys, parse_frontmatter
-from ..parsing.markdown import FENCE_RE, fenced_spans, in_spans, memory_imports
-from ..repo import claude_md_path, readable_files, git_ignored
+from ..parsing.markdown import FENCE_RE, fenced_spans, in_spans
+from ..repo import claude_md_path, readable_files, git_ignored, walk_imports
 from ..report import Report
 
 
@@ -261,18 +263,54 @@ def check_companions(ctx: AuditContext, report: Report, skills: dict[str, dict])
                    "instructions, and committed it becomes everyone's (memory).", str(local))
     md = claude_md_path(root)
     if md.is_file():
-        # The parser the budget and the reality checks use: an indented code block is no
-        # import, and an escaped space (`Dev\ Guide.md`) is one (external audit 4, sk-03).
-        for ref in memory_imports(md.read_text(encoding="utf-8", errors="replace")):
-            if ref.startswith("~/") or ref.startswith("/"):
-                continue                  # outside the repository: approval dialog, unverifiable
-            rel = ref[2:] if ref.startswith("./") else ref
-            if ign(rel):
-                continue                  # generated or installed (node_modules/): machine-dependent
-            # Relative to the importing file only (memory). The repository-root fallback
-            # hid a broken import in `.claude/CLAUDE.md` whenever the path existed at the root.
-            target = (md.parent / ref)
-            if not target.exists():
-                report.add("01-claude-md-import", "WARN",
-                           f"CLAUDE.md imports '@{ref}', which does not exist - the import "
-                           "resolves relative to the importing file (memory).", str(md))
+        _check_imports(root, md, ign, report)
+
+
+def _check_imports(root: Path, md: Path, ign, report: Report) -> None:
+    """01-claude-md-import and 01-claude-md-import-syntax, on every file the import walk reads.
+
+    The walk the budget uses (repo.walk_imports): CLAUDE.md, then the files it imports, up to
+    the four hops Claude Code follows. Until 0.26.0 only CLAUDE.md was read, so a broken
+    `@docs/nope.md` inside an imported docs/a.md gave no finding at all.
+    """
+    def label(p: Path) -> str:
+        try:
+            return Path(os.path.normpath(p)).relative_to(root).as_posix()
+        except ValueError:
+            return str(p)
+    parent: dict[str, Path] = {}           # real path of an imported file -> who imported it
+    for site in walk_imports(md):
+        ref, token = site.token.ref, site.token
+        if ref.startswith(("~/", "/")):
+            continue                      # outside the repository: approval dialog, unverifiable
+        by = parent.get(os.path.realpath(site.importer))
+        via = f" ({label(site.importer)} is imported by {label(by)})" if by is not None else ""
+        where = f"{label(site.importer)}{via}, line {token.line},"
+        if token.stop:
+            # Claude Code reads no import here (evidence.json, 01-claude-md-import-syntax).
+            # Reported only when the file it names exists: then the author meant to load it.
+            if site.target.is_file():
+                sides = [s for s, c in (("before the @", token.stop_before),
+                                        ("after the path", token.stop_after)) if c]
+                stops = " and ".join(f"the '{c}' {s}" for s, c in
+                                     (("before the @", token.stop_before),
+                                      ("after the path", token.stop_after)) if c)
+                report.add("01-claude-md-import-syntax", "NOTICE",
+                           f"{where} writes '{token.spelled}': '{label(site.target)}' exists, but "
+                           f"Claude Code does not import it - {stops} {'stop' if len(sides) > 1 else 'stops'} "
+                           "the import (measured "
+                           f"on 2.1.302, one probe run). To load the file, write a space {' and '.join(sides)}; "
+                           "to only name it, put it in backticks.", str(site.importer))
+            continue
+        if site.target.is_file():
+            parent.setdefault(os.path.realpath(site.target), site.importer)
+        if ign(os.path.normpath(os.path.relpath(site.target, root))):
+            continue                      # generated or installed (node_modules/): machine-dependent
+        # Relative to the importing file only (memory; measured, evidence.json). The
+        # repository-root fallback hid a broken import in `.claude/CLAUDE.md` whenever the
+        # path existed at the root.
+        if not site.target.exists():
+            here = f", here '{label(site.target)}'" if site.hop > 1 else ""
+            report.add("01-claude-md-import", "WARN",
+                       f"{where} imports '@{ref}', which does not exist - the import resolves "
+                       f"relative to the importing file{here} (memory).", str(site.importer))

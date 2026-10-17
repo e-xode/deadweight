@@ -95,6 +95,24 @@ and "How CLAUDE.md files load"). All files are concatenated, none overrides anot
 - An import resolving **outside the working directory** triggers an approval dialog the first
   time; if declined, those imports stay disabled and the dialog does not return.
 - Imports organise; they do not save context. An imported file loads at launch like the rest.
+- "Without the backslashes, the path ends at the first space"; "A path wrapped in quotes isn't
+  imported at all".
+
+**Tested** (2.1.302, Linux, one `claude -p` run with an `InstructionsLoaded` hook;
+`evidence.json`, `01-claude-md-import-syntax`, replayed by `probes/run_probes.py`):
+
+- Loaded: `@docs/x.md` followed by a space, a line end or the end of the file; `@./docs/x.md`;
+  `@docs/x.md/` (as `docs/x.md`); `@docs/NOTES` with no extension.
+- **Not loaded**, with the file present: `:`, `,`, `.`, `"`, `;`, `!`, `?` or `)` right after the
+  path — `@docs/b.md:` and `@docs/c.md,` import nothing, and neither does a file literally named
+  `docs/b.md:`; `(`, `"`, `'`, a lone backtick or a letter right before the `@` — in
+  `(@docs/x.md)` either parenthesis alone stops it. A file named with the character was probed
+  for `:` and `,` only. Whether Claude Code warns about such a token was not observed: the
+  probe is one non-interactive run and records loads only.
+- A chain of six imports loaded four files: the four-hop limit holds, and a file at hop 4 loads
+  without its own imports. `@docs/x.md` inside `docs/a.md` looked for `docs/docs/x.md` only.
+- Not probed: other neighbours (`*`, `[`, `]`, `>`, `|`, `-`), `@~/`, absolute paths. The auditor
+  keeps reading those as imports, and does not read an `@path` with no extension.
 
 ## Size
 
@@ -215,7 +233,8 @@ for a listed skill pays twice and rots on the next rename.
 | `01-claude-md-size` | NOTICE; WARN under `profile: house` | ≤ 12 KB per memory file, overridable per project | House convention |
 | `01-agents-md-unread` | WARN | An `AGENTS.md` beside a `CLAUDE.md` is imported, the path resolved from the importing file (`@../AGENTS.md` from `.claude/CLAUDE.md`), imports followed four hops, code excluded | Doc |
 | `01-claude-local` | WARN | `CLAUDE.local.md` is ignored by the repository's git rules | Doc |
-| `01-claude-md-import` | WARN | Each in-repo `@path` import resolves, relative to the importing file | Doc |
+| `01-claude-md-import` | WARN | Each in-repo `@path` import of `CLAUDE.md` and of the files it imports (four hops) resolves, relative to the importing file; the finding names the file and the line | Doc + Tested |
+| `01-claude-md-import-syntax` | NOTICE | No `@path` naming an existing file is stopped by a measured character next to it (`@docs/b.md:`, `(@docs/x.md`): Claude Code does not import it | Tested |
 | `12-no-code-comments` | NOTICE; WARN under `profile: house` | No `//` or `/* */` outside code blocks (fenced or indented) | House convention |
 | `15-skill-index` | NOTICE, WARN under `profile: house` (withheld skill not indexed; `/name` still runs it) / ERROR (withheld from the model and `user-invocable: false`: nobody can run it) | The skills index names withheld skills, and only them (a listed skill in the index is a NOTICE too) | House convention; the ERROR is doc |
 | `17-always-loaded-budget` | INFO / WARN / ERROR | Memory files (`./CLAUDE.md`, `./.claude/CLAUDE.md`, `./CLAUDE.local.md`, their imports, rules without `paths:`) + skill and command descriptions (`description` + `when_to_use`, capped each at `skillListingMaxDescChars`, 1,536 by default) + agent descriptions under budget | House convention |

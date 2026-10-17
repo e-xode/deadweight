@@ -38,7 +38,8 @@ The fix was not a better condition; it was removing the write.
 Matchers: `startup` and `resume` only. `clear` and `compact` reset the
 conversation, not the configuration on disk.
 
-Writes:   ${XDG_CACHE_HOME:-~/.cache}/claude-audit/<project>.json, and nothing else
+Writes:   ${XDG_CACHE_HOME:-~/.cache}/claude-audit/<project>-<md5 of its path, 8>.json - the
+          counts and every finding's message and location - and nothing else
 Read by:  templates/statusline.py and `deadweight`
 Opt out:  `claude plugin disable <this plugin> --scope project` - the
           granularity is the whole plugin, not this hook.

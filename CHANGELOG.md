@@ -1,5 +1,76 @@
 # Changelog
 
+## 0.27.0 — 2026-10-17
+
+**`audit.py` changed: floors set with 0.26.0 no longer compare** (`34-floor` refuses two auditors). Run `audit.py --set-floor` once and commit `floor.json`. What can **raise** a count: a broken `@import` in a file that `CLAUDE.md` imports (`01-claude-md-import` WARN) and the new `01-claude-md-import-syntax` NOTICE. What can **lower** one: an `@path` written next to punctuation is no longer an import, so it no longer adds its file to the always-loaded budget (17), and a missing file named that way is no longer a broken-import WARN. Measured on the 23 folders of one workspace with the 0.26.0 auditor and this one on the same files, 2026-10-17: errors 0 → 0, warnings 63 → 63, notices 113 → 113.
+
+### Fixed
+
+- **`01-claude-md-import` did not read the files `CLAUDE.md` imports** (`checks/plugin.py`,
+  `repo.walk_imports`). Before: `CLAUDE.md` with `@docs/a.md`, and `docs/a.md` with
+  `@docs/nope.md`: no finding, while the same `@docs/nope.md` written in `CLAUDE.md` gave the WARN.
+  After: the check reads the walk the budget (17) already used - `CLAUDE.md`, then each imported
+  file up to the four hops Claude Code follows, each path relative to the file that holds it - and
+  reports `docs/a.md (docs/a.md is imported by CLAUDE.md), line 3, imports '@docs/nope.md', which
+  does not exist - the import resolves relative to the importing file, here 'docs/docs/nope.md'
+  (memory).` The tokens of a file at hop 4 are not read: it loads, its imports do not (measured,
+  below). This can **raise** a WARN count. **Message changed** for every `01-claude-md-import`:
+  it was `CLAUDE.md imports '@<path>', which does not exist - the import resolves relative to the
+  importing file (memory).`; it now starts with the file's path from the repository root and the
+  line (`CLAUDE.md, line 3, imports '@<path>', ...`; `.claude/CLAUDE.md, line 3, ...` for that
+  file), and the finding's location is the importing file.
+- **`@path` followed or preceded by punctuation was counted as an import** (`parsing/markdown.py`,
+  `import_tokens`, the one parser of 17, 01, 01-agents-md-unread, 53, 54 and `environment.py`).
+  Before: `See @docs/b.md: the checkout rules, and @docs/c.md, the refund rules.` counted
+  `docs/b.md` and `docs/c.md` in `17-always-loaded-budget`. Measured on Claude Code 2.1.302 (one
+  `claude -p` run, an `InstructionsLoaded` hook; `evidence.json`, `01-claude-md-import-syntax`):
+  neither loads. Nothing loads when `:`, `,`, `.`, `"`, `;`, `!`, `?` or `)` follows the path - not
+  even a file named with that character, for `:` and `,`, the two probed that way - or when `(`, `"`, `'` or a lone backtick precedes the
+  `@`; in `(@docs/x.md)` each parenthesis alone stops it. After: those tokens are not imports, so the
+  budget figure drops by the size of the files they named, and an `@docs/x.md.` naming a missing
+  file is no longer a broken-import WARN (Claude Code reads no import there). Loaded and still
+  counted: a space, a line end or the end of the file after the path, `@./`, and `@docs/x.md/`.
+  Unchanged because not probed: any other neighbour (`*`, `[`, `]`, `>`, `|`, `-`), `@~/` and
+  absolute paths. `@docs/NOTES` (no extension) loads too, and is still not read by the auditor.
+- **New `01-claude-md-import-syntax` (NOTICE, tested).** For each such token naming a file that
+  exists, in `CLAUDE.md` or a file it imports: `CLAUDE.md, line 3, writes '@docs/b.md:':
+  'docs/b.md' exists, but Claude Code does not import it - the ':' after the path stops the import
+  (measured on 2.1.302, one probe run). To load the file, write a space after the path; to only name it, put it in
+  backticks.` This can **raise** a NOTICE count.
+- **Probe**: `probes/run_probes.py --only 01-claude-md-import-syntax` replays the measurement
+  (one Haiku run): 25 spellings in one `CLAUDE.md`, and a chain of six imports, of which four
+  loaded.
+- Measured on the 23 folders of one workspace (22 private repositories, and this one) with the
+  0.26.0 auditor and this one on the same files, 2026-10-17: errors 0 → 0, warnings 63 → 63,
+  notices 113 → 113, and no budget figure changed - none of their memory files writes an
+  `@path` next to punctuation or a broken nested import.
+- **The line of an `@import` finding was too low after a code block** (`parsing/markdown.py`,
+  `import_tokens`). The line was counted after code blocks were blanked, which blanked their line
+  ends too: an import on line 9 after a five-line block was reported on `line 4`. It is now counted
+  in the file as written. Changes the message of `01-claude-md-import` and
+  `01-claude-md-import-syntax`, not a count. Found by the external audit of this
+  release (A-00).
+- **The `01-claude-md-import-syntax` probe ended in ERROR on Windows** (`probes/run_probes.py`): it
+  created a file named `docs/colonfile.md:`, a name Windows refuses. That form is now left out where
+  its file cannot be created, and the verdict says so; the auditor's reading of it is tested on the
+  string, with no file. Emulated, not run on Windows (external audit, D-03).
+- `01-claude-md-import-syntax` now says `(measured on 2.1.302, one probe run)`, and the checklist
+  and `claude-md-anatomy.md` say the same; the anatomy no longer says "No warning is shown", which
+  the probe did not observe.
+- Not changed: `name: [` and `description: [TODO: x]` YAML flow lists remain a documented limit
+  of the frontmatter reader.
+
+### Added
+
+- `PRIVACY.md`: what the plugin reads, writes and sends, and the two commands that use a model (`--semantic`, `--environment --measure`), through your own Claude Code session. Linked from the README and set as `privacyPolicyUrl` in `plugin.json`. It names what is read or written outside the project: the cache file (`<project>-<md5 8>.json`, with every finding's message), the Copilot CLI `settings.json` that `--setup-statusline` sets for every project, what `--environment` reads in `~/.claude`, the user settings, hooks and MCP servers the last runs of `--measure` load, `@../` imports followed outside the project, the files git ignores that `--semantic` sends, and the `--method claims` cache. Rewritten after an independent review, in five parts (network, reads, writes, sends, retention): `--setup-statusline` replaces an existing launcher file even when it leaves the settings alone, and rewrites the settings file it sets; the audit also reads symbolic-link targets, `--runtime LOG`, `CLAUDE.local.md`, `.mcp.json`, `evals/`, `.vscode/settings.json`, the tracked `package.json`/`Makefile`/`justfile`, `.cursor/rules/`; which values findings quote (hook scripts, permission rules, `additionalDirectories`, MCP server names), never a credential's; the hook's `*.tmp` file; `git` runs a repository's own `core.fsmonitor` (measured); `--semantic` reads its files by name through symbolic links; the three files of the claims cache; neither model command passes `--no-session-persistence`, so Claude Code keeps the prompt in a session file (measured on 2.1.302); `--setting-sources ""` does not load the folder's `CLAUDE.md` (measured); `--measure` sends what its sessions load; the environment variables read and set; nothing is purged; `.github/dependabot.yml`.
+- `plugin.json`: `homepage` (the product page), `documentationUrl` (the README) and `privacyPolicyUrl`. No terms-of-service URL: the project is MIT-licensed and has none.
+
+### Changed
+
+- **A case file of 256 KiB or more now fails the tests** (`tests/test_package_limits.py`), a
+  contributed `tests/cases.d/*.json` included: Anthropic's pre-submission checklist holds such a
+  file for a reviewer. The same test fails past 512 files in the plugin.
+
 ## 0.26.0 — 2026-10-17
 
 **`audit.py` changed: floors set with 0.25.0 no longer compare** (`34-floor` refuses two auditors). Run `audit.py --set-floor` once and commit `floor.json`. What can **raise** a count: a hook matcher holding a permission rule as one of its `|` alternatives (new `35-hooks-matcher` NOTICE, or ERROR when no alternative can fire or the matcher is not a valid regular expression), an `autoCompactWindow` outside its documented range (`23-agent-frontmatter-keys` WARN in an agent, new `24-settings-value` NOTICE in settings), an async frontmatter hook with `onFailure: "block"` (`35-hooks-shape` NOTICE), and the findings of any check on a skill, agent or rule file that opens with a UTF-8 byte order mark, whose frontmatter is now read. What can **lower** one: on such a file, the `02-skill-frontmatter` or `08-agent-frontmatter` WARN saying it has no frontmatter; `35-hooks-timeout` on an async frontmatter hook; `24-settings-unknown-subkey` on each model name under `modelSettings`. Measured on the 23 folders of one workspace (22 private repositories, and this one) with the 0.25.0 auditor and this one on the same files, 2026-10-17: errors 0 → 0, warnings 60 → 60, notices 113 → 113. The alignment with Claude Code 2.1.270-2.1.302 below can raise a count too (`TaskOutput`, `taskOutputMaxChars`, `onFailure`, `"type": "sdk"`, `mcp__<server>` allow rules, plugin paths) and lower one (`autoCompactWindow`, `idleCompaction`); on the same 23 folders it changed none: 0 / 60 / 113.

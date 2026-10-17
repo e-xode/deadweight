@@ -1,13 +1,16 @@
 {
   "name": "deadweight",
   "displayName": "Deadweight",
-  "version": "0.26.0",
+  "version": "0.27.0",
   "description": "Audit the Claude Code configuration of a project or of a plugin: CLAUDE.md, skills, sub-agents, rules, settings, and the context budget a configuration spends on every turn. Finds the configuration that costs context every turn and does nothing.",
   "author": {
     "name": "Christophe Bragard",
     "url": "https://github.com/e-xode"
   },
   "repository": "https://github.com/e-xode/deadweight",
+  "homepage": "https://www.e-xode.net/en/products/deadweight",
+  "documentationUrl": "https://github.com/e-xode/deadweight#readme",
+  "privacyPolicyUrl": "https://github.com/e-xode/deadweight/blob/main/PRIVACY.md",
   "license": "MIT",
   "keywords": [
     "claude-code",

@@ -316,6 +316,53 @@
    ]
   },
   {
+   "id": "01-import-broken-in-imported-file",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/a.md for the rules.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/a.md": "# A\n\nAlso read @docs/nope.md here.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "01-claude-md-import",
+     "^(?!docs/a\\.md \\(docs/a\\.md is imported by CLAUDE\\.md\\), line 3,)"
+    ]
+   ]
+  },
+  {
+   "id": "01-import-four-hop-limit",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/h1.md for the rules.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/h1.md": "# h1\n\nNext: @h2.md then.\n",
+    "docs/h2.md": "# h2\n\nNext: @h3.md then.\n",
+    "docs/h3.md": "# h3\n\nNext: @h4.md then.\n\nAlso @missing-in-h3.md here.\n",
+    "docs/h4.md": "# h4\n\nNext: @missing-in-h4.md then.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "01-claude-md-import",
+     "missing-in-h4"
+    ]
+   ]
+  },
+  {
    "id": "01-import-from-dot-claude",
    "files": {
     ".claude/CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/guide.md for the release steps.\n",
@@ -352,9 +399,40 @@
    ]
   },
   {
+   "id": "01-import-line-after-code-block",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\n```sh\nmake test\nmake lint\nmake build\n```\n\nSee @docs/shop-missing.md for the rules.\n\nSee @docs/shop-x.md, the refunds.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/shop-x.md": "# X\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import",
+     "WARN",
+     1
+    ],
+    [
+     "01-claude-md-import-syntax",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "01-claude-md-import",
+     "^(?!CLAUDE\\.md, line 9, imports '@docs/shop-missing\\.md')"
+    ],
+    [
+     "01-claude-md-import-syntax",
+     "^(?!CLAUDE\\.md, line 11, writes '@docs/shop-x\\.md,')"
+    ]
+   ]
+  },
+  {
    "id": "01-import-missing",
    "files": {
-    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/shop-conventions.md.\n",
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/shop-conventions.md for the rules.\n",
     ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
    },
    "git": true,
@@ -367,9 +445,57 @@
    ]
   },
   {
-   "id": "01-import-present",
+   "id": "01-import-missing-followed-by-period",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/shop-conventions.md.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import",
+     "WARN",
+     0
+    ],
+    [
+     "01-claude-md-import-syntax",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "01-import-nested-relative-to-importer",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/a.md for the rules.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/a.md": "# A\n\nSee @b.md for refunds.\n\nSee @docs/c.md for coupons.\n",
+    "docs/b.md": "# B\n",
+    "docs/c.md": "# C\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "01-claude-md-import",
+     "'@b\\.md'"
+    ],
+    [
+     "01-claude-md-import",
+     "^(?!.*here 'docs/docs/c\\.md')"
+    ]
+   ]
+  },
+  {
+   "id": "01-import-present",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/shop-conventions.md for the rules.\n",
     ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
     "docs/shop-conventions.md": "#\n"
    },
@@ -378,6 +504,484 @@
     [
      "01-claude-md-import",
      "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "01-import-stopped-closing-parenthesis",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/shop-x.md) for the rules.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/shop-x.md": "# X\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import-syntax",
+     "NOTICE",
+     1
+    ],
+    [
+     "17-always-loaded-budget",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "17-always-loaded-budget",
+     "shop-x\\.md"
+    ],
+    [
+     "01-claude-md-import-syntax",
+     "^(?!CLAUDE\\.md,\\ line\\ 5,\\ writes\\ '@docs/shop\\-x\\.md\\)':\\ 'docs/shop\\-x\\.md'\\ exists,\\ but\\ Claude\\ Code\\ does\\ not\\ import\\ it\\ \\-\\ the\\ '\\)'\\ after\\ the\\ path\\ stops\\ the\\ import)"
+    ]
+   ]
+  },
+  {
+   "id": "01-import-stopped-colon",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/shop-x.md: the checkout rules.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/shop-x.md": "# X\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import-syntax",
+     "NOTICE",
+     1
+    ],
+    [
+     "17-always-loaded-budget",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "17-always-loaded-budget",
+     "shop-x\\.md"
+    ],
+    [
+     "01-claude-md-import-syntax",
+     "^(?!CLAUDE\\.md,\\ line\\ 5,\\ writes\\ '@docs/shop\\-x\\.md:':\\ 'docs/shop\\-x\\.md'\\ exists,\\ but\\ Claude\\ Code\\ does\\ not\\ import\\ it\\ \\-\\ the\\ ':'\\ after\\ the\\ path\\ stops\\ the\\ import)"
+    ]
+   ]
+  },
+  {
+   "id": "01-import-stopped-comma",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/shop-x.md, the checkout rules.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/shop-x.md": "# X\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import-syntax",
+     "NOTICE",
+     1
+    ],
+    [
+     "17-always-loaded-budget",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "17-always-loaded-budget",
+     "shop-x\\.md"
+    ],
+    [
+     "01-claude-md-import-syntax",
+     "^(?!CLAUDE\\.md,\\ line\\ 5,\\ writes\\ '@docs/shop\\-x\\.md,':\\ 'docs/shop\\-x\\.md'\\ exists,\\ but\\ Claude\\ Code\\ does\\ not\\ import\\ it\\ \\-\\ the\\ ','\\ after\\ the\\ path\\ stops\\ the\\ import)"
+    ]
+   ]
+  },
+  {
+   "id": "01-import-stopped-double-quote-after",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/shop-x.md\" for the rules.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/shop-x.md": "# X\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import-syntax",
+     "NOTICE",
+     1
+    ],
+    [
+     "17-always-loaded-budget",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "17-always-loaded-budget",
+     "shop-x\\.md"
+    ],
+    [
+     "01-claude-md-import-syntax",
+     "^(?!CLAUDE\\.md,\\ line\\ 5,\\ writes\\ '@docs/shop\\-x\\.md\"':\\ 'docs/shop\\-x\\.md'\\ exists,\\ but\\ Claude\\ Code\\ does\\ not\\ import\\ it\\ \\-\\ the\\ '\"'\\ after\\ the\\ path\\ stops\\ the\\ import)"
+    ]
+   ]
+  },
+  {
+   "id": "01-import-stopped-double-quote-before",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee \"@docs/shop-x.md for the rules.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/shop-x.md": "# X\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import-syntax",
+     "NOTICE",
+     1
+    ],
+    [
+     "17-always-loaded-budget",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "17-always-loaded-budget",
+     "shop-x\\.md"
+    ],
+    [
+     "01-claude-md-import-syntax",
+     "^(?!CLAUDE\\.md,\\ line\\ 5,\\ writes\\ '\"@docs/shop\\-x\\.md':\\ 'docs/shop\\-x\\.md'\\ exists,\\ but\\ Claude\\ Code\\ does\\ not\\ import\\ it\\ \\-\\ the\\ '\"'\\ before\\ the\\ @\\ stops\\ the\\ import)"
+    ]
+   ]
+  },
+  {
+   "id": "01-import-stopped-exclamation",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/shop-x.md! Then the rest.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/shop-x.md": "# X\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import-syntax",
+     "NOTICE",
+     1
+    ],
+    [
+     "17-always-loaded-budget",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "17-always-loaded-budget",
+     "shop-x\\.md"
+    ],
+    [
+     "01-claude-md-import-syntax",
+     "^(?!CLAUDE\\.md,\\ line\\ 5,\\ writes\\ '@docs/shop\\-x\\.md!':\\ 'docs/shop\\-x\\.md'\\ exists,\\ but\\ Claude\\ Code\\ does\\ not\\ import\\ it\\ \\-\\ the\\ '!'\\ after\\ the\\ path\\ stops\\ the\\ import)"
+    ]
+   ]
+  },
+  {
+   "id": "01-import-stopped-in-double-quotes",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee \"@docs/shop-x.md\" for the rules.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/shop-x.md": "# X\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import-syntax",
+     "NOTICE",
+     1
+    ],
+    [
+     "17-always-loaded-budget",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "17-always-loaded-budget",
+     "shop-x\\.md"
+    ],
+    [
+     "01-claude-md-import-syntax",
+     "^(?!CLAUDE\\.md,\\ line\\ 5,\\ writes\\ '\"@docs/shop\\-x\\.md\"':\\ 'docs/shop\\-x\\.md'\\ exists,\\ but\\ Claude\\ Code\\ does\\ not\\ import\\ it\\ \\-\\ the\\ '\"'\\ before\\ the\\ @\\ and\\ the\\ '\"'\\ after\\ the\\ path\\ stop\\ the\\ import)"
+    ]
+   ]
+  },
+  {
+   "id": "01-import-stopped-in-imported-file",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/a.md for the rules.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/a.md": "# A\n\nSee @b.md, the refunds.\n",
+    "docs/b.md": "# B\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import-syntax",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "01-claude-md-import-syntax",
+     "^(?!docs/a\\.md \\(docs/a\\.md is imported by CLAUDE\\.md\\), line 3,)"
+    ]
+   ]
+  },
+  {
+   "id": "01-import-stopped-in-parentheses",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee (@docs/shop-x.md) for the rules.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/shop-x.md": "# X\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import-syntax",
+     "NOTICE",
+     1
+    ],
+    [
+     "17-always-loaded-budget",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "17-always-loaded-budget",
+     "shop-x\\.md"
+    ],
+    [
+     "01-claude-md-import-syntax",
+     "^(?!CLAUDE\\.md,\\ line\\ 5,\\ writes\\ '\\(@docs/shop\\-x\\.md\\)':\\ 'docs/shop\\-x\\.md'\\ exists,\\ but\\ Claude\\ Code\\ does\\ not\\ import\\ it\\ \\-\\ the\\ '\\('\\ before\\ the\\ @\\ and\\ the\\ '\\)'\\ after\\ the\\ path\\ stop\\ the\\ import)"
+    ]
+   ]
+  },
+  {
+   "id": "01-import-stopped-lone-backtick-before",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee `@docs/shop-x.md for the rules.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/shop-x.md": "# X\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import-syntax",
+     "NOTICE",
+     1
+    ],
+    [
+     "17-always-loaded-budget",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "17-always-loaded-budget",
+     "shop-x\\.md"
+    ],
+    [
+     "01-claude-md-import-syntax",
+     "^(?!CLAUDE\\.md,\\ line\\ 5,\\ writes\\ '`@docs/shop\\-x\\.md':\\ 'docs/shop\\-x\\.md'\\ exists,\\ but\\ Claude\\ Code\\ does\\ not\\ import\\ it\\ \\-\\ the\\ '`'\\ before\\ the\\ @\\ stops\\ the\\ import)"
+    ]
+   ]
+  },
+  {
+   "id": "01-import-stopped-opening-parenthesis",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee (@docs/shop-x.md for the rules.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/shop-x.md": "# X\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import-syntax",
+     "NOTICE",
+     1
+    ],
+    [
+     "17-always-loaded-budget",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "17-always-loaded-budget",
+     "shop-x\\.md"
+    ],
+    [
+     "01-claude-md-import-syntax",
+     "^(?!CLAUDE\\.md,\\ line\\ 5,\\ writes\\ '\\(@docs/shop\\-x\\.md':\\ 'docs/shop\\-x\\.md'\\ exists,\\ but\\ Claude\\ Code\\ does\\ not\\ import\\ it\\ \\-\\ the\\ '\\('\\ before\\ the\\ @\\ stops\\ the\\ import)"
+    ]
+   ]
+  },
+  {
+   "id": "01-import-stopped-period",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/shop-x.md. Then the rest.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/shop-x.md": "# X\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import-syntax",
+     "NOTICE",
+     1
+    ],
+    [
+     "17-always-loaded-budget",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "17-always-loaded-budget",
+     "shop-x\\.md"
+    ],
+    [
+     "01-claude-md-import-syntax",
+     "^(?!CLAUDE\\.md,\\ line\\ 5,\\ writes\\ '@docs/shop\\-x\\.md\\.':\\ 'docs/shop\\-x\\.md'\\ exists,\\ but\\ Claude\\ Code\\ does\\ not\\ import\\ it\\ \\-\\ the\\ '\\.'\\ after\\ the\\ path\\ stops\\ the\\ import)"
+    ]
+   ]
+  },
+  {
+   "id": "01-import-stopped-question-mark",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/shop-x.md? Then the rest.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/shop-x.md": "# X\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import-syntax",
+     "NOTICE",
+     1
+    ],
+    [
+     "17-always-loaded-budget",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "17-always-loaded-budget",
+     "shop-x\\.md"
+    ],
+    [
+     "01-claude-md-import-syntax",
+     "^(?!CLAUDE\\.md,\\ line\\ 5,\\ writes\\ '@docs/shop\\-x\\.md\\?':\\ 'docs/shop\\-x\\.md'\\ exists,\\ but\\ Claude\\ Code\\ does\\ not\\ import\\ it\\ \\-\\ the\\ '\\?'\\ after\\ the\\ path\\ stops\\ the\\ import)"
+    ]
+   ]
+  },
+  {
+   "id": "01-import-stopped-semicolon",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/shop-x.md; then the rest.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/shop-x.md": "# X\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import-syntax",
+     "NOTICE",
+     1
+    ],
+    [
+     "17-always-loaded-budget",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "17-always-loaded-budget",
+     "shop-x\\.md"
+    ],
+    [
+     "01-claude-md-import-syntax",
+     "^(?!CLAUDE\\.md,\\ line\\ 5,\\ writes\\ '@docs/shop\\-x\\.md;':\\ 'docs/shop\\-x\\.md'\\ exists,\\ but\\ Claude\\ Code\\ does\\ not\\ import\\ it\\ \\-\\ the\\ ';'\\ after\\ the\\ path\\ stops\\ the\\ import)"
+    ]
+   ]
+  },
+  {
+   "id": "01-import-stopped-single-quote-before",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee '@docs/shop-x.md for the rules.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/shop-x.md": "# X\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import-syntax",
+     "NOTICE",
+     1
+    ],
+    [
+     "17-always-loaded-budget",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "17-always-loaded-budget",
+     "shop-x\\.md"
+    ],
+    [
+     "01-claude-md-import-syntax",
+     "^(?!CLAUDE\\.md,\\ line\\ 5,\\ writes\\ ''@docs/shop\\-x\\.md':\\ 'docs/shop\\-x\\.md'\\ exists,\\ but\\ Claude\\ Code\\ does\\ not\\ import\\ it\\ \\-\\ the\\ '''\\ before\\ the\\ @\\ stops\\ the\\ import)"
+    ]
+   ]
+  },
+  {
+   "id": "01-import-unprobed-neighbour-unchanged",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee *@docs/shop-x.md* for the rules.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/shop-x.md": "Shop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\nShop handlers return typed errors.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "17-always-loaded-budget",
+     "NOTICE",
+     1
+    ],
+    [
+     "01-claude-md-import-syntax",
+     "NOTICE",
      0
     ]
    ]

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import Iterable
 from urllib.parse import unquote
 
@@ -85,17 +86,65 @@ def indented_code_spans(text: str) -> list[tuple[int, int]]:
 # unfollowed (audit externe 3, g7-02).
 IMPORT_RE = re.compile(r"(?<![\w./@-])@((?:~/|\.{0,2}/)?(?:[\w./@-]|\\ )+\.[A-Za-z0-9]+)\b")
 
+# The characters that, right next to an `@path` token, make Claude Code skip the import:
+# measured on 2.1.302 (evidence.json, 01-claude-md-import-syntax: one `claude -p` run, one
+# InstructionsLoaded event per file loaded). Not loaded: `@docs/colon.md:`, `,`, `.`, `"`,
+# `;`, `!`, `?` and `)` after the path - and, for `:` and `,`, the two probed with a file named
+# with that character, not even that file, so the character is not read as part of the path; `(`, `"`, `'` and a lone backtick before
+# the `@`. Loaded: a space, a line end or the end of the file after the path, `@./`, and a
+# trailing `/` after a file name. "A path wrapped in quotes isn't imported at all" (memory).
+# Any other neighbour (`*`, `[`, `]`, `>`, `|`, `-`...) was NOT probed and keeps the rule of
+# 0.26.0 - read as an import. `@path` with no extension loads (measured, as `@README` in the
+# memory page) and is still not read here: a bare `@name` is also a package scope or a
+# mention, and nothing tells them apart.
+IMPORT_STOP_BEFORE = "(\"'`"
+IMPORT_STOP_AFTER = ":,.\";!?)"
 
-def memory_imports(text: str) -> list[str]:
-    """The `@path` imports of a memory file, as the harness parses them.
 
-    "Import parsing skips Markdown code spans and fenced code blocks" (memory): a
-    `` `@AGENTS.md` `` names the file, it does not import it. Indented code blocks are
-    skipped too (see strip_code_fences). An escaped space is returned unescaped, as the
-    path on disk.
+@dataclass(frozen=True)
+class ImportToken:
+    ref: str                 # the path, an escaped space unescaped
+    line: int                # 1-based, in the text given
+    spelled: str             # the token as written, with the characters that stop it
+    stop_before: str = ""    # the measured character before the `@` that stops the import
+    stop_after: str = ""     # the measured character after the path that stops it
+
+    @property
+    def stop(self) -> str:
+        """"" when Claude Code reads the token as an import, else the character that stops it."""
+        return self.stop_after or self.stop_before
+
+
+def import_tokens(text: str) -> list[ImportToken]:
+    """Every `@path` token of a memory file outside code, and whether Claude Code imports it.
+
+    The one place that decides what an import is: memory_imports() keeps the tokens with no
+    `stop`, and 01-claude-md-import-syntax reports the others. "Import parsing skips Markdown
+    code spans and fenced code blocks" (memory): a `` `@AGENTS.md` `` names the file, it does
+    not import it. Indented code blocks are skipped too (see strip_code_fences).
     """
     body = strip_code_fences(text, indented=True)
-    return [m.group(1).replace("\\ ", " ") for m in IMPORT_RE.finditer(body)]
+    out = []
+    for m in IMPORT_RE.finditer(body):
+        before = body[m.start() - 1] if m.start() else ""
+        after = body[m.end()] if m.end() < len(body) else ""
+        pre = before if before and before in IMPORT_STOP_BEFORE else ""
+        post = after if after and after in IMPORT_STOP_AFTER else ""
+        # The line is counted in the text given, not in `body`: blanking a code block turns its
+        # line ends into spaces too (same length, so the offsets agree), and an import after a
+        # five-line block was reported 5 lines too high (external audit of 0.27.0, A-00).
+        out.append(ImportToken(m.group(1).replace("\\ ", " "),
+                               text.count("\n", 0, m.start()) + 1,
+                               pre + m.group(0) + post, pre, post))
+    return out
+
+
+def memory_imports(text: str) -> list[str]:
+    """The `@path` imports of a memory file, as the harness parses them (see import_tokens).
+
+    An escaped space is returned unescaped, as the path on disk.
+    """
+    return [t.ref for t in import_tokens(text) if not t.stop]
 
 
 FENCE_RE = re.compile(r"^ {0,3}(?:[ \t]*)(`{3,}|~{3,})(.*)$")

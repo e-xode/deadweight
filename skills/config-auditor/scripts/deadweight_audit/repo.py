@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import os
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
+
+from .parsing.markdown import ImportToken, import_tokens
 
 
 WALK_PRUNE_DIRS = {
@@ -120,36 +123,67 @@ def project_memory_files(root: Path) -> list[Path]:
 IMPORT_MAX_HOPS = 4   # "a maximum depth of four hops" (memory)
 
 
-def expand_imports(path: Path) -> list[Path]:
-    """The files a memory file pulls in at launch through `@path` imports, recursively.
+@dataclass(frozen=True)
+class ImportSite:
+    """One `@path` token read in a file whose imports Claude Code follows."""
+    importer: Path           # the file the token is written in
+    token: ImportToken       # what it says, its line, whether it is an import at all
+    target: Path             # where it resolves: relative to the importer (memory)
+    hop: int                 # 1 for a token of the memory file itself
+
+
+def walk_imports(path: Path) -> list[ImportSite]:
+    """Every `@path` token Claude Code reads from a memory file and the files it imports.
 
     "Imported files are expanded and loaded into context at launch"; "Relative paths
     resolve relative to the file containing the import, not the working directory";
-    "a maximum depth of four hops" (memory). `~/` and absolute paths are skipped: they
-    depend on the machine. Each file once, by real path; the importing file excluded.
+    "a maximum depth of four hops" (memory). Measured on 2.1.302 (evidence.json,
+    01-claude-md-import-syntax): a chain of six loaded the first four files and not the
+    fifth, and `@docs/x.md` inside docs/h1.md did not load ./docs/x.md. So the tokens of a
+    file at hop 4 are not read: the file loads, its imports do not. `~/` and absolute paths
+    are not followed: they depend on the machine. Each file read once, by real path.
+
+    The single traversal: the budget (17, through expand_imports) and the broken-import
+    check (01-claude-md-import) both read it, so they cannot disagree on what loads.
     """
-    from .parsing.markdown import memory_imports
     seen = {os.path.realpath(path)}
-    found: list[Path] = []
+    sites: list[ImportSite] = []
     frontier = [path]
-    for _ in range(IMPORT_MAX_HOPS):
+    for hop in range(1, IMPORT_MAX_HOPS + 1):
         nxt = []
         for f in frontier:
             try:
                 text = f.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
-            for ref in memory_imports(text):
-                if ref.startswith(("~/", "/")):
+            for token in import_tokens(text):
+                target = f.parent / token.ref
+                sites.append(ImportSite(f, token, target, hop))
+                if token.stop or token.ref.startswith(("~/", "/")):
                     continue
-                target = f.parent / ref
                 real = os.path.realpath(target)
                 if real in seen or not target.is_file():
                     continue
                 seen.add(real)
-                found.append(target)
                 nxt.append(target)
         frontier = nxt
+    return sites
+
+
+def expand_imports(path: Path) -> list[Path]:
+    """The files a memory file pulls in at launch through `@path` imports, recursively.
+
+    The loaded targets of walk_imports(), in the order met; the importing file excluded.
+    """
+    seen = {os.path.realpath(path)}
+    found: list[Path] = []
+    for site in walk_imports(path):
+        if site.token.stop or site.token.ref.startswith(("~/", "/")):
+            continue
+        real = os.path.realpath(site.target)
+        if real not in seen and site.target.is_file():
+            seen.add(real)
+            found.append(site.target)
     return found
 
 

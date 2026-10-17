@@ -438,6 +438,128 @@ def probe_skill_hooks_empty(ctx: Context) -> Verdict:
     return "FAIL", facts
 
 
+# The `@path` forms of 01-claude-md-import-syntax: (label, text written in CLAUDE.md, the file
+# whose InstructionsLoaded event means "imported"). Each target is its own file under docs/,
+# so one event names one form. `True`/`False` is what 2.1.302 did (evidence.json).
+IMPORT_FORMS: tuple[tuple[str, str, str, bool], ...] = (
+    ("space after", "See @docs/space.md for the shop.", "docs/space.md", True),
+    ("end of line", "Line end: @docs/eol.md", "docs/eol.md", True),
+    ("colon after", "Colon: @docs/colon.md: then text.", "docs/colon.md", False),
+    ("colon after, file named with the colon", "Named colon: @docs/colonfile.md: then text.",
+     "docs/colonfile.md:", False),
+    ("comma after", "Comma: @docs/comma.md, then text.", "docs/comma.md", False),
+    ("comma after, file named with the comma", "Named comma: @docs/commafile.md, then text.",
+     "docs/commafile.md,", False),
+    ("period after", "Period: @docs/period.md. Then text.", "docs/period.md", False),
+    ("double quote after", 'Quote after: @docs/dqafter.md" then text.', "docs/dqafter.md", False),
+    ("semicolon after", "Semicolon: @docs/semi.md; then text.", "docs/semi.md", False),
+    ("exclamation after", "Bang: @docs/bang.md! Then text.", "docs/bang.md", False),
+    ("question mark after", "Question: @docs/quest.md? Then text.", "docs/quest.md", False),
+    ("closing parenthesis after", "Paren after: @docs/pafter.md) then text.", "docs/pafter.md",
+     False),
+    ("opening parenthesis before", "Paren before: (@docs/pbefore.md then text.",
+     "docs/pbefore.md", False),
+    ("double quote before", 'Quote before: "@docs/dqbefore.md then text.', "docs/dqbefore.md",
+     False),
+    ("wrapped in double quotes", 'Wrapped: "@docs/wrapped.md" then text.', "docs/wrapped.md",
+     False),
+    ("single quote before", "Single quote before: '@docs/sqbefore.md then text.",
+     "docs/sqbefore.md", False),
+    ("lone backtick before", "Lone backtick before: `@docs/tickbefore.md then text.",
+     "docs/tickbefore.md", False),
+    ("word character before", "Word before: shop@docs/wordbefore.md then text.",
+     "docs/wordbefore.md", False),
+    ("code span", "Code span: `@docs/span.md` then text.", "docs/span.md", False),
+    ("fenced block", "```\n@docs/fence.md\n```", "docs/fence.md", False),
+    ("./ prefix", "Dot slash: @./docs/dotrel.md then text.", "docs/dotrel.md", True),
+    ("trailing slash after a file", "Slash after: @docs/slash.md/ then text.", "docs/slash.md",
+     True),
+    ("trailing slash on a folder", "Folder: @docs/folder/ then text.", "docs/folder/inner.md",
+     False),
+    ("no extension", "No extension: @docs/NOTES then text.", "docs/NOTES", True),
+    ("end of file, no newline", "Last: @docs/eof.md", "docs/eof.md", True),
+)
+# Windows refuses these characters in a file name, and a name ending with a period or a space
+# (Microsoft, "Naming Files, Paths, and Namespaces"): `docs/colonfile.md:` cannot be created
+# there - open() raised OSError [Errno 22] and the probe ended in ERROR (external audit of
+# 0.27.0, D-03, emulated). Such a form is left out where its file cannot exist, and said so; the
+# auditor's reading of it is tested on the string, with no file (tests/test_probes.py).
+WINDOWS_RESERVED = '<>:"|?*'
+IS_WINDOWS = os.name == "nt"
+
+
+def creatable(rel: str, windows: bool | None = None) -> bool:
+    """False for a relative path this system cannot create (Windows only: reserved characters,
+    or a part ending with a period or a space)."""
+    if not (IS_WINDOWS if windows is None else windows):
+        return True
+    return not any(c in WINDOWS_RESERVED for c in rel) and not any(
+        part.endswith((".", " ")) for part in rel.split("/"))
+
+
+def import_forms(windows: bool | None = None) -> tuple[tuple[str, str, str, bool], ...]:
+    """IMPORT_FORMS whose file this system can create."""
+    return tuple(f for f in IMPORT_FORMS if creatable(f[2], windows))
+
+
+# The nested chain: CLAUDE.md -> docs/h1.md -> h2 -> ... -> h6, each import relative to the
+# importing file (`@h2.md` inside docs/h1.md). docs/h1.md also imports `@docs/rootrel.md`,
+# which exists only relative to the repository root.
+IMPORT_CHAIN: dict[str, bool] = {"docs/h1.md": True, "docs/h2.md": True, "docs/h3.md": True,
+                                 "docs/h4.md": True, "docs/h5.md": False, "docs/h6.md": False,
+                                 "docs/rootrel.md": False}
+
+
+def import_syntax_project(ctx: Context) -> tuple[Path, Path]:
+    """The probe repository of 01-claude-md-import-syntax and its InstructionsLoaded log."""
+    repo = git_init(ctx.tmp / "shop-repo")
+    command, log = hook_logger(ctx, repo)
+    write(repo / ".claude" / "settings.json", json.dumps({"hooks": {"InstructionsLoaded": [
+        {"hooks": [{"type": "command", "command": command("loads")}]}]}}))
+    lines = ["# shop-api", "", "Chain: @docs/h1.md then text.", ""]
+    for _label, text, target, _loaded in import_forms():
+        write(repo / target, f"# {target}\n")
+        lines += [text, ""]
+    write(repo / "docs" / "h1.md", "# h1\n\nNext: @h2.md then text.\n\nRoot: @docs/rootrel.md then text.\n")
+    for n in range(2, 7):
+        write(repo / "docs" / f"h{n}.md", f"# h{n}\n" + (f"\nNext: @h{n + 1}.md then text.\n" if n < 6 else ""))
+    write(repo / "docs" / "rootrel.md", "# docs/rootrel.md\n")
+    # The last form is at the end of the file, with no newline after it.
+    (repo / "CLAUDE.md").write_text("\n".join(lines).rstrip("\n"), encoding="utf-8")
+    return repo, log
+
+
+def probe_import_syntax(ctx: Context) -> Verdict:
+    """01-claude-md-import-syntax: which `@path` spellings of a CLAUDE.md load the file they name.
+
+    Read from an InstructionsLoaded hook: one event per file loaded, with its path."""
+    repo, log = import_syntax_project(ctx)
+    ctx.ask(repo, "Reply with the single word OK.")
+    loaded = set()
+    for line in read_log(log):
+        if line.get("hook_event_name") == "InstructionsLoaded":
+            try:
+                loaded.add(Path(str(line.get("file_path"))).resolve().relative_to(
+                    repo.resolve()).as_posix())
+            except ValueError:
+                continue
+    if "CLAUDE.md" not in loaded:
+        raise ProbeError(f"CLAUDE.md itself did not load: {sorted(loaded)}")
+    forms = import_forms()
+    observed = {label: target in loaded for label, _t, target, _l in forms}
+    observed.update({f"chain {t}": t in loaded for t in IMPORT_CHAIN})
+    expected = {label: want for label, _t, _target, want in forms}
+    expected.update({f"chain {t}": want for t, want in IMPORT_CHAIN.items()})
+    differ = [f"{k}: {'loaded' if observed[k] else 'not loaded'}" for k in expected
+              if observed[k] != expected[k]]
+    if differ:
+        return "FAIL", "differs from the record: " + "; ".join(differ)
+    left_out = [f[0] for f in IMPORT_FORMS if f not in forms]
+    return "PASS", (f"{sum(observed.values())} of {len(observed)} named files loaded, "
+                    "as recorded" + (f"; left out, no such file on this system: {', '.join(left_out)}"
+                                     if left_out else ""))
+
+
 @dataclass(frozen=True)
 class Probe:
     check: str          # key under "checks" in evidence.json
@@ -459,6 +581,7 @@ PROBES: tuple[Probe, ...] = (
     Probe("35-hooks-matcher", "tested", True, 2, probe_matcher_alternatives),
     Probe("frontmatter-bom", "tested", True, 1, probe_bom_frontmatter),
     Probe("35-hooks-shape", "tested_skill_hooks_empty", True, 1, probe_skill_hooks_empty),
+    Probe("01-claude-md-import-syntax", "tested", True, 1, probe_import_syntax),
 )
 
 # Recorded tests left out, and why. Each key is an evidence.json entry.

@@ -167,6 +167,8 @@ class FakeClaude:
             return self.bom(cwd, settings)
         if "shop-orders" in prompt:
             return self.skill_hooks_empty(cwd)
+        if prompt == "Reply with the single word OK." and (cwd / "docs" / "h1.md").is_file():
+            return self.import_syntax(cwd, settings)
         if "shop-reader" in prompt:
             text = ("Agent 'shop-reader' would be spawned with zero tools - refusing. Its tools list "
                     "resolved to nothing: unrecognized [TaskOutput].") if self.recorded else "Read"
@@ -242,6 +244,18 @@ class FakeClaude:
             return done(stream(init(skills), result("There is no skill shop-orders.")))
         return done(stream(init(skills), tool_use("Skill", skill="shop-orders"),
                            tool_result("Launching skill: shop-orders"), result("plover-12")))
+
+
+    def import_syntax(self, cwd: Path, settings: dict) -> subprocess.CompletedProcess:
+        """Loads what 2.1.302 loaded; `opposite` loads every file a form names."""
+        command = settings["hooks"]["InstructionsLoaded"][0]["hooks"][0]["command"]
+        loads = ["CLAUDE.md"]
+        loads += [t for _l, _x, t, want in probes.import_forms() if want or not self.recorded]
+        loads += [t for t, want in probes.IMPORT_CHAIN.items() if want or not self.recorded]
+        for rel in loads:
+            run_hook(command, {"hook_event_name": "InstructionsLoaded",
+                               "file_path": str(cwd / rel), "load_reason": "include"})
+        return done(stream(init(), result("OK")))
 
 
 class Sandbox:
@@ -360,6 +374,46 @@ class Verdicts(unittest.TestCase):
             with self.subTest(probe=f"{probe.check} {probe.entry}"):
                 (verdict, detail), _fake, _box = replay(self, probe, "opposite")
                 self.assertEqual(verdict, "FAIL", detail)
+
+
+class ImportFormsOnWindows(unittest.TestCase):
+    """`docs/colonfile.md:` cannot be created on Windows (external audit of 0.27.0, D-03): the probe
+    leaves that form out there, and what the form shows is checked on the string, with no file."""
+
+    def test_windows_leaves_out_only_the_forms_it_cannot_create(self) -> None:
+        left_out = [f[2] for f in probes.IMPORT_FORMS if f not in probes.import_forms(windows=True)]
+        self.assertEqual(left_out, ["docs/colonfile.md:"])
+        self.assertEqual(probes.import_forms(windows=False), probes.IMPORT_FORMS)
+        self.assertTrue(probes.creatable("docs/commafile.md,", windows=True))
+
+    def test_the_probe_still_tells_the_two_behaviours_apart_without_that_form(self) -> None:
+        probe = next(p for p in probes.PROBES if p.check == "01-claude-md-import-syntax")
+        written: list[str] = []
+        real_write = probes.write
+
+        def spy(path: Path, text: str) -> Path:
+            written.append(path.name)
+            return real_write(path, text)
+        with mock.patch.object(probes, "IS_WINDOWS", True), mock.patch.object(probes, "write", spy):
+            (verdict, detail), _fake, _box = replay(self, probe)
+            self.assertEqual(verdict, "PASS", detail)
+            self.assertIn("left out, no such file on this system: colon after, file named with the colon", detail)
+            self.assertIn("commafile.md,", written)
+            self.assertNotIn("colonfile.md:", written)
+            (verdict, detail), _fake, _box = replay(self, probe, "opposite")
+            self.assertEqual(verdict, "FAIL", detail)
+
+    def test_the_auditor_reads_each_left_out_form_from_the_string(self) -> None:
+        sys.path.insert(0, str(HERE.parent / "skills" / "config-auditor" / "scripts"))
+        from deadweight_audit.parsing.markdown import import_tokens, memory_imports
+        for label, text, target, loaded in probes.IMPORT_FORMS:
+            if probes.creatable(target, windows=True):
+                continue
+            with self.subTest(form=label):
+                self.assertFalse(loaded, "recorded as not loaded on 2.1.302")
+                (token,) = import_tokens(text)
+                self.assertEqual((token.ref, token.stop_after), ("docs/colonfile.md", ":"))
+                self.assertEqual(memory_imports(text), [])
 
 
 class Safety(unittest.TestCase):

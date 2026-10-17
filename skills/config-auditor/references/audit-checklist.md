@@ -30,7 +30,8 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[AUTO 01-claude-md-exists]` Present at `./CLAUDE.md` or `./.claude/CLAUDE.md`; an `AGENTS.md` alone is INFO.
 - `[AUTO 01-claude-md-lines]` ≤ 200 lines — the documented target, for each of `./CLAUDE.md`, `./.claude/CLAUDE.md` and `./CLAUDE.local.md`.
 - `[AUTO 01-claude-md-size]` ≤ 12 KB per memory file — house proxy, movable per project through the overlay.
-- `[AUTO 01-claude-md-import]` Every `@path` import resolves, relative to the importing file.
+- `[AUTO 01-claude-md-import]` Every `@path` import resolves, relative to the importing file, in `CLAUDE.md` and in the files it imports (four hops).
+- `[AUTO 01-claude-md-import-syntax]` No `@path` is stopped by punctuation next to it (`@docs/b.md:`, `@docs/c.md,`, `(@docs/x.md`): Claude Code does not import it (tested on 2.1.302 in one probe run, `evidence.json`).
 - `[AUTO 01-agents-md-unread]` An `AGENTS.md` beside a `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` is imported or it is not read; the path resolves from the importing file (`@../AGENTS.md` from `.claude/CLAUDE.md`), imports are followed four hops, and an `@` in code is not an import.
 - `[AUTO 54-agents-md-variant]` No `AGENTS.override.md` / `AGENTS.local.md` relied on for Claude Code: Claude Code reads neither, Codex reads `AGENTS.override.md`, and no agent documents reading `AGENTS.local.md`. Silent when a `CLAUDE.md` imports the file. See [agents-md-anatomy.md](./agents-md-anatomy.md).
 - `[AUTO 01-claude-local]` `CLAUDE.local.md` is ignored by the repository's git rules.

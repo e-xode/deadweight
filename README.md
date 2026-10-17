@@ -84,6 +84,8 @@ Built and maintained by Christophe Bragard at [E-XODE](https://www.e-xode.net/en
 who audits coding agent configurations and sets up coding agents for teams. To talk about yours:
 [e-xode.net/en/contact](https://www.e-xode.net/en/contact).
 
+What the plugin reads, writes and sends, and the two commands that use a model: [PRIVACY.md](PRIVACY.md).
+
 ---
 
 # How it works

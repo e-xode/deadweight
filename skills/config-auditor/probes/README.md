@@ -30,6 +30,7 @@ declares. The run ends with the tests left out and why, and the number of `claud
 | `35-hooks-matcher` | `tested` (`Bash(git *)\|Write`, `Write\|Edit(*.ts)`, each with a `Bash\|Write` control) | 2 × `claude -p` | haiku |
 | `frontmatter-bom` | `tested` (skill, agent and path-scoped rule behind a BOM, each with a twin) | 1 × `claude -p` | haiku |
 | `35-hooks-shape` | `tested_skill_hooks_empty` (`hooks: []` in a skill) | 1 × `claude -p` | haiku |
+| `01-claude-md-import-syntax` | `tested` (25 `@path` spellings in one CLAUDE.md, and a six-file import chain) | 1 × `claude -p` | haiku |
 
 The model probes read facts from the stream (`init.skills`, `init.agents`, `tool_use`,
 `tool_result`, `permission_denials`) and from command hooks that append their input to a
