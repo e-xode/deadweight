@@ -25,19 +25,27 @@ A Markdown file under `.claude/rules/`, one topic per file. **Doc**: it is conte
 - **Without `paths:`** — loaded at launch "with the same priority as `.claude/CLAUDE.md`". This
   is a documented, legitimate way to split a large `CLAUDE.md` into modules; it costs exactly
   what the same lines would cost in `CLAUDE.md`.
-- **With `paths:`** — loaded only when a matching file is read.
+- **With `paths:`** — loaded only when Claude reads, writes or edits a matching file.
 
 ## When a rule loads
 
-- **Doc**: "Path-scoped rules trigger when Claude reads files matching the pattern, not on every
-  tool use."
-- **Reported upstream, not measured here** (`anthropics/claude-code#93248`, open): writing or
-  **creating** a matching file does not load the rule. A rule meant to guard how new
-  `src/api/<name>.ts` files are written would then never fire for a file created without a
-  matching file having been read first. *Inference, not verified:* an edit usually loads it,
-  since the Edit tool requires a prior Read of the file.
+- **Doc** (read 2026-10-17): "A path-scoped rule loads when Claude uses the Read, Write, or Edit
+  tool on a matching file. It also loads when Claude views a matching file with a Bash command
+  that counts as a read, such as `cat` or `head` on a single file." The commands that count are
+  listed in [tools-reference § Edit tool behavior](https://code.claude.com/docs/en/tools-reference#edit-tool-behavior)
+  (`cat`, `nl`, `bat`, `head`, `tail`, `sed -n 'X,Yp'`, `grep`, `rg`…, one file, no pipe or
+  redirect). Claude Code's changelog dates the Write/Edit trigger to 2.1.288 and the Bash one to
+  2.1.293.
+- **Measured** (2026-10-17, Claude Code 2.1.302, Haiku, one run each, an `InstructionsLoaded` hook
+  logging every load): `Write` **creating** `src/api/refunds.ts` with no prior read loaded the
+  `src/api/**` rule (`path_glob_match`); so did `cat src/api/existing.ts` in Bash; a `Write` outside
+  the glob loaded nothing. **The rule arrived with the tool's result, after the write**: that is
+  where the model reported seeing it (its own account, one run; the stream does not show the
+  attachment). A rule that guards how a new file is written would then reach Claude one write late.
+- **Reported earlier, now superseded** (on 2.1.280, `anthropics/claude-code#93248`; not measured
+  here): creating a matching file did not load the rule; only a read did.
 - So a path-scoped rule is **not** a "100 % hit, set and forget" guardrail. It reaches Claude
-  when a matching file is read, and only until the next compaction.
+  after a matching file is touched, and only until the next compaction.
 - **Doc** ([context-window](https://code.claude.com/docs/en/context-window)): the rule lands in
   message history as a one-line "Loaded" notice for the user; the content goes to the model.
 - **Doc** ([skills](https://code.claude.com/docs/en/skills), frontmatter reference): skills accept
@@ -50,8 +58,9 @@ A Markdown file under `.claude/rules/`, one topic per file. **Doc**: it is conte
 **Doc** ([context-window § What survives compaction](https://code.claude.com/docs/en/context-window)):
 
 - Rules without `paths:` are re-injected from disk after compaction.
-- Rules with `paths:` "load into message history when their trigger file is read, so compaction
-  summarizes them away". They return only when Claude next reads a matching file.
+- Rules with `paths:` "load into message history when Claude reads, writes, or edits their
+  trigger file, so compaction summarizes them away". They return only when Claude next touches a
+  matching file.
 - "If a rule must persist across compaction, drop the `paths:` frontmatter or move it to the
   project-root CLAUDE.md."
 
@@ -132,8 +141,8 @@ between a user rule and a project rule — neither overrides the other. Review `
 
 | Criterion | Rule with `paths:` | Rule without `paths:` | Skill | `CLAUDE.md` |
 | --- | --- | --- | --- | --- |
-| Loads | When a matching file is **read** | At launch | When invoked or judged relevant | At launch |
-| After compaction | Gone until next matching read | Re-injected | Body re-injected, capped at 5,000 tokens | Re-injected (project root) |
+| Loads | After a matching file is read, written or edited | At launch | When invoked or judged relevant | At launch |
+| After compaction | Gone until a matching file is touched again | Re-injected | Body re-injected, capped at 5,000 tokens | Re-injected (project root) |
 | Carries | A short constraint tied to files | A project-wide constraint, modularised | Procedure, knowledge, scripts | Project-wide facts and constraints |
 
 Sources: [memory](https://code.claude.com/docs/en/memory),
@@ -148,7 +157,7 @@ Keep the rule short enough that duplicating the skill is impossible.
 
 Each is this plugin's choice. A project can decline it; the auditor says which checks are doctrine.
 
-- **Size ≤ 2 KB** (`14-rule-size`, NOTICE; WARN under `profile: house`). Reason: a rule loads whole on every matching read with
+- **Size ≤ 2 KB** (`14-rule-size`, NOTICE; WARN under `profile: house`). Reason: a rule loads whole on every matching read or write with
   no description to decide by; past ~2 KB it is usually a skill's body wearing a rule's clothes.
   The documented bound is a different one: 200 lines per file, past which a file "may reduce
   adherence" and Claude Code warns at startup and in `/status`, each rules file counted separately

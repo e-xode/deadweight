@@ -1,0 +1,34 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "5x-specimens-excluded",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "examples/shop-demo/index.ts": "export {}\n",
+    "vendor/shop-kit/templates/blank/.cursor/rules/collections.md": "Use collections.\n",
+    "tests/fixtures/codex-project/AGENTS.override.md": "# Override\n",
+    ".cursor/rules/shop-api.md": "Validate request bodies.\n",
+    ".cursor/rules/shop-examples.mdc": "---\nglobs: examples/**/*.ts\n---\nKeep examples short.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursor-rule-ignored",
+     "WARN",
+     1
+    ],
+    [
+     "54-agents-md-variant",
+     "NOTICE",
+     0
+    ],
+    [
+     "55-cursor-rule-glob",
+     "NOTICE",
+     0
+    ]
+   ]
+  }
+ ]
+}

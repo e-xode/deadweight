@@ -53,23 +53,30 @@ fifth file, `~/.claude.json`, holds trust decisions, MCP configurations and the 
 ## Key scope: a key that is valid and inert
 
 [doc] `settings-reference § Settings index`: each of the 234 keys carries a **Scope** — `Any file`,
-`User, local, or managed`, `User or managed`, `Managed`, or `Global config` (`~/.claude.json`).
+`User, local, or managed`, `User or managed`, `User` (`~/.claude/settings.json` only), `Managed`, or
+`Global config` (`~/.claude.json`).
 A key outside its scope is ignored; the table is not reproduced here, audit.py carries it.
 
 - **`24-settings-unknown-key`** (NOTICE) — a key absent from the reference: a typo, or a key newer
-  than the auditor.
-- **`24-settings-unknown-subkey`** (NOTICE) — a field absent from an object whose fields the
-  reference lists as a closed set (`attribution`, `permissions`, `autoMode`, `sandbox`,
-  `statusLine`, `worktree`…). A misspelt field is ignored like a misspelt key, one level down,
-  where a top-level check does not look. Objects keyed freely (`env`, `enabledPlugins`, `hooks`)
-  are not checked.
-- [doc] Hiding commit and PR attribution takes all three fields: `"attribution": {"commit": "",
-  "pr": "", "sessionUrl": false}` (`settings-reference § attribution`). `includeCoAuthoredBy` is
+  than the auditor; or a key the reference lists as removed (`taskOutputMaxChars`, "Removed in
+  v2.1.277", no effect).
+- **`24-settings-unknown-subkey`** (NOTICE) — a field absent from a closed object (`attribution`,
+  `permissions`, `autoMode`, `sandbox`, `statusLine`, `worktree`…), or from a `modelSettings.<model>`
+  entry: ignored like a misspelt key, one level down. Freely keyed (`env`, `enabledPlugins`, `hooks`): not checked.
+- **`24-settings-value`** (NOTICE) — `autoCompactWindow` not "a number of tokens from `100000` to
+  `1000000`" (or `"auto"` per model) [doc]; the effect of another value is not documented.
+- [doc] Hiding all commit and PR attribution: `"attribution": false` since 2.1.281; earlier
+  versions reject it and skip the **whole** settings file that holds it, so a file read by older
+  versions too keeps the object form, all three fields: `"attribution": {"commit": "", "pr": "",
+  "sessionUrl": false}` (`settings-reference § attribution`, read 2026-10-17). `includeCoAuthoredBy` is
   deprecated and ignored once `commit` or `pr` is set. A CLAUDE.md or memory rule about
   attribution also wins over these lines, except in managed settings — but through the model,
   which reads the rule, not through the harness: the setting holds when the rule is not read.
 - **`24-settings-scope`** (ERROR) — a key ignored in the file it sits in. Examples [doc]:
   - `modelPicker` — *User or managed*: a cloned repository cannot relabel the picker.
+  - `worktree.location` — *User*, "in `~/.claude/settings.json` on the remote machine": a
+    project file cannot move Desktop SSH worktrees. The auditor bars it from `settings.local.json`
+    too, as it does the *User or managed* keys (the Scope lists no Local; not probed).
   - `skipDangerousModePermissionPrompt` — *User, local, or managed*: a repository cannot skip the
     dialog for you.
   - `allowManagedHooksOnly`, `claudeMd` — *Managed* only.
@@ -130,7 +137,11 @@ first match decides, and specificity does not reorder them. `Bash(aws *)` in den
 - **Bash — space vs. `:*`.** `Bash(npm run *)`: everything before the first `*` is literal, and a
   trailing ` *` also matches the bare command. The space counts: `Bash(ls *)` misses `lsof`,
   `Bash(ls*)` hits it. `:*` is an equivalent trailing wildcard, **recognised only at the end**:
-  in `Bash(git:* push)` the colon is literal and the rule matches nothing it seems to →
+  in `Bash(git:* push)` the colon is literal and the rule matches nothing it seems to (doc, read
+  2026-10-17; **measured** on 2.1.302, one run each: a deny `Bash(git:* status)` did not stop
+  `git status` nor `git -C . status`, a deny `Bash(echo:* hello)` stopped `echo:x hello`). Since
+  2.1.282 such a rule is applied from settings files too, where it was skipped (changelog; the
+  startup warning it announces did not show in a `claude -p` debug log) →
   **`42-permissions-rule`** (WARN), for `Bash` and `PowerShell` patterns only: in
   `WebFetch(domain:*.x)` or `Agent(model:*)` the `param:` prefix is not a command wildcard.
 - **Bash — compound commands.** An allow rule must match each subcommand (`&&`, `||`, `;`, `|`,
@@ -154,7 +165,11 @@ first match decides, and specificity does not reorder them. `Bash(aws *)` in den
   In allow, a glob is accepted only after a literal `mcp__<server>__` prefix. **Any `mcp__` rule with
   parentheses is skipped when the file loads** → **`42-permissions-rule`** (ERROR); to match an MCP
   parameter, deny with `--disallowedTools`. Note the divergence with hook matchers: bare
-  `mcp__<server>` matches all its tools here, and none in a matcher.
+  `mcp__<server>` matches all its tools here, and none in a matcher. **Except** for a server whose
+  normalized name (`.` and spaces become `_`) contains `__` or ends in `_`: as an allow rule, only
+  `mcp__<whole name>__*` reaches its tools - `mcp__reports__v2` and `mcp__reports` are read as rules
+  for a server named `reports` (permissions, read 2026-10-17; changelog 2.1.299). For the servers of
+  the repository's `.mcp.json` → **`42-permissions-rule`** (WARN). Not measured: it needs a server.
 - **WebFetch** — `WebFetch(domain:shop.example)`; `*.shop.example` covers subdomains but not the
   apex; a middle `*` never crosses a dot. Bare `WebFetch` and `WebFetch(domain:*)` differ: only the
   `domain:` form feeds the sandbox network list.

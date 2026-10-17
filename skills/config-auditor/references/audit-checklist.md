@@ -47,7 +47,7 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[AUTO 03-skill-name-matches-folder]` `name` equals the folder name.
 - `[AUTO 04-skill-description-length]` Description 80–1,024 chars; description + `when_to_use` ≤ 1,536 (listing cutoff).
 - `[AUTO 04-skill-description-antitrigger]` An anti-trigger clause — house convention.
-- `[AUTO 04-skill-description-brackets]` No `<` or `>` (claude.ai upload and `quick_validate` reject them).
+- `[AUTO 04-skill-description-brackets]` No `<` or `>` (claude.ai upload and `quick_validate` reject them): WARN in a plugin, NOTICE in a project.
 - `[AUTO 05-skill-md-size]` / `[AUTO 21-skill-md-compaction]` ≤ 50 KB hard, ≤ ~20 KB effective (compaction re-attach).
 - `[AUTO 06-skill-duplicate-name]` Unique `name`.
 - `[AUTO 15-skill-index]` A skill the model cannot reach by itself (`disable-model-invocation`, `skillOverrides` off) is named in the Skills index — house convention. A `paths:` skill surfaces on a matching read and is not required. A listed skill named in the index is a house NOTICE as well.
@@ -92,11 +92,11 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[AUTO 08-agent-frontmatter]` Frontmatter in none of the eight shapes the validator rejects (ERROR: the agent does not load; the shapes are listed in agent-anatomy.md); `---` on line 1; `name` and `description` present; no `:` in `name`, no leading `-`, ≤ 256 chars; no duplicate `name`. In a plugin, an empty or unparsable frontmatter is a WARN: the agent loads under its filename.
 - `[AUTO 08b-agent-description]` 80–900 chars with an anti-trigger clause — house convention.
 - `[AUTO 09-*]` Listed in `## Agents directory` and back — house convention (WARN).
-- `[AUTO 23-agent-tools]` Every tool resolves (tools-reference); `Task` is an alias (NOTICE); `Agent(<type>)` in a subagent definition is ignored (WARN), except for the agent the `agent` setting names; a tool removed from sub-agents is a WARN; ERROR only when no entry resolves.
+- `[AUTO 23-agent-tools]` Every tool resolves (tools-reference); `Task` is an alias (NOTICE); `Agent(<type>)` in a subagent definition is ignored (WARN), except for the agent the `agent` setting names; a tool removed from sub-agents, or from Claude Code (`TaskOutput`, 2.1.277), is a WARN; ERROR only when no entry resolves.
 - `[AUTO 23-agent-model]` An alias (`sonnet`, `opus`, `haiku`, `fable`, `best`, `opusplan`, `inherit`; `[1m]` goes on an alias other than `inherit` or on a full name), an id starting with `claude-` (or after `.`, `/`, `:`) or a Bedrock ARN; anything else is a NOTICE (a provider deployment name is free-form).
 - `[AUTO 23-agent-permission-mode]` A documented mode; `bypassPermissions` declared by a subagent is not honoured.
 - `[AUTO 23-agent-skills-preload]` Preload targets exist (a `plugin:skill` target is INFO).
-- `[AUTO 23-agent-frontmatter-keys]` No key outside the eighteen documented; in a plugin, no `hooks` / `mcpServers` / `permissionMode`.
+- `[AUTO 23-agent-frontmatter-keys]` No key outside the nineteen documented (`autoCompactWindow` since 2.1.296); in a plugin, no `hooks` / `mcpServers` / `permissionMode`; `autoCompactWindow` is a plain integer from `100000` to `1000000` (WARN otherwise: `200k` reads as 200 and the field is ignored, sub-agents).
 - `[MANUAL]` `tools` is the minimum; `memory` re-enables Read, Write and Edit.
 - `[MANUAL]` The delegation carries an objective, an output format, the tools and sources, and boundaries.
 
@@ -106,14 +106,14 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[AUTO 14-rule-unknown-field]` `paths` is the only field read (`globs:` is ignored).
 - `[AUTO 22-rule-glob-match]` Every glob matches a file (`\[` escapes; an unclosed `[` matches nothing); a glob into a directory git ignores is NOTICE, not in the floor.
 - `[AUTO 14-rule-size]` / `[AUTO 14-rule-code-comments]` / `[AUTO 14-rule-english-only]` House conventions.
-- `[MANUAL]` A rule meant to guard file **creation** does not rely on `paths:` — rules trigger on reads.
+- `[MANUAL]` A rule meant to guard file **creation** does not rely on `paths:` — since 2.1.288 a `Write` loads it, but with the tool's result, after the file is written (measured 2.1.302; `evidence.json`, `manual-rule-guards-creation`).
 - `[MANUAL]` Two rules never contradict each other: Claude may pick one arbitrarily.
 
 ## Hooks
 
-- `[AUTO 35-hooks-parse]` / `[AUTO 35-hooks-shape]` Valid JSON; known handler type with its required field.
+- `[AUTO 35-hooks-parse]` / `[AUTO 35-hooks-shape]` Valid JSON; known handler type with its required field; `onFailure` is `continue` or `block`, and `block` sits where it acts - a command or http hook, not on `Stop`/`SubagentStop`/`TaskCompleted`/`TeammateIdle`, not on an `async` one (NOTICE).
 - `[AUTO 35-hooks-event]` One of the thirty-three events.
-- `[AUTO 35-hooks-matcher]` No matcher on a matcherless event; no bare `mcp__<server>` (use `mcp__<server>__.*`).
+- `[AUTO 35-hooks-matcher]` No matcher on a matcherless event; no bare `mcp__<server>` (use `mcp__<server>__.*`); no permission rule (`Bash(git *)`) as a matcher or as one of its `|` alternatives (it goes in `if`).
 - `[AUTO 35-hooks-if]` `if` only on tool events, one rule, no `&&` / `||`.
 - `[AUTO 35-hooks-timeout]` NOTICE: no explicit timeout where the default is long; the per-event default is named. Not reported on an `async: true` hook.
 - `[AUTO 35-hooks-command]` The script exists; a script run directly is executable; no `CLAUDE_PLUGIN_ROOT` in a project hook; no `./` path in a skill's hook (it resolves from the working directory).
@@ -130,15 +130,17 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[AUTO 24-settings-skill-overrides]` Keys name a project skill, or are NOTICE (bundled, user, synced).
 - `[AUTO 24-settings-statusline]` / `[AUTO 24-settings-output-style]` The script exists, `refreshInterval` ≥ 1; the style name matches exactly.
 - `[AUTO 42-permissions-conflict]` No rule both allowed and denied or asked.
-- `[AUTO 42-permissions-rule]` Allow rules name known tools, no unanchored glob, no `mcp__…(…)`, `:*` only at the end of a `Bash` or `PowerShell` pattern; a whole-tool `Agent` allow rule has no effect (NOTICE); a path rule never starts with `$HOME/`, which is not expanded (write `~/`).
-- `[AUTO 24-settings-unknown-subkey]` Every field of a closed object (`attribution`, `permissions`…) is documented.
+- `[AUTO 42-permissions-rule]` Allow rules name known tools, no unanchored glob, no `mcp__…(…)`, `:*` only at the end of a `Bash` or `PowerShell` pattern; a whole-tool `Agent` allow rule has no effect (NOTICE); a path rule never starts with `$HOME/`, which is not expanded (write `~/`); a removed tool (`TaskOutput`) approves nothing (WARN); `mcp__<server>` for a `.mcp.json` server whose name contains `__` or ends in `_` approves none of its tools - write `mcp__<server>__*` (WARN).
+- `[AUTO 24-settings-unknown-subkey]` Every field of a closed object (`attribution`, `permissions`…) is documented, and every field of a `modelSettings.<model>` entry. `"attribution": false` is valid since 2.1.281.
+- `[AUTO 24-settings-value]` `autoCompactWindow`, at the top level or under `modelSettings.<model>`, is a number from `100000` to `1000000` (or `"auto"` under a model); otherwise a NOTICE - the page does not say what Claude Code does with another value.
+- `[AUTO 24-settings-unknown-key]` A key the reference lists as removed (`taskOutputMaxChars`, 2.1.277) has no effect (NOTICE).
 - `[MANUAL]` A rule the prose states and a setting can enforce is in the setting too — commit attribution first: a
   CLAUDE.md that forbids a co-author trailer, with no `attribution` in settings, holds only while the rule is read.
 - `[MANUAL]` A Bash deny is not a security boundary; sandboxing is.
 
 ## MCP
 
-- `[AUTO 43-mcp-shape]` `.mcp.json` parses; a `url` has a `type`; SSE is deprecated (NOTICE).
+- `[AUTO 43-mcp-shape]` `.mcp.json` parses; a `url` has a `type`; no `"type": "sdk"` entry, which Claude Code skips (ERROR); SSE is deprecated (NOTICE).
 - `[AUTO 43-mcp-secret]` No literal credential — reference `${VAR}`.
 - `[AUTO 43-mcp-credential-var]` No protected credential variable in a remote `url` or header (read as empty): the five the docs name, and eight more measured on Claude Code 2.1.294.
 - `[AUTO 43-mcp-approval]` No server approval committed in the shared settings file.
@@ -146,7 +148,7 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 ## Plugins
 
 - `[AUTO 44-plugin-layout]` No component directory inside `.claude-plugin/`.
-- `[AUTO 44-plugin-path]` Component paths start with `./` and stay inside the plugin; a field that replaces a default directory (`agents`, `commands`, `outputStyles`, `workflows`, `experimental.themes`, `experimental.monitors`) lists every file in it.
+- `[AUTO 44-plugin-path]` Component paths start with `./` and stay inside the plugin (`workflows`, `themes`, `monitors` and their `experimental.` forms included since 0.26.0); a field that replaces a default directory (`agents`, `commands`, `outputStyles`, `workflows`, `experimental.themes`, `experimental.monitors`) lists every file in it.
 - `[AUTO 44-plugin-version]` `plugin.json` and the marketplace entry agree.
 - `[AUTO 30-plugin-cost]` / `[AUTO 36-foreign-skill]` The listing cost consumers cannot trim; no routing to a skill the plugin does not ship.
 - `[AUTO 45-command-shadowed]` No command sharing a skill's name; no `name` / `paths` in a command file.

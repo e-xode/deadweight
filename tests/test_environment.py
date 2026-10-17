@@ -27,7 +27,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 import environment  # noqa: E402
 
-SECRET = "sk-shop-not-a-real-token"
+SECRET = "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
 BUCKET = "bucket-0001"
 
 

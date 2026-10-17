@@ -10,6 +10,13 @@ import re
 YAML_TRUE = {"true", "yes", "on", "1"}
 
 
+# A UTF-8 byte order mark before the opening `---`. Measured once each, Claude Code 2.1.302
+# (2026-10-17, `claude -p`; evidence.json, `frontmatter-bom`): a SKILL.md opening with one is
+# listed with its description, an agent opening with one loads, a rule (`paths:`) opening with
+# one loads on reading a matching file, not at session start. Every reader below skips the mark
+# for all three alike. Read as text, the mark hid the frontmatter from every check.
+BOM = "\ufeff"
+
 BLOCK_SCALAR_INDICATORS = {">", ">-", ">+", "|", "|-", "|+"}
 # A block-scalar header may also carry an indentation digit, before or after the
 # chomping sign (YAML 1.2, 8.1.1): `>2`, `|2-`, `>-2`. Knowing only the six bare forms
@@ -33,6 +40,7 @@ def _strip_inline_comment(value: str) -> str:
 
 
 def parse_frontmatter(text: str) -> tuple[dict[str, str] | None, int]:
+    text = text.removeprefix(BOM)
     if not text.startswith("---"):
         return None, 0
     lines = text.splitlines()
@@ -93,6 +101,7 @@ def frontmatter_raw_value(text: str, key: str) -> str | None:
     parse_frontmatter strips quotes, so `"> Refund policy"` and `> Refund policy` come
     out the same; a check that must tell a quoted value from a raw one reads this.
     """
+    text = text.removeprefix(BOM)
     if not text.startswith("---"):
         return None
     lines = text.splitlines()
@@ -175,6 +184,7 @@ def frontmatter_yaml_error(text: str) -> str | None:
     several lines are not judged by the ':' tests: the validator accepts them, and
     reading them as values gave false ERRORs (audit 3, g3-00).
     """
+    text = text.removeprefix(BOM)
     if not text.startswith("---"):
         return None
     lines = text.splitlines()
@@ -276,6 +286,7 @@ def frontmatter_yaml_error(text: str) -> str | None:
 
 def frontmatter_keys(text: str) -> list[str]:
     """Top-level frontmatter keys, in file order."""
+    text = text.removeprefix(BOM)
     if not text.startswith("---"):
         return []
     lines = text.splitlines()
@@ -408,6 +419,7 @@ def yaml_block(lines: list[str]):
 
 def frontmatter_hooks(text: str):
     """The `hooks:` block of a frontmatter, parsed; None when there is none or it is out of subset."""
+    text = text.removeprefix(BOM)
     if not text.startswith("---"):
         return None
     lines = text.splitlines()
@@ -415,6 +427,8 @@ def frontmatter_hooks(text: str):
     if end_ is None:
         return None
     fm = lines[1:end_]
+    if any(re.match(r"^hooks:\s*\[\s*\]\s*$", l) for l in fm):
+        return []    # `hooks: []`, an inline empty list: read, and it declares nothing
     start = next((i for i, l in enumerate(fm) if re.match(r"^hooks:\s*$", l)), None)
     if start is None:
         return None

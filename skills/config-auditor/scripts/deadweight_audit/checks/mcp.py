@@ -60,6 +60,14 @@ def check_mcp(ctx: AuditContext, report: Report) -> None:
             report.add("43-mcp-shape", "ERROR",
                        f"MCP server '{srv}' has a url and no type: Claude Code skips it (mcp).",
                        str(path))
+        # "Claude Code skips a `"type": "sdk"` entry in `.mcp.json`, `~/.claude.json`, or
+        # settings" (mcp, read 2026-10-17). Tested on 2.1.302 (`claude mcp list`): "Skipped -
+        # MCP server ... declares type "sdk", which only an SDK host application can register".
+        if conf.get("type") == "sdk":
+            report.add("43-mcp-shape", "ERROR",
+                       f"MCP server '{srv}' declares type \"sdk\": only an SDK host application "
+                       "can register an in-process server, so Claude Code skips this entry with a "
+                       "warning (mcp).", str(path))
         if str(conf.get("type", "")).lower() == "sse":
             report.add("43-mcp-shape", "NOTICE",
                        f"MCP server '{srv}' uses the SSE transport, which is deprecated (mcp).",

@@ -1,0 +1,412 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "31-alias-34-audit-sha",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/audit.local.json": "{\"exemptions\": [{\"check\": \"34-audit-sha\", \"path\": \".\", \"reason\": \"CI fails after each upgrade\", \"date\": \"2026-10-08\"}, {\"check\": \"34-floor\", \"path\": \".\", \"reason\": \"CI fails after each upgrade\", \"date\": \"2026-10-08\"}]}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "31-overlay-alias",
+     "NOTICE",
+     1
+    ],
+    [
+     "31-overlay-schema",
+     "WARN",
+     2
+    ]
+   ]
+  },
+  {
+   "id": "31-alias-to-unexemptable-id",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/audit.local.json": "{\"exemptions\": [{\"check\": \"34-audit-sha\", \"path\": \".\", \"reason\": \"CI fails after each upgrade\", \"date\": \"2026-10-08\"}]}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "31-overlay-alias",
+     "NOTICE",
+     1
+    ],
+    [
+     "31-overlay-schema",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "31-overlay-alias",
+     "still works"
+    ]
+   ]
+  },
+  {
+   "id": "31-comment-key",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/audit.local.json": "{\"profile\": \"house\", \"_comment\": \"shop-api overlay\"}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "31-overlay-unknown",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "31-exemption-11-downgraded",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-notes/SKILL.md": "---\nname: shop-notes\ndescription: Keep the shop team's working notes on refunds and payouts. Do not use for customer-facing text.\n---\n\nCe fichier doit toujours etre lu avant, parce que les notes changent souvent selon le client.\n",
+    ".claude/audit.local.json": "{\"profile\": \"house\", \"exemptions\": [{\"check\": \"11-english-only\", \"path\": \"shop-notes/SKILL.md\", \"reason\": \"team notes, French on purpose\", \"date\": \"2026-09-23\", \"severity\": \"INFO\"}]}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "11-english-only",
+     "INFO",
+     1
+    ],
+    [
+     "11-english-only",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "31-exemption-11-negative-control",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-notes/SKILL.md": "---\nname: shop-notes\ndescription: Keep the shop team's working notes on refunds and payouts. Do not use for customer-facing text.\n---\n\nCe fichier doit toujours etre lu avant, parce que les notes changent souvent selon le client.\n",
+    ".claude/audit.local.json": "{\"profile\": \"house\"}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "11-english-only",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "31-exemption-does-not-raise",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-notes/SKILL.md": "---\nname: shop-notes\ndescription: Keep the shop team's working notes on refunds and payouts. Do not use for customer-facing text.\n---\n\nCe fichier doit toujours etre lu avant, parce que les notes changent souvent selon le client.\n",
+    ".claude/audit.local.json": "{\"exemptions\": [{\"check\": \"11-english-only\", \"path\": \"shop-notes/SKILL.md\", \"reason\": \"team notes, French on purpose\", \"date\": \"2026-09-23\", \"severity\": \"WARN\"}]}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "11-english-only",
+     "NOTICE",
+     1
+    ],
+    [
+     "31-overlay-schema",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "31-exemption-of-a-lettered-id",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-review.md": "---\nname: shop-review\ndescription: Review shop code changes for correctness before merge, reading the diff and the tests.\n---\n\nReview.\n",
+    ".claude/audit.local.json": "{\"exemptions\": [{\"check\": \"08b-agent-description\", \"path\": \".claude/agents/shop-review.md\", \"reason\": \"the only review agent; no sibling to confuse it with\", \"date\": \"2026-10-17\"}]}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "31-overlay-unknown-check",
+     "WARN",
+     0
+    ],
+    [
+     "08b-agent-description",
+     "NOTICE",
+     0
+    ],
+    [
+     "31-overlay-unused",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "31-family-is-not-an-id",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/audit.local.json": "{\"exemptions\": [{\"check\": \"39-eval-quality\", \"path\": \"CLAUDE.md\", \"reason\": \"shop-api keeps it\", \"date\": \"2026-10-08\"}, {\"check\": \"42-permissions\", \"path\": \"CLAUDE.md\", \"reason\": \"shop-api keeps it\", \"date\": \"2026-10-08\"}, {\"check\": \"43-mcp\", \"path\": \"CLAUDE.md\", \"reason\": \"shop-api keeps it\", \"date\": \"2026-10-08\"}, {\"check\": \"44-plugin-manifest\", \"path\": \"CLAUDE.md\", \"reason\": \"shop-api keeps it\", \"date\": \"2026-10-08\"}]}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "31-overlay-unknown-check",
+     "WARN",
+     4
+    ]
+   ]
+  },
+  {
+   "id": "31-live-exemption",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-notes/SKILL.md": "---\nname: shop-notes\ndescription: Keep the shop team's working notes on refunds and payouts. Do not use for customer-facing text.\n---\n\nCe fichier doit toujours etre lu avant, parce que les notes changent souvent selon le client.\n",
+    ".claude/audit.local.json": "{\"exemptions\": [{\"check\": \"11-english-only\", \"path\": \"shop-notes/SKILL.md\", \"reason\": \"team notes, French on purpose\", \"date\": \"2026-09-23\"}]}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "31-overlay-stale",
+     "WARN",
+     0
+    ],
+    [
+     "31-overlay",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "31-overlay-absent",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "31-overlay",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "31-overlay-empty",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/audit.local.json": "{}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "31-overlay-schema",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "31-overlay-profile-only",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/audit.local.json": "{\"profile\": \"house\"}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "31-overlay-schema",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "31-overlay-unknown-profile",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/audit.local.json": "{\"profile\": \"hous\"}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "31-overlay-schema",
+     "WARN",
+     1
+    ],
+    [
+     "31-overlay-schema",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "31-ratchet-id",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/audit.local.json": "{\"exemptions\": [{\"check\": \"34-audit-sha\", \"path\": \"CLAUDE.md\", \"reason\": \"shop-api keeps it\", \"date\": \"2026-10-08\"}, {\"check\": \"34-floor\", \"path\": \"CLAUDE.md\", \"reason\": \"shop-api keeps it\", \"date\": \"2026-10-08\"}]}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "31-overlay-alias",
+     "NOTICE",
+     1
+    ],
+    [
+     "31-overlay-schema",
+     "WARN",
+     2
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "31-overlay-schema",
+     "`34-audit-sha`"
+    ]
+   ]
+  },
+  {
+   "id": "31-stale-exemption",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/audit.local.json": "{\"exemptions\": [{\"check\": \"11-english-only\", \"path\": \"shop-gone/SKILL.md\", \"reason\": \"team notes, French on purpose\", \"date\": \"2026-09-23\"}]}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "31-overlay-stale",
+     "WARN",
+     1
+    ],
+    [
+     "31-overlay",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "31-thresholds",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/audit.local.json": "{\"thresholds\": {\"SKILL_MD_ERROR_BYTES\": {\"value\": 100, \"reason\": \"shop skills stay tiny\", \"date\": \"2026-10-17\"}, \"DESCRIPTION_MAX_CHARS\": {\"value\": 2048, \"reason\": \"longer descriptions\", \"date\": \"2026-10-17\"}, \"CLAUDE_MD_MAX_BYTES\": {\"value\": 20000}}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "31-overlay-threshold",
+     "INFO",
+     1
+    ],
+    [
+     "31-overlay-threshold",
+     "ERROR",
+     2
+    ],
+    [
+     "05-skill-md-size",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "31-unknown-key",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/audit.local.json": "{\"profile\": \"house\", \"exemption\": [{\"check\": \"11-english-only\", \"path\": \"shop-notes/SKILL.md\", \"reason\": \"team notes, French on purpose\", \"date\": \"2026-09-23\"}]}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "31-overlay-unknown",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "31-unreadable-overlay",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/audit.local.json": "{not json\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "31-overlay-parse",
+     "ERROR",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "31-overlay-unknown",
+     "__error__"
+    ]
+   ]
+  },
+  {
+   "id": "31-unused-exemption",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-notes/SKILL.md": "---\nname: shop-notes\ndescription: Keep the shop team's working notes on refunds and payouts. Do not use for customer-facing text.\n---\n\nRead this file first; the notes change often.\n",
+    ".claude/audit.local.json": "{\"profile\": \"house\", \"exemptions\": [{\"check\": \"11-english-only\", \"path\": \"shop-notes/SKILL.md\", \"reason\": \"team notes, French on purpose\", \"date\": \"2026-09-23\"}]}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "31-overlay-unused",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "31-used-exemption",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-notes/SKILL.md": "---\nname: shop-notes\ndescription: Keep the shop team's working notes on refunds and payouts. Do not use for customer-facing text.\n---\n\nCe fichier doit toujours etre lu avant, parce que les notes changent souvent selon le client.\n",
+    ".claude/audit.local.json": "{\"profile\": \"house\", \"exemptions\": [{\"check\": \"11-english-only\", \"path\": \"shop-notes/SKILL.md\", \"reason\": \"team notes, French on purpose\", \"date\": \"2026-09-23\"}]}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "31-overlay-unused",
+     "INFO",
+     0
+    ],
+    [
+     "11-english-only",
+     "WARN",
+     0
+    ]
+   ]
+  }
+ ]
+}

@@ -22,7 +22,7 @@
   },
   "23-agent-tools": {
    "documented": "https://code.claude.com/docs/en/sub-agents (an Agent(...) list applies only to an agent run as the main thread)",
-   "documented_note": "The alias Task -> Agent was documented on the sub-agents page and is no longer (read 2026-10-08).",
+   "documented_note": "The alias Task -> Agent was documented on the sub-agents page and is no longer (read 2026-10-08). tools-reference lists TaskOutput as \"Removed in v2.1.277\" (read 2026-10-17).",
    "reported": [
     "https://github.com/anthropics/claude-code/issues/28277"
    ],
@@ -32,6 +32,13 @@
     "system": "Linux",
     "how": "deny [\"Task\"], deny [\"Agent\"] and no rule, each in a fresh project; a session asked to spawn a subagent.",
     "result": "Task and Agent rules both remove the Agent tool; without a rule the subagent runs."
+   },
+   "tested_taskoutput": {
+    "date": "2026-10-17",
+    "claude_code": "2.1.302",
+    "system": "Linux",
+    "how": "claude -p --model haiku --setting-sources project in an empty git repository holding .claude/agents/shop-reader.md, asked to call the Agent tool with that subagent; three agents: tools: TaskOutput / tools: Read, TaskOutput / tools: Read, Grep. One run each.",
+    "result": "tools: TaskOutput: \"Agent 'shop-reader' would be spawned with zero tools — refusing. Its tools list resolved to nothing: unrecognized [TaskOutput].\" tools: Read, TaskOutput: the agent listed Read alone. tools: Read, Grep: Read and Grep."
    }
   },
   "43-mcp-credential-var": {
@@ -62,6 +69,95 @@
     "system": "Linux",
     "how": "claude -p --model claude-haiku-5-5 --setting-sources project --settings <file>, HOME set to a temporary folder holding probe/secret.txt (also the working directory), asked to Read that file; three settings files: no rule, deny Read($HOME/probe/secret.txt), deny Read(~/probe/secret.txt). One run each.",
     "result": "No rule: the content was returned. Deny Read($HOME/...): the content was returned, permission_denials empty. Deny Read(~/...): refused, \"File is in a directory that is denied by your permission settings.\""
+   },
+   "tested_mid_colon_star": {
+    "date": "2026-10-17",
+    "claude_code": "2.1.302",
+    "system": "Linux",
+    "how": "claude -p --model haiku --setting-sources project --allowedTools Bash --debug-file, project settings holding one deny rule, asked to run one command. Rules and commands: Bash(git:* status) vs `git status` and `git -C . status`; Bash(echo:* hello) vs `echo:x hello`; Bash(git status) vs `git status` (control). One run each.",
+    "result": "Bash(git:* status): both git commands ran, permission_denials empty (the debug log shows the rule added to projectSettings). Bash(echo:* hello): `echo:x hello` denied. Control denied. No startup warning about the pattern in the -p debug log. The colon is literal, `*` a wildcard, as the permissions page says."
+   }
+  },
+  "35-hooks-shape": {
+   "documented": "https://code.claude.com/docs/en/hooks (Block the action when a hook fails; command and HTTP hook fields)",
+   "documented_note": "onFailure: \"continue\" (default) or \"block\", on command and http hooks, 2.1.295+; no effect on Stop, SubagentStop, TaskCompleted, TeammateIdle nor on async/asyncRewake command hooks (read 2026-10-17). Scope of this entry: the onFailure NOTICEs (tested) and the `hooks: []` NOTICE of a skill's frontmatter (tested_skill_hooks_empty).",
+   "reported": [],
+   "tested": {
+    "date": "2026-10-17",
+    "claude_code": "2.1.302",
+    "system": "Linux",
+    "how": "claude -p --model haiku --setting-sources project --allowedTools Bash, a PreToolUse Bash command hook running `node <missing>.js` (exec form, timeout 10), with and without \"onFailure\": \"block\"; asked to run `ls`. One run each.",
+    "result": "With block: the call was refused, \"PreToolUse:Bash hook error: [node .../missing-check.js]: failed; blocking because onFailure is \\\"block\\\"\". Without: `ls` ran. The no-effect cases (Stop, async) were not tested."
+   },
+   "tested_skill_hooks_empty": {
+    "date": "2026-10-17",
+    "claude_code": "2.1.302",
+    "system": "Linux",
+    "how": "claude -p --model haiku --setting-sources project --output-format stream-json --verbose --no-session-persistence --strict-mcp-config --allowedTools Skill, from an empty temporary git repository holding .claude/skills/shop-orders/SKILL.md (frontmatter name, description, `hooks: []`; body: reply with a marker word) and a control skill without `hooks`; asked to call the Skill tool with shop-orders and reply what it says. Read from the stream: init.skills, the Skill tool_use and its tool_result, the final reply. One run. Replayed by probes/run_probes.py (--only 35-hooks-shape).",
+    "result": "shop-orders is in init.skills, beside the control; the Skill call returned no error and the reply was the body's marker word. Scope: a skill only; an agent's `hooks: []` was not run."
+   }
+  },
+  "35-hooks-matcher": {
+   "documented": "https://code.claude.com/docs/en/hooks (Matcher patterns: only letters, digits, _, -, spaces, `,` and `|` make an exact list; any other character makes the whole matcher one JavaScript regular expression on the tool name; argument patterns go in `if`)",
+   "documented_note": "Scope of this entry: a permission rule written as one `|` alternative of a matcher (NOTICE when the matcher is a valid regular expression, ERROR when it is not). The page does not say what an invalid regular expression does; that part is measured only.",
+   "reported": [],
+   "tested": {
+    "date": "2026-10-17",
+    "claude_code": "2.1.302",
+    "system": "Linux",
+    "how": "claude -p --model haiku --setting-sources project --output-format stream-json --verbose --no-session-persistence --strict-mcp-config --allowedTools Bash Write, in two empty temporary git repositories. Each .claude/settings.json has two PreToolUse command hooks that append the hook input's tool_name to a log in the repository: the probed matcher, and a control matcher `Bash|Write`. Probed matchers: `Bash(git *)|Write` (a valid regular expression), `Write|Edit(*.ts)` (not one). Asked to run `git status` with Bash, then create note.txt with Write. One run each. Replayed by probes/run_probes.py.",
+    "result": "`Bash(git *)|Write`: fired on Write only, not on the `git status` Bash call. `Write|Edit(*.ts)`: fired on nothing. The control fired on Bash and Write in both repositories, so an invalid matcher does not stop the other groups of the same event."
+   }
+  },
+  "43-mcp-shape": {
+   "documented": "https://code.claude.com/docs/en/mcp (Claude Code skips a \"type\": \"sdk\" entry in .mcp.json, ~/.claude.json, or settings)",
+   "documented_note": "Read 2026-10-17. Scope of this entry: the `type: sdk` ERROR.",
+   "reported": [],
+   "tested": {
+    "date": "2026-10-17",
+    "claude_code": "2.1.302",
+    "system": "Linux",
+    "how": "`claude mcp list` in an empty git repository whose .mcp.json holds a type sdk server and a stdio server; output filtered to those two names.",
+    "result": "\"[Warning] [shop-sdk] mcpServers.shop-sdk: Skipped — MCP server \\\"shop-sdk\\\" declares type \\\"sdk\\\", which only an SDK host application can register\"; the stdio server listed, pending approval."
+   }
+  },
+  "44-plugin-path": {
+   "documented": "https://code.claude.com/docs/en/plugins-reference (Fields; Path rules: every component path starts with ./ and stays inside the root)",
+   "documented_note": "Read 2026-10-17: workflows, experimental.themes, experimental.monitors and top-level themes/monitors are component paths; experimental.evals is not. Scope of this entry: those keys, added in 0.26.0.",
+   "reported": [],
+   "tested": {
+    "date": "2026-10-17",
+    "claude_code": "2.1.302",
+    "system": "Linux",
+    "how": "claude plugin validate on a minimal plugin, plugin.json varied: experimental.themes \"themes/\"; monitors \"./../shared/monitors.json\"; workflows [\"workflows/refund.js\"]; experimental.themes \"./themes/\" (control).",
+    "result": "\"experimental.themes: Invalid string: must start with \\\"./\\\"\"; \"monitors: Path contains \\\"..\\\" which could be a path traversal attempt\" plus a warning to declare it under experimental.monitors; \"workflows.0: Invalid string: must start with \\\"./\\\"\"; the control passed."
+   }
+  },
+  "manual-rule-guards-creation": {
+   "documented": "https://code.claude.com/docs/en/memory (A path-scoped rule loads when Claude uses the Read, Write, or Edit tool on a matching file, or views it with a Bash command that counts as a read)",
+   "documented_note": "Read 2026-10-17. Not an audit.py check: the [MANUAL] checklist item and anti-pattern F4. The changelog dates the Write/Edit trigger to 2.1.288 and the Bash one to 2.1.293.",
+   "reported": [
+    "https://github.com/anthropics/claude-code/issues/93248"
+   ],
+   "reported_note": "Reported upstream on 2.1.280 (#93248): creating a file did not load the rule. Not measured here on 2.1.280; the only local run is the tested entry, on 2.1.302.",
+   "tested": {
+    "date": "2026-10-17",
+    "claude_code": "2.1.302",
+    "system": "Linux",
+    "how": "claude -p --model haiku --setting-sources project --permission-mode acceptEdits, a rule .claude/rules/api.md with paths src/api/** and an InstructionsLoaded hook appending each event to a log. Three runs: Write creating src/api/refunds.ts with no prior read; Bash `cat src/api/existing.ts`; Write creating src/web/other.ts (control).",
+    "result": "Write in scope: the log shows .claude/rules/api.md, load_reason path_glob_match, and the model said the rule arrived in the Write's tool result, after the file was written. cat: same log line. Control: nothing loaded."
+   }
+  },
+  "frontmatter-bom": {
+   "documented": null,
+   "documented_note": "Not an audit.py check of its own: the frontmatter readers used by 02-skill-frontmatter, 08-agent-frontmatter, 19-frontmatter-quoting, 22-rule-glob-match and the frontmatter hooks of 35-hooks-shape skip a UTF-8 byte order mark before the opening `---` since 0.26.0. The skills, sub-agents and memory pages were not found to mention a byte order mark (audit relecture, 2026-10-17); not re-read for this entry.",
+   "reported": [],
+   "tested": {
+    "date": "2026-10-17",
+    "claude_code": "2.1.302",
+    "system": "Linux",
+    "how": "claude -p --model haiku --setting-sources project --output-format stream-json --verbose --no-session-persistence --strict-mcp-config --allowedTools Read, from an empty temporary git repository. Files opening with a byte order mark, each beside a twin without one: skill shop-refunds (description with a marker word, body with another), skill shop-coupons with `user-invocable: false` (twin shop-discounts), agent file shop-reviewer.md with frontmatter name shop-reviewer-bom (twin shop-tester-plain), rule payments.md with paths src/payments/** (twin web.md with src/web/**), plus an unconditional rule and an InstructionsLoaded command hook logging file_path and load_reason. Asked to Read src/web/page.ts, then src/payments/amount.ts, then quote the description of shop-refunds from its skills listing without another tool. Read from the stream: init.skills, init.agents, tool_use; from the hook log: each load. One run. Replayed by probes/run_probes.py (--only frontmatter-bom).",
+    "result": "Skill with a mark: in init.skills, and the reply quoted its frontmatter description exactly, marker included, without the body's marker and without reading the file (the model's own account). Skill with a mark and `user-invocable: false`: left out of init.skills, as its twin without a mark: the field was read. Agent with a mark: in init.agents under its frontmatter name. Rule with a mark: loaded only on reading src/payments/amount.ts (load_reason path_glob_match), not at session start, like its twin on src/web/page.ts; the unconditional rule and CLAUDE.md loaded at session_start. Side observation, not used as a signal: `disable-model-invocation: true` left a skill in init.skills, with or without a mark."
    }
   }
  }

@@ -1,0 +1,134 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "16-exactly-100-lines",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nRead `references/policy.md` and `references/windows.md`.\n",
+    ".claude/skills/shop-refunds/references/policy.md": "Refund rule 0.\nRefund rule 1.\nRefund rule 2.\nRefund rule 3.\nRefund rule 4.\nRefund rule 5.\nRefund rule 6.\nRefund rule 7.\nRefund rule 8.\nRefund rule 9.\nRefund rule 10.\nRefund rule 11.\nRefund rule 12.\nRefund rule 13.\nRefund rule 14.\nRefund rule 15.\nRefund rule 16.\nRefund rule 17.\nRefund rule 18.\nRefund rule 19.\nRefund rule 20.\nRefund rule 21.\nRefund rule 22.\nRefund rule 23.\nRefund rule 24.\nRefund rule 25.\nRefund rule 26.\nRefund rule 27.\nRefund rule 28.\nRefund rule 29.\nRefund rule 30.\nRefund rule 31.\nRefund rule 32.\nRefund rule 33.\nRefund rule 34.\nRefund rule 35.\nRefund rule 36.\nRefund rule 37.\nRefund rule 38.\nRefund rule 39.\nRefund rule 40.\nRefund rule 41.\nRefund rule 42.\nRefund rule 43.\nRefund rule 44.\nRefund rule 45.\nRefund rule 46.\nRefund rule 47.\nRefund rule 48.\nRefund rule 49.\nRefund rule 50.\nRefund rule 51.\nRefund rule 52.\nRefund rule 53.\nRefund rule 54.\nRefund rule 55.\nRefund rule 56.\nRefund rule 57.\nRefund rule 58.\nRefund rule 59.\nRefund rule 60.\nRefund rule 61.\nRefund rule 62.\nRefund rule 63.\nRefund rule 64.\nRefund rule 65.\nRefund rule 66.\nRefund rule 67.\nRefund rule 68.\nRefund rule 69.\nRefund rule 70.\nRefund rule 71.\nRefund rule 72.\nRefund rule 73.\nRefund rule 74.\nRefund rule 75.\nRefund rule 76.\nRefund rule 77.\nRefund rule 78.\nRefund rule 79.\nRefund rule 80.\nRefund rule 81.\nRefund rule 82.\nRefund rule 83.\nRefund rule 84.\nRefund rule 85.\nRefund rule 86.\nRefund rule 87.\nRefund rule 88.\nRefund rule 89.\nRefund rule 90.\nRefund rule 91.\nRefund rule 92.\nRefund rule 93.\nRefund rule 94.\nRefund rule 95.\nRefund rule 96.\nRefund rule 97.\nRefund rule 98.\nRefund rule 99.\n",
+    ".claude/skills/shop-refunds/references/windows.md": "Refund window 0.\nRefund window 1.\nRefund window 2.\nRefund window 3.\nRefund window 4.\nRefund window 5.\nRefund window 6.\nRefund window 7.\nRefund window 8.\nRefund window 9.\nRefund window 10.\nRefund window 11.\nRefund window 12.\nRefund window 13.\nRefund window 14.\nRefund window 15.\nRefund window 16.\nRefund window 17.\nRefund window 18.\nRefund window 19.\nRefund window 20.\nRefund window 21.\nRefund window 22.\nRefund window 23.\nRefund window 24.\nRefund window 25.\nRefund window 26.\nRefund window 27.\nRefund window 28.\nRefund window 29.\nRefund window 30.\nRefund window 31.\nRefund window 32.\nRefund window 33.\nRefund window 34.\nRefund window 35.\nRefund window 36.\nRefund window 37.\nRefund window 38.\nRefund window 39.\nRefund window 40.\nRefund window 41.\nRefund window 42.\nRefund window 43.\nRefund window 44.\nRefund window 45.\nRefund window 46.\nRefund window 47.\nRefund window 48.\nRefund window 49.\nRefund window 50.\nRefund window 51.\nRefund window 52.\nRefund window 53.\nRefund window 54.\nRefund window 55.\nRefund window 56.\nRefund window 57.\nRefund window 58.\nRefund window 59.\nRefund window 60.\nRefund window 61.\nRefund window 62.\nRefund window 63.\nRefund window 64.\nRefund window 65.\nRefund window 66.\nRefund window 67.\nRefund window 68.\nRefund window 69.\nRefund window 70.\nRefund window 71.\nRefund window 72.\nRefund window 73.\nRefund window 74.\nRefund window 75.\nRefund window 76.\nRefund window 77.\nRefund window 78.\nRefund window 79.\nRefund window 80.\nRefund window 81.\nRefund window 82.\nRefund window 83.\nRefund window 84.\nRefund window 85.\nRefund window 86.\nRefund window 87.\nRefund window 88.\nRefund window 89.\nRefund window 90.\nRefund window 91.\nRefund window 92.\nRefund window 93.\nRefund window 94.\nRefund window 95.\nRefund window 96.\nRefund window 97.\nRefund window 98.\nRefund window 99.\nRefund window 100.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "16-reference-size",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "16-french-toc",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee [policy](references/policy.md).\n",
+    ".claude/skills/shop-refunds/references/policy.md": "# Remboursements\n\nContents : les fenêtres · les reçus · les litiges.\n\n## Partie 0\n\nTexte 0.\n\n## Partie 1\n\nTexte 1.\n\n## Partie 2\n\nTexte 2.\n\n## Partie 3\n\nTexte 3.\n\n## Partie 4\n\nTexte 4.\n\n## Partie 5\n\nTexte 5.\n\n## Partie 6\n\nTexte 6.\n\n## Partie 7\n\nTexte 7.\n\n## Partie 8\n\nTexte 8.\n\n## Partie 9\n\nTexte 9.\n\n## Partie 10\n\nTexte 10.\n\n## Partie 11\n\nTexte 11.\n\n## Partie 12\n\nTexte 12.\n\n## Partie 13\n\nTexte 13.\n\n## Partie 14\n\nTexte 14.\n\n## Partie 15\n\nTexte 15.\n\n## Partie 16\n\nTexte 16.\n\n## Partie 17\n\nTexte 17.\n\n## Partie 18\n\nTexte 18.\n\n## Partie 19\n\nTexte 19.\n\n## Partie 20\n\nTexte 20.\n\n## Partie 21\n\nTexte 21.\n\n## Partie 22\n\nTexte 22.\n\n## Partie 23\n\nTexte 23.\n\n## Partie 24\n\nTexte 24.\n\n## Partie 25\n\nTexte 25.\n\n## Partie 26\n\nTexte 26.\n\n## Partie 27\n\nTexte 27.\n\n## Partie 28\n\nTexte 28.\n\n## Partie 29\n\nTexte 29.\n\n## Partie 30\n\nTexte 30.\n\n## Partie 31\n\nTexte 31.\n\n## Partie 32\n\nTexte 32.\n\n## Partie 33\n\nTexte 33.\n\n## Partie 34\n\nTexte 34.\n\n## Partie 35\n\nTexte 35.\n\n## Partie 36\n\nTexte 36.\n\n## Partie 37\n\nTexte 37.\n\n## Partie 38\n\nTexte 38.\n\n## Partie 39\n\nTexte 39.\n\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "16-reference-size",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "16-mention-is-not-a-toc",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee [policy](references/policy.md).\n",
+    ".claude/skills/shop-refunds/references/policy.md": "# Config\n\nOptions:\n\n- `toc`: Table of contents options\n- `footer`: footer\n\n## Partie 0\n\nTexte 0.\n\n## Partie 1\n\nTexte 1.\n\n## Partie 2\n\nTexte 2.\n\n## Partie 3\n\nTexte 3.\n\n## Partie 4\n\nTexte 4.\n\n## Partie 5\n\nTexte 5.\n\n## Partie 6\n\nTexte 6.\n\n## Partie 7\n\nTexte 7.\n\n## Partie 8\n\nTexte 8.\n\n## Partie 9\n\nTexte 9.\n\n## Partie 10\n\nTexte 10.\n\n## Partie 11\n\nTexte 11.\n\n## Partie 12\n\nTexte 12.\n\n## Partie 13\n\nTexte 13.\n\n## Partie 14\n\nTexte 14.\n\n## Partie 15\n\nTexte 15.\n\n## Partie 16\n\nTexte 16.\n\n## Partie 17\n\nTexte 17.\n\n## Partie 18\n\nTexte 18.\n\n## Partie 19\n\nTexte 19.\n\n## Partie 20\n\nTexte 20.\n\n## Partie 21\n\nTexte 21.\n\n## Partie 22\n\nTexte 22.\n\n## Partie 23\n\nTexte 23.\n\n## Partie 24\n\nTexte 24.\n\n## Partie 25\n\nTexte 25.\n\n## Partie 26\n\nTexte 26.\n\n## Partie 27\n\nTexte 27.\n\n## Partie 28\n\nTexte 28.\n\n## Partie 29\n\nTexte 29.\n\n## Partie 30\n\nTexte 30.\n\n## Partie 31\n\nTexte 31.\n\n## Partie 32\n\nTexte 32.\n\n## Partie 33\n\nTexte 33.\n\n## Partie 34\n\nTexte 34.\n\n## Partie 35\n\nTexte 35.\n\n## Partie 36\n\nTexte 36.\n\n## Partie 37\n\nTexte 37.\n\n## Partie 38\n\nTexte 38.\n\n## Partie 39\n\nTexte 39.\n\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "16-reference-size",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "16-reference-with-toc",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nRules: [refund rules](references/rules.md).\n",
+    ".claude/skills/shop-refunds/references/rules.md": "# Refund rules\n\nContents: [Windows](#windows) · [Chargebacks](#chargebacks)\n\n- rule 0\n- rule 1\n- rule 2\n- rule 3\n- rule 4\n- rule 5\n- rule 6\n- rule 7\n- rule 8\n- rule 9\n- rule 10\n- rule 11\n- rule 12\n- rule 13\n- rule 14\n- rule 15\n- rule 16\n- rule 17\n- rule 18\n- rule 19\n- rule 20\n- rule 21\n- rule 22\n- rule 23\n- rule 24\n- rule 25\n- rule 26\n- rule 27\n- rule 28\n- rule 29\n- rule 30\n- rule 31\n- rule 32\n- rule 33\n- rule 34\n- rule 35\n- rule 36\n- rule 37\n- rule 38\n- rule 39\n- rule 40\n- rule 41\n- rule 42\n- rule 43\n- rule 44\n- rule 45\n- rule 46\n- rule 47\n- rule 48\n- rule 49\n- rule 50\n- rule 51\n- rule 52\n- rule 53\n- rule 54\n- rule 55\n- rule 56\n- rule 57\n- rule 58\n- rule 59\n- rule 60\n- rule 61\n- rule 62\n- rule 63\n- rule 64\n- rule 65\n- rule 66\n- rule 67\n- rule 68\n- rule 69\n- rule 70\n- rule 71\n- rule 72\n- rule 73\n- rule 74\n- rule 75\n- rule 76\n- rule 77\n- rule 78\n- rule 79\n- rule 80\n- rule 81\n- rule 82\n- rule 83\n- rule 84\n- rule 85\n- rule 86\n- rule 87\n- rule 88\n- rule 89\n- rule 90\n- rule 91\n- rule 92\n- rule 93\n- rule 94\n- rule 95\n- rule 96\n- rule 97\n- rule 98\n- rule 99\n- rule 100\n- rule 101\n- rule 102\n- rule 103\n- rule 104\n- rule 105\n- rule 106\n- rule 107\n- rule 108\n- rule 109\n- rule 110\n- rule 111\n- rule 112\n- rule 113\n- rule 114\n- rule 115\n- rule 116\n- rule 117\n- rule 118\n- rule 119\n- rule 120\n- rule 121\n- rule 122\n- rule 123\n- rule 124\n- rule 125\n- rule 126\n- rule 127\n- rule 128\n- rule 129\n- rule 130\n- rule 131\n- rule 132\n- rule 133\n- rule 134\n- rule 135\n- rule 136\n- rule 137\n- rule 138\n- rule 139\n- rule 140\n- rule 141\n- rule 142\n- rule 143\n- rule 144\n- rule 145\n- rule 146\n- rule 147\n- rule 148\n- rule 149\n- rule 150\n- rule 151\n- rule 152\n- rule 153\n- rule 154\n- rule 155\n- rule 156\n- rule 157\n- rule 158\n- rule 159\n- rule 160\n- rule 161\n- rule 162\n- rule 163\n- rule 164\n- rule 165\n- rule 166\n- rule 167\n- rule 168\n- rule 169\n- rule 170\n- rule 171\n- rule 172\n- rule 173\n- rule 174\n- rule 175\n- rule 176\n- rule 177\n- rule 178\n- rule 179\n- rule 180\n- rule 181\n- rule 182\n- rule 183\n- rule 184\n- rule 185\n- rule 186\n- rule 187\n- rule 188\n- rule 189\n- rule 190\n- rule 191\n- rule 192\n- rule 193\n- rule 194\n- rule 195\n- rule 196\n- rule 197\n- rule 198\n- rule 199\n- rule 200\n- rule 201\n- rule 202\n- rule 203\n- rule 204\n- rule 205\n- rule 206\n- rule 207\n- rule 208\n- rule 209\n- rule 210\n- rule 211\n- rule 212\n- rule 213\n- rule 214\n- rule 215\n- rule 216\n- rule 217\n- rule 218\n- rule 219\n- rule 220\n- rule 221\n- rule 222\n- rule 223\n- rule 224\n- rule 225\n- rule 226\n- rule 227\n- rule 228\n- rule 229\n- rule 230\n- rule 231\n- rule 232\n- rule 233\n- rule 234\n- rule 235\n- rule 236\n- rule 237\n- rule 238\n- rule 239\n- rule 240\n- rule 241\n- rule 242\n- rule 243\n- rule 244\n- rule 245\n- rule 246\n- rule 247\n- rule 248\n- rule 249\n- rule 250\n- rule 251\n- rule 252\n- rule 253\n- rule 254\n- rule 255\n- rule 256\n- rule 257\n- rule 258\n- rule 259\n- rule 260\n- rule 261\n- rule 262\n- rule 263\n- rule 264\n- rule 265\n- rule 266\n- rule 267\n- rule 268\n- rule 269\n- rule 270\n- rule 271\n- rule 272\n- rule 273\n- rule 274\n- rule 275\n- rule 276\n- rule 277\n- rule 278\n- rule 279\n- rule 280\n- rule 281\n- rule 282\n- rule 283\n- rule 284\n- rule 285\n- rule 286\n- rule 287\n- rule 288\n- rule 289\n- rule 290\n- rule 291\n- rule 292\n- rule 293\n- rule 294\n- rule 295\n- rule 296\n- rule 297\n- rule 298\n- rule 299\n- rule 300\n- rule 301\n- rule 302\n- rule 303\n- rule 304\n- rule 305\n- rule 306\n- rule 307\n- rule 308\n- rule 309\n- rule 310\n- rule 311\n- rule 312\n- rule 313\n- rule 314\n- rule 315\n- rule 316\n- rule 317\n- rule 318\n- rule 319\n- rule 320\n- rule 321\n- rule 322\n- rule 323\n- rule 324\n- rule 325\n- rule 326\n- rule 327\n- rule 328\n- rule 329\n- rule 330\n- rule 331\n- rule 332\n- rule 333\n- rule 334\n- rule 335\n- rule 336\n- rule 337\n- rule 338\n- rule 339\n- rule 340\n- rule 341\n- rule 342\n- rule 343\n- rule 344\n- rule 345\n- rule 346\n- rule 347\n- rule 348\n- rule 349\n- rule 350\n- rule 351\n- rule 352\n- rule 353\n- rule 354\n- rule 355\n- rule 356\n- rule 357\n- rule 358\n- rule 359\n- rule 360\n- rule 361\n- rule 362\n- rule 363\n- rule 364\n- rule 365\n- rule 366\n- rule 367\n- rule 368\n- rule 369\n- rule 370\n- rule 371\n- rule 372\n- rule 373\n- rule 374\n- rule 375\n- rule 376\n- rule 377\n- rule 378\n- rule 379\n- rule 380\n- rule 381\n- rule 382\n- rule 383\n- rule 384\n- rule 385\n- rule 386\n- rule 387\n- rule 388\n- rule 389\n- rule 390\n- rule 391\n- rule 392\n- rule 393\n- rule 394\n- rule 395\n- rule 396\n- rule 397\n- rule 398\n- rule 399\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "16-reference-size",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "16-reference-without-toc",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nRules: [refund rules](references/rules.md).\n",
+    ".claude/skills/shop-refunds/references/rules.md": "# Refund rules\n\n- rule 0\n- rule 1\n- rule 2\n- rule 3\n- rule 4\n- rule 5\n- rule 6\n- rule 7\n- rule 8\n- rule 9\n- rule 10\n- rule 11\n- rule 12\n- rule 13\n- rule 14\n- rule 15\n- rule 16\n- rule 17\n- rule 18\n- rule 19\n- rule 20\n- rule 21\n- rule 22\n- rule 23\n- rule 24\n- rule 25\n- rule 26\n- rule 27\n- rule 28\n- rule 29\n- rule 30\n- rule 31\n- rule 32\n- rule 33\n- rule 34\n- rule 35\n- rule 36\n- rule 37\n- rule 38\n- rule 39\n- rule 40\n- rule 41\n- rule 42\n- rule 43\n- rule 44\n- rule 45\n- rule 46\n- rule 47\n- rule 48\n- rule 49\n- rule 50\n- rule 51\n- rule 52\n- rule 53\n- rule 54\n- rule 55\n- rule 56\n- rule 57\n- rule 58\n- rule 59\n- rule 60\n- rule 61\n- rule 62\n- rule 63\n- rule 64\n- rule 65\n- rule 66\n- rule 67\n- rule 68\n- rule 69\n- rule 70\n- rule 71\n- rule 72\n- rule 73\n- rule 74\n- rule 75\n- rule 76\n- rule 77\n- rule 78\n- rule 79\n- rule 80\n- rule 81\n- rule 82\n- rule 83\n- rule 84\n- rule 85\n- rule 86\n- rule 87\n- rule 88\n- rule 89\n- rule 90\n- rule 91\n- rule 92\n- rule 93\n- rule 94\n- rule 95\n- rule 96\n- rule 97\n- rule 98\n- rule 99\n- rule 100\n- rule 101\n- rule 102\n- rule 103\n- rule 104\n- rule 105\n- rule 106\n- rule 107\n- rule 108\n- rule 109\n- rule 110\n- rule 111\n- rule 112\n- rule 113\n- rule 114\n- rule 115\n- rule 116\n- rule 117\n- rule 118\n- rule 119\n- rule 120\n- rule 121\n- rule 122\n- rule 123\n- rule 124\n- rule 125\n- rule 126\n- rule 127\n- rule 128\n- rule 129\n- rule 130\n- rule 131\n- rule 132\n- rule 133\n- rule 134\n- rule 135\n- rule 136\n- rule 137\n- rule 138\n- rule 139\n- rule 140\n- rule 141\n- rule 142\n- rule 143\n- rule 144\n- rule 145\n- rule 146\n- rule 147\n- rule 148\n- rule 149\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "16-reference-size",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "16-toc-keyword-without-entries",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee [policy](references/policy.md).\n",
+    ".claude/skills/shop-refunds/references/policy.md": "# Remboursements\n\nContents : voir plus bas.\n\n## Partie 0\n\nTexte 0.\n\n## Partie 1\n\nTexte 1.\n\n## Partie 2\n\nTexte 2.\n\n## Partie 3\n\nTexte 3.\n\n## Partie 4\n\nTexte 4.\n\n## Partie 5\n\nTexte 5.\n\n## Partie 6\n\nTexte 6.\n\n## Partie 7\n\nTexte 7.\n\n## Partie 8\n\nTexte 8.\n\n## Partie 9\n\nTexte 9.\n\n## Partie 10\n\nTexte 10.\n\n## Partie 11\n\nTexte 11.\n\n## Partie 12\n\nTexte 12.\n\n## Partie 13\n\nTexte 13.\n\n## Partie 14\n\nTexte 14.\n\n## Partie 15\n\nTexte 15.\n\n## Partie 16\n\nTexte 16.\n\n## Partie 17\n\nTexte 17.\n\n## Partie 18\n\nTexte 18.\n\n## Partie 19\n\nTexte 19.\n\n## Partie 20\n\nTexte 20.\n\n## Partie 21\n\nTexte 21.\n\n## Partie 22\n\nTexte 22.\n\n## Partie 23\n\nTexte 23.\n\n## Partie 24\n\nTexte 24.\n\n## Partie 25\n\nTexte 25.\n\n## Partie 26\n\nTexte 26.\n\n## Partie 27\n\nTexte 27.\n\n## Partie 28\n\nTexte 28.\n\n## Partie 29\n\nTexte 29.\n\n## Partie 30\n\nTexte 30.\n\n## Partie 31\n\nTexte 31.\n\n## Partie 32\n\nTexte 32.\n\n## Partie 33\n\nTexte 33.\n\n## Partie 34\n\nTexte 34.\n\n## Partie 35\n\nTexte 35.\n\n## Partie 36\n\nTexte 36.\n\n## Partie 37\n\nTexte 37.\n\n## Partie 38\n\nTexte 38.\n\n## Partie 39\n\nTexte 39.\n\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "16-reference-size",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "16-toc-two-sections",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee [policy](references/policy.md).\n",
+    ".claude/skills/shop-refunds/references/policy.md": "# Effets\n\n## Table of Contents\n\n- [Typewriter](#typewriter)\n- [Visualizer](#visualizer)\n\n## Typewriter\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\n## Visualizer\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\nTexte.\n\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "16-reference-size",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "16-without-toc",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee [policy](references/policy.md).\n",
+    ".claude/skills/shop-refunds/references/policy.md": "# Remboursements\n\nLes contenus : voir plus bas.\n\n## Partie 0\n\nTexte 0.\n\n## Partie 1\n\nTexte 1.\n\n## Partie 2\n\nTexte 2.\n\n## Partie 3\n\nTexte 3.\n\n## Partie 4\n\nTexte 4.\n\n## Partie 5\n\nTexte 5.\n\n## Partie 6\n\nTexte 6.\n\n## Partie 7\n\nTexte 7.\n\n## Partie 8\n\nTexte 8.\n\n## Partie 9\n\nTexte 9.\n\n## Partie 10\n\nTexte 10.\n\n## Partie 11\n\nTexte 11.\n\n## Partie 12\n\nTexte 12.\n\n## Partie 13\n\nTexte 13.\n\n## Partie 14\n\nTexte 14.\n\n## Partie 15\n\nTexte 15.\n\n## Partie 16\n\nTexte 16.\n\n## Partie 17\n\nTexte 17.\n\n## Partie 18\n\nTexte 18.\n\n## Partie 19\n\nTexte 19.\n\n## Partie 20\n\nTexte 20.\n\n## Partie 21\n\nTexte 21.\n\n## Partie 22\n\nTexte 22.\n\n## Partie 23\n\nTexte 23.\n\n## Partie 24\n\nTexte 24.\n\n## Partie 25\n\nTexte 25.\n\n## Partie 26\n\nTexte 26.\n\n## Partie 27\n\nTexte 27.\n\n## Partie 28\n\nTexte 28.\n\n## Partie 29\n\nTexte 29.\n\n## Partie 30\n\nTexte 30.\n\n## Partie 31\n\nTexte 31.\n\n## Partie 32\n\nTexte 32.\n\n## Partie 33\n\nTexte 33.\n\n## Partie 34\n\nTexte 34.\n\n## Partie 35\n\nTexte 35.\n\n## Partie 36\n\nTexte 36.\n\n## Partie 37\n\nTexte 37.\n\n## Partie 38\n\nTexte 38.\n\n## Partie 39\n\nTexte 39.\n\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "16-reference-size",
+     "WARN",
+     1
+    ]
+   ]
+  }
+ ]
+}

@@ -1,0 +1,2 @@
+{"checks": {"01-shop-check": {"tested": {"claude_code": "7.4.9"}, "tested_again": {"claude_code": "7.4.10"}},
+            "02-shop-other": {"tested": {"claude_code": "7.4.8"}}}}

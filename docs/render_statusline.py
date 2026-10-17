@@ -89,7 +89,8 @@ def main():
     out.append("</svg>")
     (HERE / "statusline.svg").write_text("\n".join(out) + "\n", encoding="utf-8")
     for label, ansi in rows:
-        print(f"{re.sub(r'\x1b\[[0-9;]*m', '', ansi):30}  {label}")
+        plain = re.sub(r"\x1b\[[0-9;]*m", "", ansi)    # a backslash inside an f-string expression is Python 3.12+
+        print(f"{plain:30}  {label}")
 
 
 if __name__ == "__main__":

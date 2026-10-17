@@ -1,0 +1,191 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "02-agent-indented-or-quoted-header",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/agents/shop-indent.md": "---\nname: shop-indent\ndescription: >2\n   Review shop code changes before merge. Do not use for writing code.\n---\n\nReview.\n",
+    ".claude/agents/shop-quoted.md": "---\nname: shop-quoted\ndescription: \"> Review shop code changes before merge. Do not use for writing code.\"\n---\n\nReview.\n",
+    ".claude/agents/shop-inline.md": "---\nname: shop-inline\ndescription: > Review shop code changes before merge. Do not use for writing code.\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "02-frontmatter-block-scalar",
+     "INFO",
+     1
+    ],
+    [
+     "02-frontmatter-block-scalar",
+     "ERROR",
+     0
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "02-frontmatter-block-scalar",
+     "parser failed"
+    ]
+   ]
+  },
+  {
+   "id": "02-anthropic-skills-in-project",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/anthropic-skills/SKILL.md": "---\nname: anthropic-skills\ndescription: Format shop invoices as PDF for customers. Do not use for refunds.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "02-skill-md-exists",
+     "ERROR",
+     1
+    ],
+    [
+     "32-skill-name-reserved",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "32-skill-name-reserved",
+     "Claude Code loads it"
+    ]
+   ]
+  },
+  {
+   "id": "02-category-folder-in-project",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-billing/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-checkout/SKILL.md": "---\nname: shop-checkout\ndescription: Build the shop checkout pages and their layout. Do not use for refunds.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "02-skill-md-exists",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "02-empty-description",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: \"\"\n---\n\nBody.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "02-skill-frontmatter",
+     "ERROR",
+     0
+    ],
+    [
+     "02-skill-frontmatter",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "02-name-optional-in-project",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nBody.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "02-skill-frontmatter",
+     "ERROR",
+     0
+    ],
+    [
+     "02-skill-frontmatter",
+     "WARN",
+     0
+    ],
+    [
+     "02-skill-frontmatter",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "02-nothing-declared",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "02-skills-dir",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "02-project-with-agents-no-skills",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/agents/shop-review.md": "---\nname: shop-review\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "02-skills-dir",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "02-skill-without-frontmatter",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "# Refunds\n\nHandle refunds.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "02-skill-frontmatter",
+     "ERROR",
+     0
+    ],
+    [
+     "02-skill-frontmatter",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "02-synced-in-plugin",
+   "files": {
+    ".claude-plugin/plugin.json": "{\"name\": \"shop-kit\", \"version\": \"1.0.0\"}\n",
+    "README.md": "# shop-kit\n",
+    "skills/synced/SKILL.md": "---\nname: synced\ndescription: Sync the shop catalogue with the warehouse feed. Do not use for refunds.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "00-layout",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "02-skill-md-exists",
+     "synced"
+    ]
+   ]
+  }
+ ]
+}

@@ -83,7 +83,7 @@ When none of the three counting files exist:
   in the shop repository this is how `api/AGENTS.md` is picked up once Claude reads a file under
   `api/`.
 - "Inside each `AGENTS.md`: `@path` imports are expanded, `claudeMdExcludes` patterns apply, and
-  subagents that skip project instructions skip these files too."
+  subagents that start without project instructions start without these files too."
 - "Not read: `AGENTS.local.md`, `AGENTS.override.md`, or anything under a `.agents/` directory" —
   an `AGENTS.override.md` copied from a Codex habit into the shop repository is invisible here.
 

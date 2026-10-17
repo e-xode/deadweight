@@ -1,0 +1,44 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "18-nested-command",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/commands/deploy.md": "---\ndescription: Deploy the shop.\n---\n\nRun it.\n",
+    ".claude/commands/ops/lint-all.md": "---\ndescription: Lint the shop.\n---\n\nRun it.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nThen deploy.\n\n➜ See skill: deploy\n\n➜ See skill: lint-all\n\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "18-see-skill-target",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "18-see-skill-to-command",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/commands/shop-deploy.md": "Deploy the shop API.\n",
+    ".claude/skills/shop-release/SKILL.md": "---\nname: shop-release\ndescription: Prepare a shop API release: changelog, version bump, tag. Do not use for deploying.\n---\n\n➜ See skill: shop-deploy\n\n➜ See skill: shop-ghost\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "18-see-skill-target",
+     "ERROR",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "18-see-skill-target",
+     "shop-deploy"
+    ]
+   ]
+  }
+ ]
+}

@@ -2,3 +2,5 @@
 # the class of defect that crashes a branch of audit.py nobody exercised. The
 # security rules were measured on this code and dropped: 11 findings, none real
 # (md5 as a cache key, subprocess with an argument list).
+
+target-version = "py311"   # CI and the portability matrix run 3.11: syntax newer than that is an error here, not on the user's machine

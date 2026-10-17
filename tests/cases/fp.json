@@ -1,0 +1,150 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "fp-boolean-yes",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\ndisable-model-invocation: yes\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "15-skill-index",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "fp-claude-md-in-dot-claude",
+   "files": {
+    ".claude/CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-exists",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "fp-model-fable",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-review.md": "---\nname: shop-review\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nmodel: fable\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-model",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "fp-paths-not-unreachable",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\npaths: src/**\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "15-skill-index",
+     "NOTICE",
+     0
+    ],
+    [
+     "15-skill-index",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "fp-plugin-preload",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-review.md": "---\nname: shop-review\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nskills: shop-kit:refund-rules\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-skills-preload",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "fp-rule-in-subfolder",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/rules/api/payments.md": "---\npaths:\n  - src/payments/**\n---\n\nValidate amounts.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "22-rule-glob-match",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "fp-skilloverrides-builtin",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"skillOverrides\": {\n    \"doctor\": \"off\"\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-skill-overrides",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "fp-strip-skills-path",
+   "files": {
+    ".claude-plugin/plugin.json": "{\n  \"name\": \"shop-kit\",\n  \"skills\": \"./.claude/skills\"\n}",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "02-skills-dir",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "fp-task-alias",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-review.md": "---\nname: shop-review\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\ntools: Read, Task\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-tools",
+     "ERROR",
+     0
+    ]
+   ]
+  }
+ ]
+}

@@ -1,0 +1,91 @@
+name: claude-code-watch
+
+# The plugin's references describe a moving target: every Claude Code release can add a
+# key, remove a tool or change where a field is read. This workflow reads each new
+# release's changelog section and opens ONE issue listing the identifiers the plugin
+# has never named, the removals and deprecations, and the lines that touch a
+# configuration surface, then compares the auditor's vocabulary lists with the raw
+# docs pages (.github/scripts/vocabulary_drift.py). It needs no model and no API key: the script is a set of
+# regular expressions, .github/scripts/claude_code_watch.py, and runs locally the same
+# way without --create-issue.
+#
+# State lives in the issues, not in the repository: an issue labelled
+# `claude-code-drift` whose title carries `A..B` covers up to B, open or closed.
+# Before the first one, the floor is the highest version recorded as tested in
+# skills/config-auditor/evidence.json. Nothing is ever committed back.
+#
+# GitHub's own limits on `schedule` (docs.github.com, "Events that trigger workflows"):
+# it runs only from the latest commit on the default branch; it can be delayed - and
+# queued jobs dropped - at high load, the start of every hour above all, hence minute
+# 37; in a public repository it is disabled after 60 days without repository
+# activity, so a quiet plugin stops watching exactly when it most needs to:
+# workflow_dispatch re-runs it by hand, and re-enabling is one click in the Actions tab.
+
+on:
+  schedule:
+    - cron: "37 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: claude-code-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      # Exit 4: the upstream changelog's version headings changed shape. The step fails
+      # (red run, `::error::` annotation) instead of reporting "nothing new" for good.
+      - name: Read the new releases and open one issue for the range
+        id: watch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python3 .github/scripts/claude_code_watch.py --create-issue --repo "$GH_REPO"
+      # The auditor's hard-coded lists against the raw docs pages. Exit 10 (drift): the
+      # section goes into the issue the watch just opened, or, without one, into the
+      # single open "Claude Code drift: documentation vocabulary" issue, replaced in place
+      # on later runs. Exit 3 (a page could not be downloaded) is a warning, never drift.
+      # Any other status - 1 is a Python traceback - fails the step and touches no issue:
+      # a crash read as drift would open an empty issue or erase the standing section.
+      - name: Compare the auditor's vocabulary with the documentation
+        if: ${{ !cancelled() }}
+        timeout-minutes: 3
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_URL: ${{ steps.watch.outputs.issue_url }}
+        run: |
+          set +e
+          python3 .github/scripts/vocabulary_drift.py --markdown > "$RUNNER_TEMP/drift.md"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/drift.md"
+          case "$status" in
+            0) ;;
+            10) python3 .github/scripts/vocabulary_drift.py --attach "$RUNNER_TEMP/drift.md" \
+                  --repo "$GH_REPO" --issue-url "$ISSUE_URL" ;;
+            3) echo "::warning::vocabulary not checked: a documentation page could not be read" ;;
+            *) echo "::error::vocabulary_drift.py failed (exit $status), no issue touched"
+               exit "$status" ;;
+          esac
+      - name: Post the issue to Google Chat (optional)
+        if: steps.watch.outputs.issue_url != ''
+        continue-on-error: true
+        timeout-minutes: 2
+        env:
+          GOOGLE_CHAT_WEBHOOK: ${{ secrets.GOOGLE_CHAT_WEBHOOK }}
+          ISSUE_TITLE: ${{ steps.watch.outputs.issue_title }}
+          ISSUE_URL: ${{ steps.watch.outputs.issue_url }}
+        run: |
+          if [ -z "$GOOGLE_CHAT_WEBHOOK" ]; then exit 0; fi
+          python3 .github/scripts/claude_code_watch.py --notify "$ISSUE_TITLE" "$ISSUE_URL"

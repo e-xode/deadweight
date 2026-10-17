@@ -1,0 +1,158 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "09-agent-name-underscore",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\n## Agents directory\n\n| Agent | When |\n| --- | --- |\n| `shop_QA` | Review checkout changes. |\n| `Ghost_X` | Nothing. |\n",
+    ".claude/agents/shop-qa.md": "---\nname: shop_QA\ndescription: Review shop checkout changes before merge.\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "09-claude-md-agent-missing",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "09-agent-name-vs-file",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\n## Agents directory\n\n| Agent | When |\n| --- | --- |\n| `shop-reviewer` | Review checkout changes. |\n",
+    ".claude/agents/shop-reviewer.md": "---\nname: shop-code-reviewer\ndescription: Review shop checkout changes before merge.\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "09-claude-md-agent-missing",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "09-claude-md-agent-missing",
+     "does not exist"
+    ]
+   ]
+  },
+  {
+   "id": "09-agent-tools-column",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\n## Agents directory\n\n| Agent | Model | Tools |\n| --- | --- | --- |\n| `shop-reviewer` | `sonnet` | `Read, Grep` |\n| `shop-ghost` | `haiku` | `Read` |\n",
+    ".claude/agents/shop-reviewer.md": "---\nname: shop-reviewer\ndescription: Review shop checkout changes before merge.\ntools: Read, Grep\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "09-claude-md-agent-missing",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "09-agent-without-anti-trigger",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-review.md": "---\nname: shop-review\ndescription: Review shop code changes for correctness before merge, reading the diff and the tests.\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "08b-agent-description",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "09-agents-table-in-two-pairs",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\n## Agents directory\n\n| Agent | Domain | Agent | Tools |\n| --- | --- | --- | --- |\n| `shop-a` | refunds | `shop-b` | `Read, Grep` |\n| `shop-ghost` | invoices | | |\n",
+    ".claude/agents/shop-a.md": "---\nname: shop-a\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\n---\n\nReview.\n",
+    ".claude/agents/shop-b.md": "---\nname: shop-b\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\n---\n\nReview.\n",
+    ".claude/agents/shop-c.md": "---\nname: shop-c\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "09-claude-md-agent-missing",
+     "WARN",
+     1
+    ],
+    [
+     "09-agent-in-claude-md",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "09-agent-in-claude-md",
+     "'shop-b'"
+    ],
+    [
+     "09-claude-md-agent-missing",
+     "Read, Grep"
+    ]
+   ]
+  },
+  {
+   "id": "09-agents-table-short-delimiter",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\n## Agents directory\n\n| Domain | Agent |\n|:--|:-|\n| Payments | `shop-pay` |\n| QA | `shop-qa-typo` |\n",
+    ".claude/agents/shop-pay.md": "---\nname: shop-pay\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\n---\n\nReview.\n",
+    ".claude/agents/shop-c.md": "---\nname: shop-c\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "09-claude-md-agent-missing",
+     "WARN",
+     1
+    ],
+    [
+     "09-agent-in-claude-md",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "09-agent-in-claude-md",
+     "'shop-pay'"
+    ]
+   ]
+  },
+  {
+   "id": "09-agents-table-without-outer-pipes",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\n## Agents directory\n\nDomain | Agent | Model\n--- | --- | ---\nPayments | `shop-pay` | sonnet\nQA | `shop-qa-typo` | haiku\n",
+    ".claude/agents/shop-pay.md": "---\nname: shop-pay\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\n---\n\nReview.\n",
+    ".claude/agents/shop-c.md": "---\nname: shop-c\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "09-claude-md-agent-missing",
+     "WARN",
+     1
+    ],
+    [
+     "09-agent-in-claude-md",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "09-agent-in-claude-md",
+     "'shop-pay'"
+    ]
+   ]
+  }
+ ]
+}

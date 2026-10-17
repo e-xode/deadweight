@@ -53,6 +53,7 @@ Silent or near-silent failures:
 
 - **`url` without `type`** → read as stdio → **skipped**, with `MCP server "<name>" has a "url" but no "type"` (mcp, Option 1). In a headless run the only trace is `mcp_server_errors` in the `system/init` event (2.1.219+). → `43-mcp-shape` ERROR.
 - **`type: "sse"`** still works but is deprecated → `43-mcp-shape` NOTICE.
+- **`type: "sdk"`** in `.mcp.json`, `~/.claude.json` or settings → **skipped**: "only an SDK host application" registers an in-process server (mcp; since 2.1.274 per the changelog). **Measured** (2026-10-17, 2.1.302, `claude mcp list`): `Skipped — MCP server "shop-sdk" declares type "sdk", which only an SDK host application can register`, as a warning. → `43-mcp-shape` ERROR.
 - **Invalid JSON** in `.mcp.json` → `43-mcp-shape` ERROR.
 - **Empty `url`** on a remote entry is *not* an error: shown as `not configured`, never connected — the documented way for a plugin to ship a placeholder connector (mcp, Server status detail).
 - **Hidden whitespace** (a pasted token with a trailing newline) in `command`, `url`, `args`, `env`, `headers`: warned, **not trimmed**, used as written (mcp, Configuration warnings).
@@ -119,6 +120,7 @@ Callable name: `mcp__<server>__<tool>` (permissions, MCP; hooks, Match MCP tools
 | `mcp__*` or `*` in **allow** | **skipped with a warning; approves nothing** |
 | `mcp__*` in **deny/ask** | valid: every MCP tool |
 | any `mcp__…(…)` with parentheses in a settings file | **skipped**; listed in the invalid-settings dialog and `claude doctor` |
+| `mcp__reports__v2` or `mcp__reports` (allow), for a server whose name contains `__` or ends in `_` | **matches none of its tools**: read as a rule for a server named `reports`; write `mcp__reports__v2__*` (permissions; 2.1.299) → `42-permissions-rule` WARN for `.mcp.json` servers |
 
 **Hook matchers** (hooks, Match MCP tools):
 
@@ -139,7 +141,8 @@ Callable name: `mcp__<server>__<tool>` (permissions, MCP; hooks, Match MCP tools
 - It is **off**, and every tool definition loads upfront, when `ANTHROPIC_BASE_URL` is a non-first-party host, with `ENABLE_TOOL_SEARCH=false`, with `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS`, on pre-4.5 models on Google Cloud's Agent Platform, and on Azure-hosted Foundry (mcp, Configure tool search). `ENABLE_TOOL_SEARCH=auto[:N]` loads upfront below N % (default 10) of the window.
 - Without tool search, a request that needs a still-connecting server waits through **`WaitForMcpServers`**; with it, the wait happens inside `ToolSearch` (mcp, Tool availability).
 - **`alwaysLoad: true`** on a server (or `_meta["anthropic/alwaysLoad"]` on a tool) bypasses deferral: every definition is paid every turn, and startup waits up to 5 s for that server (mcp, Exempt a server from deferral). An audit question, not an error: which tool is needed on *every* turn?
-- Each tool description and each server's instructions are truncated at 2,048 characters; `CLAUDE_CODE_MAX_MCP_DESCRIPTION_LENGTH` changes it (2.1.280+) (mcp, For MCP server authors).
+- **`alwaysLoad: false`** on a server (2.1.287+) keeps **all** its tools behind tool search, including those its author marked `_meta["anthropic/alwaysLoad"]: true`; left out, those marked tools load upfront (mcp, Exempt a server from deferral; read 2026-10-17).
+- Server instructions and the description of a tool that loads upfront are cut at **4,096** characters; a description Claude loads through tool search, at 16,384. Before 2.1.296 the shorter limit was 2,048, and before 2.1.295 it applied to every description. Tool search matches only the part within the shorter limit: put the words Claude would search for first. `CLAUDE_CODE_MAX_MCP_DESCRIPTION_LENGTH` (2.1.280+) replaces **both** limits (mcp, For MCP server authors; read 2026-10-17).
 - Tool **output**: warning above 10,000 tokens, limit 25,000 (`MAX_MCP_OUTPUT_TOKENS`); over the limit the result goes to a file and the conversation gets a path (mcp, MCP output limits).
 - A tool whose input schema fails the API's checks is excluded alone, not the whole server — when the feature flag arrived; otherwise the whole request 400s (mcp, Tools with invalid input schemas).
 
@@ -158,7 +161,7 @@ Callable name: `mcp__<server>__<tool>` (permissions, MCP; hooks, Match MCP tools
 
 | Check | Reads | Fires on |
 | --- | --- | --- |
-| `43-mcp-shape` | `.mcp.json` at the root (a repository with only that file is audited as a project) | invalid JSON (ERROR); `url` without `type` (ERROR); `type: sse` (NOTICE) |
+| `43-mcp-shape` | `.mcp.json` at the root (a repository with only that file is audited as a project) | invalid JSON (ERROR); `url` without `type` (ERROR); `type: sdk` (ERROR); `type: sse` (NOTICE) |
 | `43-mcp-secret` | same, `url`/`headers`/`env`/`args` | literal-looking token without `${` (ERROR) |
 | `43-mcp-credential-var` | same, `url`/`headers` | one of the five documented protected names, or the eight measured on 2.1.294 (ERROR) |
 | `43-mcp-approval` | shared `.claude/settings.json` | `enableAllProjectMcpServers` / `enabledMcpjsonServers` committed (WARN) |

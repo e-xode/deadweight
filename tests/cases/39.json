@@ -1,0 +1,107 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "39-all-judges-in-case-yaml",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "evals/shop-tone/case.yaml": "schema_version: \"1.1\"\nname: shop-tone\nexecution:\n  prompt: Answer the refund email.\ngraders:\n  - name: tone\n    type: llm\n    criteria: |\n      The reply is polite.\n      type: regex is not a key here.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "39-eval-all-llm",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "39-fixture-add-dirs",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "evals/shop-refunds/order/case.yaml": "schema_version: \"1.1\"\nname: order\nexecution:\n  prompt: Refund the order in resources/order.json.\ncontext:\n  add_dirs: [resources]\ngraders:\n  - name: amount\n    type: regex\n    pattern: '42\\.00'\n",
+    "evals/shop-refunds/order/resources/order.json": "{\"total\": \"42.00\"}\n",
+    "evals/shop-refunds/order/graders/judge.md": "---\ntype: llm\n---\nThe reply states the refunded amount.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "39-eval-no-fixture",
+     "NOTICE",
+     0
+    ],
+    [
+     "26-evals-coverage",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "39-judge-focus-trace",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "evals/shop-load/case.yaml": "schema_version: \"1.1\"\nname: shop-load\nexecution:\n  prompt: Refund order 1042.\n",
+    "evals/shop-load/graders/judge.md": "---\ntype: llm\nfocus: trace\n---\nThe run must load the `shop-refunds` skill.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "39-eval-judged-fact",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "39-eval-judged-fact",
+     "reads the last message"
+    ]
+   ]
+  },
+  {
+   "id": "39-regex-in-case-yaml",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "evals/shop-total/case.yaml": "schema_version: \"1.1\"\nname: shop-total\nexecution:\n  prompt: Total of order 1042?\ngraders:\n  - name: has-total\n    type: regex\n    pattern: total\n",
+    "evals/shop-total/graders/judge.md": "---\ntype: llm\n---\nThe answer gives the order total.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "39-eval-all-llm",
+     "NOTICE",
+     0
+    ],
+    [
+     "39-eval-no-fixture",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "39-tool-used-in-case-yaml",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "evals/shop-load/case.yaml": "schema_version: \"1.1\"\nname: shop-load\nexecution:\n  prompt: Refund order 1042.\ngraders:\n  - name: skill-fired\n    type: tool_used\n    tool: Skill\n    min: 1\n",
+    "evals/shop-load/graders/judge.md": "---\ntype: llm\n---\nThe run must load the `shop-refunds` skill, then answer with the refund amount.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "39-eval-judged-fact",
+     "WARN",
+     0
+    ],
+    [
+     "39-eval-no-fixture",
+     "NOTICE",
+     1
+    ]
+   ]
+  }
+ ]
+}

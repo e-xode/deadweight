@@ -1,0 +1,68 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "37-another-audit-script",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-fleet/SKILL.md": "---\nname: shop-fleet\ndescription: Audit the shop fleet. Do not use for refunds.\n---\n\n```bash\npython3 scripts/shop_audit.py --repo-root . --repo-slug shop/api\n```\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "37-documented-flag",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "37-flag-that-does-not-exist",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "README.md": "Run it:\n\n```bash\npython3 ~/.claude/plugins/cache/deadweight/skills/config-auditor/scripts/audit.py --root . --shop-strict\n```\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "37-documented-flag",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "37-neighbouring-flag",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "README.md": "Run it:\n\n```bash\npython3 \"$(deadweight --where)/skills/config-auditor/scripts/audit.py\" --root .\n```\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "37-documented-flag",
+     "ERROR",
+     0
+    ]
+   ],
+   "known_failure": true
+  },
+  {
+   "id": "37-project-own-audit-py",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "README.md": "# shop-api\n\n```bash\npython3 scripts/audit.py --strict\npython3 ~/.claude/plugins/cache/deadweight/skills/config-auditor/scripts/audit.py --bogus-flag\n```\n",
+    "scripts/audit.py": "import argparse\np = argparse.ArgumentParser()\np.add_argument(\"--strict\")\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "37-documented-flag",
+     "ERROR",
+     1
+    ]
+   ]
+  }
+ ]
+}

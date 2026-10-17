@@ -19,6 +19,8 @@ from ..vocabulary.hooks import (
     HOOK_PLUGIN_ROOT_VARS,
     HOOK_PROJECT_DIR_VARS,
     HOOK_TOOL_EVENTS,
+    HOOK_ONFAILURE_NO_EFFECT_EVENTS,
+    HOOK_ONFAILURE_VALUES,
     HOOK_TYPE_FIELDS,
     KNOWN_HOOK_EVENTS,
     MATCHERLESS_HOOK_EVENTS,
@@ -161,6 +163,58 @@ def _dot_slash_hint(ctx: AuditContext, root: Path, decl: Path, token: str) -> st
 SCRIPT_RE = re.compile(r"\.(sh|bash|zsh|py|js|mjs|cjs|ts|rb|pl|ps1)$")
 
 
+def _top_level_alternatives(matcher: str) -> list[str]:
+    """The alternatives of a matcher, split on the `|` that sit outside parentheses.
+
+    `Write|Bash(npm run lint|npm test)` is two alternatives, not three: split on every `|`,
+    its `Bash(...)` part was never seen as a permission rule (external audit 2026-10-17, A-01).
+    A backslash escapes the next character, as in a regular expression.
+    """
+    out: list[str] = []
+    cur: list[str] = []
+    depth, esc = 0, False
+    for ch in matcher:
+        if esc:
+            esc = False
+        elif ch == "\\":
+            esc = True
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth = max(depth - 1, 0)
+        elif ch == "|" and depth == 0:
+            out.append("".join(cur).strip())
+            cur = []
+            continue
+        cur.append(ch)
+    out.append("".join(cur).strip())
+    return out
+
+
+# YAML 1.2 core booleans. Hook frontmatter is read as text, so `async: true` arrives as the
+# string 'true': tested with `is True`, the onFailure NOTICE never fired on a frontmatter hook,
+# and 35-hooks-timeout fired on an async one (external audit 2026-10-17, A-02).
+_YAML_BOOLEANS = {"true": True, "True": True, "TRUE": True,
+                  "false": False, "False": False, "FALSE": False}
+_HOOK_FLAGS = ("async", "asyncRewake", "once")
+
+
+def _frontmatter_flags(hooks):
+    """`hooks` read from a frontmatter, with its boolean handler fields made booleans."""
+    if not isinstance(hooks, dict):
+        return hooks
+    for entries in hooks.values():
+        for entry in entries if isinstance(entries, list) else []:
+            inner = entry.get("hooks") if isinstance(entry, dict) else None
+            for hook in inner if isinstance(inner, list) else []:
+                if not isinstance(hook, dict):
+                    continue
+                for flag in _HOOK_FLAGS:
+                    if isinstance(hook.get(flag), str) and hook[flag] in _YAML_BOOLEANS:
+                        hook[flag] = _YAML_BOOLEANS[hook[flag]]
+    return hooks
+
+
 def check_hooks(ctx: AuditContext, report: Report) -> None:
     """Hooks: the only configuration that executes, and the last one audited.
 
@@ -198,7 +252,7 @@ def check_frontmatter_hooks(ctx: AuditContext, report: Report) -> None:
               [(p, "agent") for p in readable_files((root / ctx.agents_dir).rglob("*.md"))]
     for p, kind_ in sources:
         try:
-            text = p.read_text(encoding="utf-8")
+            text = p.read_text(encoding="utf-8-sig")
         except (OSError, UnicodeDecodeError):
             continue
         if not re.search(r"^hooks:", text.split("\n---", 2)[0] if text.startswith("---") else "", re.M):
@@ -231,10 +285,19 @@ def check_frontmatter_hooks(ctx: AuditContext, report: Report) -> None:
                                    f"'{mm.group(1)}' in the frontmatter hooks of '{p.relative_to(root)}' "
                                    "is not a hook event: it never fires (hooks).", str(p))
             continue
+        if hooks == []:
+            # `hooks: []` is a list, and an empty one declares nothing - as `"hooks": []` in a
+            # matcher group runs nothing. It was read "only in part (multi-line scalars, flow
+            # mappings)" until 0.26.0. The skill still loads: measured once, Claude Code 2.1.302
+            # (`claude -p`, 2026-10-17; evidence.json, `35-hooks-shape`, `tested_skill_hooks_empty`: a skill only).
+            report.add("35-hooks-shape", "NOTICE",
+                       f"'hooks' in the frontmatter of '{p.relative_to(root)}' is an empty list: "
+                       "it declares no hook.", str(p))
+            continue
         if kind_ == "agent" and isinstance(hooks, dict) and "Stop" in hooks:
             # "Claude Code converts a Stop hook here to SubagentStop" (hooks).
             hooks = {("SubagentStop" if e == "Stop" else e): v for e, v in hooks.items()}
-        _audit_hooks(ctx, report, hooks, str(p.relative_to(root)), p)
+        _audit_hooks(ctx, report, _frontmatter_flags(hooks), str(p.relative_to(root)), p)
     if foreign:
         shown = ", ".join(str(x.relative_to(root)) for x in foreign[:3])
         report.add("35-hooks-event", "WARN",
@@ -248,6 +311,40 @@ def check_frontmatter_hooks(ctx: AuditContext, report: Report) -> None:
                    f"{len(partial)} file(s) declare frontmatter hooks in a form this script reads "
                    f"only in part (multi-line scalars, flow mappings): event names checked, the "
                    f"rest not ({shown}{'...' if len(partial) > 3 else ''}).", str(root))
+
+
+def _check_on_failure(report: Report, hook: dict, kind: str, event: str, spot: str, rel: str,
+                      path: Path) -> None:
+    """`onFailure` where the hooks page says it does nothing, or with an undocumented value.
+
+    NOTICE: the hook still runs; only the promise "a failure blocks the action" is empty.
+    """
+    value = hook.get("onFailure")
+    if value not in HOOK_ONFAILURE_VALUES:
+        report.add("35-hooks-shape", "NOTICE",
+                   f"{spot} in '{rel}' sets onFailure to {json.dumps(value)}: the documented "
+                   "values are \"continue\" (the default) and \"block\" (hooks, 2.1.295+).",
+                   str(path))
+        return
+    if value != "block":
+        return
+    if kind not in ("command", "http"):
+        report.add("35-hooks-shape", "NOTICE",
+                   f"{spot} in '{rel}' sets onFailure: \"block\" on a '{kind}' hook: the hooks "
+                   "page documents the field for command and http hooks only, so nothing says a "
+                   "failure of this one blocks the action (hooks).", str(path))
+        return
+    if event in HOOK_ONFAILURE_NO_EFFECT_EVENTS:
+        why = (f"it has no effect on '{event}', where exit code 2 sends Claude back to work and "
+               "Claude cannot repair a hook that will not run")
+    elif kind == "command" and (hook.get("async") is True or hook.get("asyncRewake") is True):
+        why = "it has no effect on a background command hook (`async` or `asyncRewake`)"
+    else:
+        return
+    report.add("35-hooks-shape", "NOTICE",
+               f"{spot} in '{rel}' sets onFailure: \"block\", but {why}: a failure of this "
+               "hook does not block anything (hooks, Block the action when a hook fails).",
+               str(path))
 
 
 def _audit_hooks(ctx: AuditContext, report: Report, hooks, rel: str, path: Path, in_agent: bool = False) -> None:
@@ -297,7 +394,13 @@ def _audit_hooks(ctx: AuditContext, report: Report, hooks, rel: str, path: Path,
             # TOOL NAME only (hooks, "Matchers"), and `Bash(git commit*)` matches no tool name.
             # The argument filter belongs in the handler's `if` field. Judged by running the
             # pattern on the tool it names: `Edit(.*)` does match `Edit` and is left alone.
-            pr = re.fullmatch(r"\s*([A-Za-z_]+)\((.*)\)\s*", m) if isinstance(m, str) else None
+            alts = _top_level_alternatives(m) if isinstance(m, str) else []
+            # A single alternative only: `Bash(git *)|Edit(*.ts)` also starts with `Tool(` and
+            # ends with `)`, and read whole it got this branch's advice - a matcher 'Bash' and
+            # an `if` holding two rules, which `if` does not support (external audit
+            # 2026-10-17, A-01).
+            pr = (re.fullmatch(r"\s*([A-Za-z_]+)\((.*)\)\s*", m)
+                  if isinstance(m, str) and len(alts) == 1 else None)
             if (event in HOOK_TOOL_EVENTS and pr
                     and (pr.group(1) in KNOWN_TOOLS or pr.group(1) in TOOL_ALIASES)):
                 try:
@@ -310,6 +413,46 @@ def _audit_hooks(ctx: AuditContext, report: Report, hooks, rel: str, path: Path,
                                "A matcher is compared with the tool name only, so this group never "
                                f"fires on '{event}'. Write the matcher '{pr.group(1)}' and put "
                                f"'{m.strip()}' in the handler's `if` field (hooks).", str(path))
+            # The same rule as ONE alternative of a matcher, `Bash(git *)|Write` or
+            # `Write|Edit(*.ts)`: the whole matcher is still one regular expression on the tool
+            # name (hooks). Probe, Claude Code 2.1.302 (2026-10-17, `claude -p`, one run, not yet
+            # in evidence.json): `Bash(git *)|Write` fired on Write and not on `git status`;
+            # `Write|Edit(*.ts)`, not a valid regular expression, fired on neither. The hooks
+            # page does not say what an invalid matcher does: that ERROR rests on the one run.
+            alts = alts if len(alts) > 1 else []
+            rules = [a for a in alts if re.fullmatch(r"[A-Za-z_]+\(.*\)", a)
+                     and (a.split("(")[0] in KNOWN_TOOLS or a.split("(")[0] in TOOL_ALIASES)]
+            if event in HOOK_TOOL_EVENTS and rules:
+                names = "|".join(dict.fromkeys(a.split("(")[0] if a in rules else a for a in alts))
+                try:
+                    dead = [a for a in rules if re.search(m, a.split("(")[0]) is None]
+                    valid = True
+                except re.error:
+                    dead, valid = rules, False
+                shown = ", ".join(repr(a) for a in dead)
+                # `if` "holds exactly one permission rule" (hooks): two rules, two handlers.
+                put = (f"put {shown} in a handler's `if` field" if len(dead) == 1 else
+                       f"put each of {shown} in the `if` field of a handler of its own")
+                if not valid:
+                    report.add("35-hooks-matcher", "ERROR",
+                               f"{where} in '{rel}' has matcher '{m}', which holds the permission rule "
+                               f"{shown} and is not a valid regular expression. The hooks page does not "
+                               "say what Claude Code does with one; measured once, on Claude Code "
+                               "2.1.302, such a group fired on none of its tools. Write the matcher "
+                               f"'{names}' and {put} (hooks).", str(path))
+                elif len(dead) == len(alts):
+                    report.add("35-hooks-matcher", "ERROR",
+                               f"{where} in '{rel}' has matcher '{m}': every alternative is written as a "
+                               "permission rule, and a matcher is compared with the tool name only, so "
+                               f"this group never fires on '{event}'. Write the matcher '{names}' and "
+                               f"{put} (hooks).", str(path))
+                elif dead:
+                    report.add("35-hooks-matcher", "NOTICE",
+                               f"{where} in '{rel}' lists {shown} in matcher '{m}', written as a "
+                               "permission rule. A matcher is compared with the tool name only, so that "
+                               "alternative matches no tool; the others still fire. Put "
+                               f"{shown} in a handler's `if` field, in a group of its own (hooks).",
+                               str(path))
             # "Matchers are case-sensitive" (hooks-guide), and a matcher made only of
             # letters, digits, `_ - , |` and spaces is compared as exact names (hooks):
             # `bash`, `Create` or `MCP` on a tool event matches no tool, ever.
@@ -383,6 +526,8 @@ def _audit_hooks(ctx: AuditContext, report: Report, hooks, rel: str, path: Path,
                                    f"{spot} in '{rel}' combines rules in 'if': it holds exactly "
                                    "one permission rule, with no &&, || or list (hooks).",
                                    str(path))
+                if "onFailure" in hook:
+                    _check_on_failure(report, hook, kind, event, spot, rel, path)
                 missing = [f for f in HOOK_TYPE_FIELDS[kind] if not hook.get(f)]
                 if missing and kind != "command":
                     report.add("35-hooks-shape", "ERROR",

@@ -1,0 +1,127 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "51-false-friends",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nMake the change small. Validation commands (e.g., `npm run ci`).\n\n```go\nm := make(map[string]int) // make when writing\n```\n\nBuild with `make -C src`.\n",
+    "package.json": "{\"name\": \"shop-api\", \"scripts\": {\"test\": \"vitest\", \"lint\": \"eslint .\"}}\n",
+    "Makefile": "include shared/common.mk\n\nall:\n\techo ok\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "51-stale-command",
+     "WARN",
+     0
+    ],
+    [
+     "51-stale-command",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "51-just-import-and-mod",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `just test`, `just shop-tasks seed` and `npm run shop-absent`.\n",
+    "justfile": "import 'shop.just'\nmod shop-tasks\n\nlint:\n    echo lint\n",
+    "shop.just": "test:\n    echo test\n",
+    "shop-tasks.just": "seed:\n    echo seed\n",
+    "package.json": "{\"scripts\": {\"lint\": \"eslint .\"}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "51-stale-command",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "51-stale-command",
+     "just "
+    ]
+   ]
+  },
+  {
+   "id": "51-make-several-targets-and-j",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test`, `make build`, `make -j 4 build` and `make shop-absent`.\n",
+    "Makefile": "build test: deps\n\techo ok\ndeps:\n\techo deps\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "51-stale-command",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "51-stale-command",
+     "make (?:test|build|4)\\b"
+    ]
+   ]
+  },
+  {
+   "id": "51-missing-script",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `npm run test:e2e` before a release.\n",
+    "package.json": "{\"name\": \"shop-api\", \"scripts\": {\"test\": \"vitest\", \"lint\": \"eslint .\"}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "51-stale-command",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "51-non-ascii-path",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `npm run deploy` to ship, then `npm run release`.\n",
+    "package.json": "{\"name\": \"shop-api\", \"scripts\": {\"build\": \"vite build\"}}\n",
+    "apps/café/package.json": "{\"name\": \"shop-cafe\", \"scripts\": {\"deploy\": \"node deploy.js\"}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "51-stale-command",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "51-stale-command",
+     "npm run deploy"
+    ]
+   ]
+  },
+  {
+   "id": "51-repo-without-manifest",
+   "files": {
+    "CLAUDE.md": "# notes\n\nRun `npm run build` in the app repository.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "51-stale-command",
+     "WARN",
+     0
+    ],
+    [
+     "53-no-verification-command",
+     "NOTICE",
+     0
+    ]
+   ]
+  }
+ ]
+}

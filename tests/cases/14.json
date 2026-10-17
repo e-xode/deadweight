@@ -1,0 +1,156 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "14-comment-in-a-rule",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/rules/js.md": "# js\n\n// shop handlers return typed errors\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "14-rule-code-comments",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "14-cursor-globs-once",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/rules/shop-api.md": "---\nglobs: src/api/**\n---\n\nKeep handlers thin.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "14-rule-no-paths",
+     "WARN",
+     0
+    ],
+    [
+     "14-rule-unknown-field",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "14-pour-english-in-rule",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/rules/batches.md": "---\ndescription: batches\n---\nPour the batch into the queue.\n\nPour the refunds into the ledger.\n\nPour the receipts into the archive.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "14-rule-english-only",
+     "WARN",
+     0
+    ],
+    [
+     "14-rule-english-only",
+     "NOTICE",
+     0
+    ],
+    [
+     "14-rule-no-paths",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "14-rule-globs-key",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/rules/api.md": "---\nglobs: src/**\n---\n\nValidate.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "14-rule-unknown-field",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "14-rule-in-french",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/rules/batches.md": "---\ndescription: batches\n---\nPour déployer, vous devez toujours lancer les tests dans le dossier du lot.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "14-rule-english-only",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "14-rule-size-message",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "src/api/refunds.ts": "export const refund = 1;\n",
+    ".claude/rules/shop-api.md": "---\npaths:\n  - \"src/**/*.ts\"\n---\n- Validate every shop-api request body field number 0 with the schema.\n- Validate every shop-api request body field number 1 with the schema.\n- Validate every shop-api request body field number 2 with the schema.\n- Validate every shop-api request body field number 3 with the schema.\n- Validate every shop-api request body field number 4 with the schema.\n- Validate every shop-api request body field number 5 with the schema.\n- Validate every shop-api request body field number 6 with the schema.\n- Validate every shop-api request body field number 7 with the schema.\n- Validate every shop-api request body field number 8 with the schema.\n- Validate every shop-api request body field number 9 with the schema.\n- Validate every shop-api request body field number 10 with the schema.\n- Validate every shop-api request body field number 11 with the schema.\n- Validate every shop-api request body field number 12 with the schema.\n- Validate every shop-api request body field number 13 with the schema.\n- Validate every shop-api request body field number 14 with the schema.\n- Validate every shop-api request body field number 15 with the schema.\n- Validate every shop-api request body field number 16 with the schema.\n- Validate every shop-api request body field number 17 with the schema.\n- Validate every shop-api request body field number 18 with the schema.\n- Validate every shop-api request body field number 19 with the schema.\n- Validate every shop-api request body field number 20 with the schema.\n- Validate every shop-api request body field number 21 with the schema.\n- Validate every shop-api request body field number 22 with the schema.\n- Validate every shop-api request body field number 23 with the schema.\n- Validate every shop-api request body field number 24 with the schema.\n- Validate every shop-api request body field number 25 with the schema.\n- Validate every shop-api request body field number 26 with the schema.\n- Validate every shop-api request body field number 27 with the schema.\n- Validate every shop-api request body field number 28 with the schema.\n- Validate every shop-api request body field number 29 with the schema.\n- Validate every shop-api request body field number 30 with the schema.\n- Validate every shop-api request body field number 31 with the schema.\n- Validate every shop-api request body field number 32 with the schema.\n- Validate every shop-api request body field number 33 with the schema.\n- Validate every shop-api request body field number 34 with the schema.\n- Validate every shop-api request body field number 35 with the schema.\n- Validate every shop-api request body field number 36 with the schema.\n- Validate every shop-api request body field number 37 with the schema.\n- Validate every shop-api request body field number 38 with the schema.\n- Validate every shop-api request body field number 39 with the schema.\n- Validate every shop-api request body field number 40 with the schema.\n- Validate every shop-api request body field number 41 with the schema.\n- Validate every shop-api request body field number 42 with the schema.\n- Validate every shop-api request body field number 43 with the schema.\n- Validate every shop-api request body field number 44 with the schema.\n- Validate every shop-api request body field number 45 with the schema.\n- Validate every shop-api request body field number 46 with the schema.\n- Validate every shop-api request body field number 47 with the schema.\n- Validate every shop-api request body field number 48 with the schema.\n- Validate every shop-api request body field number 49 with the schema.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "14-rule-size",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "14-rule-size",
+     "Consider converting to a skill"
+    ]
+   ]
+  },
+  {
+   "id": "14-rule-without-paths",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/rules/shop-style.md": "---\ndescription: Shop code style.\n---\n\nUse tabs in shop templates.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "14-rule-no-paths",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "14-scoped-rule-skill-paths",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "src/api/refunds.ts": "export const x = 1;\n",
+    ".claude/rules/api.md": "---\npaths:\n  - \"src/api/**/*.ts\"\n---\n- Refund handler rule 0: validate the amount and the order id.\n- Refund handler rule 1: validate the amount and the order id.\n- Refund handler rule 2: validate the amount and the order id.\n- Refund handler rule 3: validate the amount and the order id.\n- Refund handler rule 4: validate the amount and the order id.\n- Refund handler rule 5: validate the amount and the order id.\n- Refund handler rule 6: validate the amount and the order id.\n- Refund handler rule 7: validate the amount and the order id.\n- Refund handler rule 8: validate the amount and the order id.\n- Refund handler rule 9: validate the amount and the order id.\n- Refund handler rule 10: validate the amount and the order id.\n- Refund handler rule 11: validate the amount and the order id.\n- Refund handler rule 12: validate the amount and the order id.\n- Refund handler rule 13: validate the amount and the order id.\n- Refund handler rule 14: validate the amount and the order id.\n- Refund handler rule 15: validate the amount and the order id.\n- Refund handler rule 16: validate the amount and the order id.\n- Refund handler rule 17: validate the amount and the order id.\n- Refund handler rule 18: validate the amount and the order id.\n- Refund handler rule 19: validate the amount and the order id.\n- Refund handler rule 20: validate the amount and the order id.\n- Refund handler rule 21: validate the amount and the order id.\n- Refund handler rule 22: validate the amount and the order id.\n- Refund handler rule 23: validate the amount and the order id.\n- Refund handler rule 24: validate the amount and the order id.\n- Refund handler rule 25: validate the amount and the order id.\n- Refund handler rule 26: validate the amount and the order id.\n- Refund handler rule 27: validate the amount and the order id.\n- Refund handler rule 28: validate the amount and the order id.\n- Refund handler rule 29: validate the amount and the order id.\n- Refund handler rule 30: validate the amount and the order id.\n- Refund handler rule 31: validate the amount and the order id.\n- Refund handler rule 32: validate the amount and the order id.\n- Refund handler rule 33: validate the amount and the order id.\n- Refund handler rule 34: validate the amount and the order id.\n- Refund handler rule 35: validate the amount and the order id.\n- Refund handler rule 36: validate the amount and the order id.\n- Refund handler rule 37: validate the amount and the order id.\n- Refund handler rule 38: validate the amount and the order id.\n- Refund handler rule 39: validate the amount and the order id.\n- Refund handler rule 40: validate the amount and the order id.\n- Refund handler rule 41: validate the amount and the order id.\n- Refund handler rule 42: validate the amount and the order id.\n- Refund handler rule 43: validate the amount and the order id.\n- Refund handler rule 44: validate the amount and the order id.\n- Refund handler rule 45: validate the amount and the order id.\n- Refund handler rule 46: validate the amount and the order id.\n- Refund handler rule 47: validate the amount and the order id.\n- Refund handler rule 48: validate the amount and the order id.\n- Refund handler rule 49: validate the amount and the order id.\n- Refund handler rule 50: validate the amount and the order id.\n- Refund handler rule 51: validate the amount and the order id.\n- Refund handler rule 52: validate the amount and the order id.\n- Refund handler rule 53: validate the amount and the order id.\n- Refund handler rule 54: validate the amount and the order id.\n- Refund handler rule 55: validate the amount and the order id.\n- Refund handler rule 56: validate the amount and the order id.\n- Refund handler rule 57: validate the amount and the order id.\n- Refund handler rule 58: validate the amount and the order id.\n- Refund handler rule 59: validate the amount and the order id.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "14-rule-size",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "14-rule-size",
+     "loads by its description"
+    ]
+   ]
+  }
+ ]
+}

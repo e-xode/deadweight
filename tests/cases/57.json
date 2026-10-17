@@ -1,0 +1,1047 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "57-compact-only-a-hint",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/rules/api.md": "---\npaths:\n  - \"src/api/**\"\n---\nValidate every request body.\n",
+    ".claude/rules/infra.md": "---\npaths:\n  - \"infra/**\"\n---\nNever touch terraform state.\n",
+    "src/api/CLAUDE.md": "# api\n\nHandlers return typed errors.\n",
+    "src/api/refunds.ts": "export const handler = () => 1;\n",
+    "infra/main.tf": "terraform {}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "57-runtime-rule-unscoped",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "57-runtime-rule-unscoped",
+     "did not read it as path-scoped there"
+    ]
+   ],
+   "runtime": [
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s0",
+     "load_reason": "session_start",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s0",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s1",
+     "load_reason": "session_start",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s1",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s2",
+     "load_reason": "session_start",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s2",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s3",
+     "load_reason": "session_start",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s3",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s4",
+     "load_reason": "session_start",
+     "ts": "2026-09-24T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s4",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-24T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s4",
+     "load_reason": "compact",
+     "ts": "2026-09-24T12:00:00"
+    }
+   ]
+  },
+  {
+   "id": "57-external-symlinked-rule-with-paths",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/rules/api.md": "---\npaths:\n  - \"src/api/**\"\n---\nValidate every request body.\n",
+    ".claude/rules/infra.md": "---\npaths:\n  - \"infra/**\"\n---\nNever touch terraform state.\n",
+    "src/api/CLAUDE.md": "# api\n\nHandlers return typed errors.\n",
+    "src/api/refunds.ts": "export const handler = () => 1;\n",
+    "infra/main.tf": "terraform {}\n",
+    "../shop-shared-rules/security.md": "---\npaths:\n  - \"src/api/**\"\n---\nNever log tokens.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "57-runtime-never-loaded",
+     "NOTICE",
+     2
+    ]
+   ],
+   "links": {
+    ".claude/rules/security.md": "../../../shop-shared-rules/security.md"
+   },
+   "forbidden_messages": [
+    [
+     "57-runtime-never-loaded",
+     "security\\.md.*check that its paths"
+    ]
+   ],
+   "runtime": [
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s0",
+     "load_reason": "session_start",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s0",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s0",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s1",
+     "load_reason": "session_start",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s1",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s1",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s2",
+     "load_reason": "session_start",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s2",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s2",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s3",
+     "load_reason": "session_start",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s3",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s3",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s4",
+     "load_reason": "session_start",
+     "ts": "2026-09-24T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s4",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-24T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s4",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-24T10:00:00"
+    }
+   ]
+  },
+  {
+   "id": "57-nested-claude-md-no-paths",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/rules/api.md": "---\npaths:\n  - \"src/api/**\"\n---\nValidate every request body.\n",
+    ".claude/rules/infra.md": "---\npaths:\n  - \"infra/**\"\n---\nNever touch terraform state.\n",
+    "src/api/CLAUDE.md": "# api\n\nHandlers return typed errors.\n",
+    "src/api/refunds.ts": "export const handler = () => 1;\n",
+    "infra/main.tf": "terraform {}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "57-runtime-never-loaded",
+     "NOTICE",
+     2
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "57-runtime-never-loaded",
+     "nested CLAUDE\\.md.*paths match"
+    ]
+   ],
+   "runtime": [
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s0",
+     "load_reason": "session_start",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s0",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s1",
+     "load_reason": "session_start",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s1",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s2",
+     "load_reason": "session_start",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s2",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s3",
+     "load_reason": "session_start",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s3",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s4",
+     "load_reason": "session_start",
+     "ts": "2026-09-24T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s4",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-24T10:00:00"
+    }
+   ]
+  },
+  {
+   "id": "57-rule-loaded-at-start",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/rules/api.md": "---\npaths:\n  - \"src/api/**\"\n---\nValidate every request body.\n",
+    ".claude/rules/infra.md": "---\npaths:\n  - \"infra/**\"\n---\nNever touch terraform state.\n",
+    "src/api/CLAUDE.md": "# api\n\nHandlers return typed errors.\n",
+    "src/api/refunds.ts": "export const handler = () => 1;\n",
+    "infra/main.tf": "terraform {}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "57-runtime-rule-unscoped",
+     "NOTICE",
+     1
+    ],
+    [
+     "57-runtime-never-loaded",
+     "NOTICE",
+     0
+    ]
+   ],
+   "runtime": [
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s0",
+     "load_reason": "session_start",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s0",
+     "load_reason": "session_start",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": ".claude/rules/infra.md",
+     "session_id": "s0",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s0",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s1",
+     "load_reason": "session_start",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s1",
+     "load_reason": "session_start",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": ".claude/rules/infra.md",
+     "session_id": "s1",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s1",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s2",
+     "load_reason": "session_start",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s2",
+     "load_reason": "session_start",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": ".claude/rules/infra.md",
+     "session_id": "s2",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s2",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s3",
+     "load_reason": "session_start",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s3",
+     "load_reason": "session_start",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": ".claude/rules/infra.md",
+     "session_id": "s3",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s3",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s4",
+     "load_reason": "session_start",
+     "ts": "2026-09-24T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s4",
+     "load_reason": "session_start",
+     "ts": "2026-09-24T10:00:00"
+    },
+    {
+     "file": ".claude/rules/infra.md",
+     "session_id": "s4",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-24T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s4",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-24T10:00:00"
+    }
+   ]
+  },
+  {
+   "id": "57-rule-never-loaded",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/rules/api.md": "---\npaths:\n  - \"src/api/**\"\n---\nValidate every request body.\n",
+    ".claude/rules/infra.md": "---\npaths:\n  - \"infra/**\"\n---\nNever touch terraform state.\n",
+    "src/api/CLAUDE.md": "# api\n\nHandlers return typed errors.\n",
+    "src/api/refunds.ts": "export const handler = () => 1;\n",
+    "infra/main.tf": "terraform {}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "57-runtime-never-loaded",
+     "NOTICE",
+     1
+    ],
+    [
+     "57-runtime-rule-unscoped",
+     "NOTICE",
+     0
+    ],
+    [
+     "57-runtime-log",
+     "INFO",
+     1
+    ],
+    [
+     "22-rule-glob-match",
+     "WARN",
+     0
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "57-runtime-never-loaded",
+     "api\\.md|src/api/CLAUDE"
+    ]
+   ],
+   "runtime": [
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s0",
+     "load_reason": "session_start",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s0",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s0",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s1",
+     "load_reason": "session_start",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s1",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s1",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s2",
+     "load_reason": "session_start",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s2",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s2",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s3",
+     "load_reason": "session_start",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s3",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s3",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s4",
+     "load_reason": "session_start",
+     "ts": "2026-09-24T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s4",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-24T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s4",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-24T10:00:00"
+    }
+   ]
+  },
+  {
+   "id": "57-rule-scoped-afterwards",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/rules/api.md": "---\npaths:\n  - \"src/api/**\"\n---\nValidate every request body.\n",
+    ".claude/rules/infra.md": "---\npaths:\n  - \"infra/**\"\n---\nNever touch terraform state.\n",
+    "src/api/CLAUDE.md": "# api\n\nHandlers return typed errors.\n",
+    "src/api/refunds.ts": "export const handler = () => 1;\n",
+    "infra/main.tf": "terraform {}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "57-runtime-rule-unscoped",
+     "NOTICE",
+     0
+    ],
+    [
+     "57-runtime-never-loaded",
+     "NOTICE",
+     1
+    ],
+    [
+     "57-runtime-log",
+     "INFO",
+     1
+    ]
+   ],
+   "runtime": [
+    {
+     "file": "CLAUDE.md",
+     "session_id": "old",
+     "load_reason": "session_start",
+     "ts": "2026-09-01T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "old",
+     "load_reason": "session_start",
+     "ts": "2026-09-01T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s0",
+     "load_reason": "session_start",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s0",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s0",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s1",
+     "load_reason": "session_start",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s1",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s1",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s2",
+     "load_reason": "session_start",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s2",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s2",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s3",
+     "load_reason": "session_start",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s3",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s3",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s4",
+     "load_reason": "session_start",
+     "ts": "2026-09-24T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s4",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-24T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s4",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-24T10:00:00"
+    }
+   ]
+  },
+  {
+   "id": "57-scoped-rule-reloaded-after-compact",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/rules/api.md": "---\npaths:\n  - \"src/api/**\"\n---\nValidate every request body.\n",
+    ".claude/rules/infra.md": "---\npaths:\n  - \"infra/**\"\n---\nNever touch terraform state.\n",
+    "src/api/CLAUDE.md": "# api\n\nHandlers return typed errors.\n",
+    "src/api/refunds.ts": "export const handler = () => 1;\n",
+    "infra/main.tf": "terraform {}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "57-runtime-rule-unscoped",
+     "NOTICE",
+     1
+    ],
+    [
+     "57-runtime-log",
+     "INFO",
+     1
+    ]
+   ],
+   "runtime": [
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s0",
+     "load_reason": "session_start",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s0",
+     "load_reason": "session_start",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s0",
+     "load_reason": "compact",
+     "ts": "2026-09-20T11:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s0",
+     "load_reason": "compact",
+     "ts": "2026-09-20T11:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s1",
+     "load_reason": "session_start",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s1",
+     "load_reason": "session_start",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s1",
+     "load_reason": "compact",
+     "ts": "2026-09-21T11:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s1",
+     "load_reason": "compact",
+     "ts": "2026-09-21T11:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s2",
+     "load_reason": "session_start",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s2",
+     "load_reason": "session_start",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s2",
+     "load_reason": "compact",
+     "ts": "2026-09-22T11:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s2",
+     "load_reason": "compact",
+     "ts": "2026-09-22T11:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s3",
+     "load_reason": "session_start",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s3",
+     "load_reason": "session_start",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s3",
+     "load_reason": "compact",
+     "ts": "2026-09-23T11:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s3",
+     "load_reason": "compact",
+     "ts": "2026-09-23T11:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s4",
+     "load_reason": "session_start",
+     "ts": "2026-09-24T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s4",
+     "load_reason": "session_start",
+     "ts": "2026-09-24T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s4",
+     "load_reason": "compact",
+     "ts": "2026-09-24T11:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s4",
+     "load_reason": "compact",
+     "ts": "2026-09-24T11:00:00"
+    }
+   ]
+  },
+  {
+   "id": "57-sessions-from-another-repo",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/rules/api.md": "---\npaths:\n  - \"src/api/**\"\n---\nValidate every request body.\n",
+    ".claude/rules/infra.md": "---\npaths:\n  - \"infra/**\"\n---\nNever touch terraform state.\n",
+    "src/api/CLAUDE.md": "# api\n\nHandlers return typed errors.\n",
+    "src/api/refunds.ts": "export const handler = () => 1;\n",
+    "infra/main.tf": "terraform {}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "57-runtime-log",
+     "INFO",
+     2
+    ]
+   ],
+   "runtime": [
+    {
+     "file": "../shop-api-clone/CLAUDE.md",
+     "session_id": "o0",
+     "load_reason": "session_start",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": "../shop-api-clone/CLAUDE.md",
+     "session_id": "o1",
+     "load_reason": "session_start",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": "../shop-api-clone/CLAUDE.md",
+     "session_id": "o2",
+     "load_reason": "session_start",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": "../shop-api-clone/CLAUDE.md",
+     "session_id": "o3",
+     "load_reason": "session_start",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": "../shop-api-clone/CLAUDE.md",
+     "session_id": "o4",
+     "load_reason": "session_start",
+     "ts": "2026-09-24T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s0",
+     "load_reason": "session_start",
+     "ts": "2026-09-28T10:00:00"
+    }
+   ]
+  },
+  {
+   "id": "57-too-few-sessions",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/rules/api.md": "---\npaths:\n  - \"src/api/**\"\n---\nValidate every request body.\n",
+    ".claude/rules/infra.md": "---\npaths:\n  - \"infra/**\"\n---\nNever touch terraform state.\n",
+    "src/api/CLAUDE.md": "# api\n\nHandlers return typed errors.\n",
+    "src/api/refunds.ts": "export const handler = () => 1;\n",
+    "infra/main.tf": "terraform {}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "57-runtime-never-loaded",
+     "NOTICE",
+     0
+    ],
+    [
+     "57-runtime-log",
+     "INFO",
+     2
+    ]
+   ],
+   "runtime": [
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s0",
+     "load_reason": "session_start",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s0",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s0",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-20T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s1",
+     "load_reason": "session_start",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s1",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s1",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-21T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s2",
+     "load_reason": "session_start",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s2",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s2",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-22T10:00:00"
+    },
+    {
+     "file": "CLAUDE.md",
+     "session_id": "s3",
+     "load_reason": "session_start",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": ".claude/rules/api.md",
+     "session_id": "s3",
+     "load_reason": "path_glob_match",
+     "ts": "2026-09-23T10:00:00"
+    },
+    {
+     "file": "src/api/CLAUDE.md",
+     "session_id": "s3",
+     "load_reason": "nested_traversal",
+     "ts": "2026-09-23T10:00:00"
+    }
+   ]
+  },
+  {
+   "id": "57-without-log",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/rules/api.md": "---\npaths:\n  - \"src/api/**\"\n---\nValidate every request body.\n",
+    ".claude/rules/infra.md": "---\npaths:\n  - \"infra/**\"\n---\nNever touch terraform state.\n",
+    "src/api/CLAUDE.md": "# api\n\nHandlers return typed errors.\n",
+    "src/api/refunds.ts": "export const handler = () => 1;\n",
+    "infra/main.tf": "terraform {}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "57-runtime-log",
+     "INFO",
+     0
+    ],
+    [
+     "57-runtime-never-loaded",
+     "NOTICE",
+     0
+    ],
+    [
+     "57-runtime-rule-unscoped",
+     "NOTICE",
+     0
+    ]
+   ]
+  }
+ ]
+}

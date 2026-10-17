@@ -1,0 +1,448 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "01-agents-md-claude-local",
+   "files": {
+    "AGENTS.md": "# Shop agents\n\nRun `npm test` before every commit.\n",
+    "CLAUDE.local.md": "# Mine\n\nUse the staging database.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-agents-md-unread",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "01-agents-md-claude-local-imports",
+   "files": {
+    "AGENTS.md": "# Shop agents\n\nRun `npm test` before every commit.\n",
+    "CLAUDE.local.md": "@AGENTS.md\n\nUse the staging database.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-agents-md-unread",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "01-agents-md-dot-claude",
+   "files": {
+    "AGENTS.md": "# Shop agents\n\nRun `npm test` before every commit.\n",
+    ".claude/CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-agents-md-unread",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "01-agents-md-dot-slash-import",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\n@./AGENTS.md\n",
+    "AGENTS.md": "# shop-api\n\nRun `make test`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-agents-md-unread",
+     "WARN",
+     0
+    ],
+    [
+     "01-claude-md-size",
+     "OK",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "01-agents-md-import-misresolved",
+   "files": {
+    ".claude/CLAUDE.md": "# shop-api\n\n@AGENTS.md\n",
+    "AGENTS.md": "# shop-api\n\nRun `make test`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-agents-md-unread",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "01-agents-md-in-backticks",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nSee `@AGENTS.md` for the shared rules.\n",
+    "AGENTS.md": "# shop-api\n\nRun `make test`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-agents-md-unread",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "01-agents-md-named-in-prose",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRead AGENTS.md first.\n",
+    "AGENTS.md": "# Agents\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-agents-md-unread",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "01-agents-md-relative-import",
+   "files": {
+    ".claude/CLAUDE.md": "# shop-api\n\n@../AGENTS.md\n",
+    "AGENTS.md": "# shop-api\n\nRun `make test`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-agents-md-unread",
+     "WARN",
+     0
+    ],
+    [
+     "01-claude-md-size",
+     "OK",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "01-agents-md-symlink",
+   "files": {
+    "AGENTS.md": "# shop-api\n\nRun `make test` before any change.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-agents-md-unread",
+     "WARN",
+     0
+    ]
+   ],
+   "links": {
+    "CLAUDE.md": "AGENTS.md"
+   }
+  },
+  {
+   "id": "01-claude-local-md-in-dot-claude",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/claude.local.md": "Use the staging database.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-case",
+     "WARN",
+     0
+    ],
+    [
+     "01-claude-md-size",
+     "OK",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "01-claude-local-not-ignored",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "CLAUDE.local.md": "# mine\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-local",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "01-claude-md-exact-case",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-case",
+     "WARN",
+     0
+    ],
+    [
+     "01-claude-md-size",
+     "OK",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "01-claude-md-in-two-cases",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "claude.md": "# shop-api\n\nRun `make test` before any change.\nOld rule.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-case",
+     "WARN",
+     1
+    ]
+   ],
+   "case_sensitive_fs": true
+  },
+  {
+   "id": "01-claude-md-lines-dot-claude-long",
+   "files": {
+    "CLAUDE.md": "# shop-api\n",
+    ".claude/CLAUDE.md": "- Rule 0: keep shop handlers typed.\n- Rule 1: keep shop handlers typed.\n- Rule 2: keep shop handlers typed.\n- Rule 3: keep shop handlers typed.\n- Rule 4: keep shop handlers typed.\n- Rule 5: keep shop handlers typed.\n- Rule 6: keep shop handlers typed.\n- Rule 7: keep shop handlers typed.\n- Rule 8: keep shop handlers typed.\n- Rule 9: keep shop handlers typed.\n- Rule 10: keep shop handlers typed.\n- Rule 11: keep shop handlers typed.\n- Rule 12: keep shop handlers typed.\n- Rule 13: keep shop handlers typed.\n- Rule 14: keep shop handlers typed.\n- Rule 15: keep shop handlers typed.\n- Rule 16: keep shop handlers typed.\n- Rule 17: keep shop handlers typed.\n- Rule 18: keep shop handlers typed.\n- Rule 19: keep shop handlers typed.\n- Rule 20: keep shop handlers typed.\n- Rule 21: keep shop handlers typed.\n- Rule 22: keep shop handlers typed.\n- Rule 23: keep shop handlers typed.\n- Rule 24: keep shop handlers typed.\n- Rule 25: keep shop handlers typed.\n- Rule 26: keep shop handlers typed.\n- Rule 27: keep shop handlers typed.\n- Rule 28: keep shop handlers typed.\n- Rule 29: keep shop handlers typed.\n- Rule 30: keep shop handlers typed.\n- Rule 31: keep shop handlers typed.\n- Rule 32: keep shop handlers typed.\n- Rule 33: keep shop handlers typed.\n- Rule 34: keep shop handlers typed.\n- Rule 35: keep shop handlers typed.\n- Rule 36: keep shop handlers typed.\n- Rule 37: keep shop handlers typed.\n- Rule 38: keep shop handlers typed.\n- Rule 39: keep shop handlers typed.\n- Rule 40: keep shop handlers typed.\n- Rule 41: keep shop handlers typed.\n- Rule 42: keep shop handlers typed.\n- Rule 43: keep shop handlers typed.\n- Rule 44: keep shop handlers typed.\n- Rule 45: keep shop handlers typed.\n- Rule 46: keep shop handlers typed.\n- Rule 47: keep shop handlers typed.\n- Rule 48: keep shop handlers typed.\n- Rule 49: keep shop handlers typed.\n- Rule 50: keep shop handlers typed.\n- Rule 51: keep shop handlers typed.\n- Rule 52: keep shop handlers typed.\n- Rule 53: keep shop handlers typed.\n- Rule 54: keep shop handlers typed.\n- Rule 55: keep shop handlers typed.\n- Rule 56: keep shop handlers typed.\n- Rule 57: keep shop handlers typed.\n- Rule 58: keep shop handlers typed.\n- Rule 59: keep shop handlers typed.\n- Rule 60: keep shop handlers typed.\n- Rule 61: keep shop handlers typed.\n- Rule 62: keep shop handlers typed.\n- Rule 63: keep shop handlers typed.\n- Rule 64: keep shop handlers typed.\n- Rule 65: keep shop handlers typed.\n- Rule 66: keep shop handlers typed.\n- Rule 67: keep shop handlers typed.\n- Rule 68: keep shop handlers typed.\n- Rule 69: keep shop handlers typed.\n- Rule 70: keep shop handlers typed.\n- Rule 71: keep shop handlers typed.\n- Rule 72: keep shop handlers typed.\n- Rule 73: keep shop handlers typed.\n- Rule 74: keep shop handlers typed.\n- Rule 75: keep shop handlers typed.\n- Rule 76: keep shop handlers typed.\n- Rule 77: keep shop handlers typed.\n- Rule 78: keep shop handlers typed.\n- Rule 79: keep shop handlers typed.\n- Rule 80: keep shop handlers typed.\n- Rule 81: keep shop handlers typed.\n- Rule 82: keep shop handlers typed.\n- Rule 83: keep shop handlers typed.\n- Rule 84: keep shop handlers typed.\n- Rule 85: keep shop handlers typed.\n- Rule 86: keep shop handlers typed.\n- Rule 87: keep shop handlers typed.\n- Rule 88: keep shop handlers typed.\n- Rule 89: keep shop handlers typed.\n- Rule 90: keep shop handlers typed.\n- Rule 91: keep shop handlers typed.\n- Rule 92: keep shop handlers typed.\n- Rule 93: keep shop handlers typed.\n- Rule 94: keep shop handlers typed.\n- Rule 95: keep shop handlers typed.\n- Rule 96: keep shop handlers typed.\n- Rule 97: keep shop handlers typed.\n- Rule 98: keep shop handlers typed.\n- Rule 99: keep shop handlers typed.\n- Rule 100: keep shop handlers typed.\n- Rule 101: keep shop handlers typed.\n- Rule 102: keep shop handlers typed.\n- Rule 103: keep shop handlers typed.\n- Rule 104: keep shop handlers typed.\n- Rule 105: keep shop handlers typed.\n- Rule 106: keep shop handlers typed.\n- Rule 107: keep shop handlers typed.\n- Rule 108: keep shop handlers typed.\n- Rule 109: keep shop handlers typed.\n- Rule 110: keep shop handlers typed.\n- Rule 111: keep shop handlers typed.\n- Rule 112: keep shop handlers typed.\n- Rule 113: keep shop handlers typed.\n- Rule 114: keep shop handlers typed.\n- Rule 115: keep shop handlers typed.\n- Rule 116: keep shop handlers typed.\n- Rule 117: keep shop handlers typed.\n- Rule 118: keep shop handlers typed.\n- Rule 119: keep shop handlers typed.\n- Rule 120: keep shop handlers typed.\n- Rule 121: keep shop handlers typed.\n- Rule 122: keep shop handlers typed.\n- Rule 123: keep shop handlers typed.\n- Rule 124: keep shop handlers typed.\n- Rule 125: keep shop handlers typed.\n- Rule 126: keep shop handlers typed.\n- Rule 127: keep shop handlers typed.\n- Rule 128: keep shop handlers typed.\n- Rule 129: keep shop handlers typed.\n- Rule 130: keep shop handlers typed.\n- Rule 131: keep shop handlers typed.\n- Rule 132: keep shop handlers typed.\n- Rule 133: keep shop handlers typed.\n- Rule 134: keep shop handlers typed.\n- Rule 135: keep shop handlers typed.\n- Rule 136: keep shop handlers typed.\n- Rule 137: keep shop handlers typed.\n- Rule 138: keep shop handlers typed.\n- Rule 139: keep shop handlers typed.\n- Rule 140: keep shop handlers typed.\n- Rule 141: keep shop handlers typed.\n- Rule 142: keep shop handlers typed.\n- Rule 143: keep shop handlers typed.\n- Rule 144: keep shop handlers typed.\n- Rule 145: keep shop handlers typed.\n- Rule 146: keep shop handlers typed.\n- Rule 147: keep shop handlers typed.\n- Rule 148: keep shop handlers typed.\n- Rule 149: keep shop handlers typed.\n- Rule 150: keep shop handlers typed.\n- Rule 151: keep shop handlers typed.\n- Rule 152: keep shop handlers typed.\n- Rule 153: keep shop handlers typed.\n- Rule 154: keep shop handlers typed.\n- Rule 155: keep shop handlers typed.\n- Rule 156: keep shop handlers typed.\n- Rule 157: keep shop handlers typed.\n- Rule 158: keep shop handlers typed.\n- Rule 159: keep shop handlers typed.\n- Rule 160: keep shop handlers typed.\n- Rule 161: keep shop handlers typed.\n- Rule 162: keep shop handlers typed.\n- Rule 163: keep shop handlers typed.\n- Rule 164: keep shop handlers typed.\n- Rule 165: keep shop handlers typed.\n- Rule 166: keep shop handlers typed.\n- Rule 167: keep shop handlers typed.\n- Rule 168: keep shop handlers typed.\n- Rule 169: keep shop handlers typed.\n- Rule 170: keep shop handlers typed.\n- Rule 171: keep shop handlers typed.\n- Rule 172: keep shop handlers typed.\n- Rule 173: keep shop handlers typed.\n- Rule 174: keep shop handlers typed.\n- Rule 175: keep shop handlers typed.\n- Rule 176: keep shop handlers typed.\n- Rule 177: keep shop handlers typed.\n- Rule 178: keep shop handlers typed.\n- Rule 179: keep shop handlers typed.\n- Rule 180: keep shop handlers typed.\n- Rule 181: keep shop handlers typed.\n- Rule 182: keep shop handlers typed.\n- Rule 183: keep shop handlers typed.\n- Rule 184: keep shop handlers typed.\n- Rule 185: keep shop handlers typed.\n- Rule 186: keep shop handlers typed.\n- Rule 187: keep shop handlers typed.\n- Rule 188: keep shop handlers typed.\n- Rule 189: keep shop handlers typed.\n- Rule 190: keep shop handlers typed.\n- Rule 191: keep shop handlers typed.\n- Rule 192: keep shop handlers typed.\n- Rule 193: keep shop handlers typed.\n- Rule 194: keep shop handlers typed.\n- Rule 195: keep shop handlers typed.\n- Rule 196: keep shop handlers typed.\n- Rule 197: keep shop handlers typed.\n- Rule 198: keep shop handlers typed.\n- Rule 199: keep shop handlers typed.\n- Rule 200: keep shop handlers typed.\n- Rule 201: keep shop handlers typed.\n- Rule 202: keep shop handlers typed.\n- Rule 203: keep shop handlers typed.\n- Rule 204: keep shop handlers typed.\n- Rule 205: keep shop handlers typed.\n- Rule 206: keep shop handlers typed.\n- Rule 207: keep shop handlers typed.\n- Rule 208: keep shop handlers typed.\n- Rule 209: keep shop handlers typed.\n- Rule 210: keep shop handlers typed.\n- Rule 211: keep shop handlers typed.\n- Rule 212: keep shop handlers typed.\n- Rule 213: keep shop handlers typed.\n- Rule 214: keep shop handlers typed.\n- Rule 215: keep shop handlers typed.\n- Rule 216: keep shop handlers typed.\n- Rule 217: keep shop handlers typed.\n- Rule 218: keep shop handlers typed.\n- Rule 219: keep shop handlers typed.\n- Rule 220: keep shop handlers typed.\n- Rule 221: keep shop handlers typed.\n- Rule 222: keep shop handlers typed.\n- Rule 223: keep shop handlers typed.\n- Rule 224: keep shop handlers typed.\n- Rule 225: keep shop handlers typed.\n- Rule 226: keep shop handlers typed.\n- Rule 227: keep shop handlers typed.\n- Rule 228: keep shop handlers typed.\n- Rule 229: keep shop handlers typed.\n- Rule 230: keep shop handlers typed.\n- Rule 231: keep shop handlers typed.\n- Rule 232: keep shop handlers typed.\n- Rule 233: keep shop handlers typed.\n- Rule 234: keep shop handlers typed.\n- Rule 235: keep shop handlers typed.\n- Rule 236: keep shop handlers typed.\n- Rule 237: keep shop handlers typed.\n- Rule 238: keep shop handlers typed.\n- Rule 239: keep shop handlers typed.\n- Rule 240: keep shop handlers typed.\n- Rule 241: keep shop handlers typed.\n- Rule 242: keep shop handlers typed.\n- Rule 243: keep shop handlers typed.\n- Rule 244: keep shop handlers typed.\n- Rule 245: keep shop handlers typed.\n- Rule 246: keep shop handlers typed.\n- Rule 247: keep shop handlers typed.\n- Rule 248: keep shop handlers typed.\n- Rule 249: keep shop handlers typed.\n- Rule 250: keep shop handlers typed.\n- Rule 251: keep shop handlers typed.\n- Rule 252: keep shop handlers typed.\n- Rule 253: keep shop handlers typed.\n- Rule 254: keep shop handlers typed.\n- Rule 255: keep shop handlers typed.\n- Rule 256: keep shop handlers typed.\n- Rule 257: keep shop handlers typed.\n- Rule 258: keep shop handlers typed.\n- Rule 259: keep shop handlers typed.\n- Rule 260: keep shop handlers typed.\n- Rule 261: keep shop handlers typed.\n- Rule 262: keep shop handlers typed.\n- Rule 263: keep shop handlers typed.\n- Rule 264: keep shop handlers typed.\n- Rule 265: keep shop handlers typed.\n- Rule 266: keep shop handlers typed.\n- Rule 267: keep shop handlers typed.\n- Rule 268: keep shop handlers typed.\n- Rule 269: keep shop handlers typed.\n- Rule 270: keep shop handlers typed.\n- Rule 271: keep shop handlers typed.\n- Rule 272: keep shop handlers typed.\n- Rule 273: keep shop handlers typed.\n- Rule 274: keep shop handlers typed.\n- Rule 275: keep shop handlers typed.\n- Rule 276: keep shop handlers typed.\n- Rule 277: keep shop handlers typed.\n- Rule 278: keep shop handlers typed.\n- Rule 279: keep shop handlers typed.\n- Rule 280: keep shop handlers typed.\n- Rule 281: keep shop handlers typed.\n- Rule 282: keep shop handlers typed.\n- Rule 283: keep shop handlers typed.\n- Rule 284: keep shop handlers typed.\n- Rule 285: keep shop handlers typed.\n- Rule 286: keep shop handlers typed.\n- Rule 287: keep shop handlers typed.\n- Rule 288: keep shop handlers typed.\n- Rule 289: keep shop handlers typed.\n- Rule 290: keep shop handlers typed.\n- Rule 291: keep shop handlers typed.\n- Rule 292: keep shop handlers typed.\n- Rule 293: keep shop handlers typed.\n- Rule 294: keep shop handlers typed.\n- Rule 295: keep shop handlers typed.\n- Rule 296: keep shop handlers typed.\n- Rule 297: keep shop handlers typed.\n- Rule 298: keep shop handlers typed.\n- Rule 299: keep shop handlers typed.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-lines",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "01-claude-md-lines-local-long",
+   "files": {
+    "CLAUDE.md": "# shop-api\n",
+    "CLAUDE.local.md": "- Note 0: local shop sandbox.\n- Note 1: local shop sandbox.\n- Note 2: local shop sandbox.\n- Note 3: local shop sandbox.\n- Note 4: local shop sandbox.\n- Note 5: local shop sandbox.\n- Note 6: local shop sandbox.\n- Note 7: local shop sandbox.\n- Note 8: local shop sandbox.\n- Note 9: local shop sandbox.\n- Note 10: local shop sandbox.\n- Note 11: local shop sandbox.\n- Note 12: local shop sandbox.\n- Note 13: local shop sandbox.\n- Note 14: local shop sandbox.\n- Note 15: local shop sandbox.\n- Note 16: local shop sandbox.\n- Note 17: local shop sandbox.\n- Note 18: local shop sandbox.\n- Note 19: local shop sandbox.\n- Note 20: local shop sandbox.\n- Note 21: local shop sandbox.\n- Note 22: local shop sandbox.\n- Note 23: local shop sandbox.\n- Note 24: local shop sandbox.\n- Note 25: local shop sandbox.\n- Note 26: local shop sandbox.\n- Note 27: local shop sandbox.\n- Note 28: local shop sandbox.\n- Note 29: local shop sandbox.\n- Note 30: local shop sandbox.\n- Note 31: local shop sandbox.\n- Note 32: local shop sandbox.\n- Note 33: local shop sandbox.\n- Note 34: local shop sandbox.\n- Note 35: local shop sandbox.\n- Note 36: local shop sandbox.\n- Note 37: local shop sandbox.\n- Note 38: local shop sandbox.\n- Note 39: local shop sandbox.\n- Note 40: local shop sandbox.\n- Note 41: local shop sandbox.\n- Note 42: local shop sandbox.\n- Note 43: local shop sandbox.\n- Note 44: local shop sandbox.\n- Note 45: local shop sandbox.\n- Note 46: local shop sandbox.\n- Note 47: local shop sandbox.\n- Note 48: local shop sandbox.\n- Note 49: local shop sandbox.\n- Note 50: local shop sandbox.\n- Note 51: local shop sandbox.\n- Note 52: local shop sandbox.\n- Note 53: local shop sandbox.\n- Note 54: local shop sandbox.\n- Note 55: local shop sandbox.\n- Note 56: local shop sandbox.\n- Note 57: local shop sandbox.\n- Note 58: local shop sandbox.\n- Note 59: local shop sandbox.\n- Note 60: local shop sandbox.\n- Note 61: local shop sandbox.\n- Note 62: local shop sandbox.\n- Note 63: local shop sandbox.\n- Note 64: local shop sandbox.\n- Note 65: local shop sandbox.\n- Note 66: local shop sandbox.\n- Note 67: local shop sandbox.\n- Note 68: local shop sandbox.\n- Note 69: local shop sandbox.\n- Note 70: local shop sandbox.\n- Note 71: local shop sandbox.\n- Note 72: local shop sandbox.\n- Note 73: local shop sandbox.\n- Note 74: local shop sandbox.\n- Note 75: local shop sandbox.\n- Note 76: local shop sandbox.\n- Note 77: local shop sandbox.\n- Note 78: local shop sandbox.\n- Note 79: local shop sandbox.\n- Note 80: local shop sandbox.\n- Note 81: local shop sandbox.\n- Note 82: local shop sandbox.\n- Note 83: local shop sandbox.\n- Note 84: local shop sandbox.\n- Note 85: local shop sandbox.\n- Note 86: local shop sandbox.\n- Note 87: local shop sandbox.\n- Note 88: local shop sandbox.\n- Note 89: local shop sandbox.\n- Note 90: local shop sandbox.\n- Note 91: local shop sandbox.\n- Note 92: local shop sandbox.\n- Note 93: local shop sandbox.\n- Note 94: local shop sandbox.\n- Note 95: local shop sandbox.\n- Note 96: local shop sandbox.\n- Note 97: local shop sandbox.\n- Note 98: local shop sandbox.\n- Note 99: local shop sandbox.\n- Note 100: local shop sandbox.\n- Note 101: local shop sandbox.\n- Note 102: local shop sandbox.\n- Note 103: local shop sandbox.\n- Note 104: local shop sandbox.\n- Note 105: local shop sandbox.\n- Note 106: local shop sandbox.\n- Note 107: local shop sandbox.\n- Note 108: local shop sandbox.\n- Note 109: local shop sandbox.\n- Note 110: local shop sandbox.\n- Note 111: local shop sandbox.\n- Note 112: local shop sandbox.\n- Note 113: local shop sandbox.\n- Note 114: local shop sandbox.\n- Note 115: local shop sandbox.\n- Note 116: local shop sandbox.\n- Note 117: local shop sandbox.\n- Note 118: local shop sandbox.\n- Note 119: local shop sandbox.\n- Note 120: local shop sandbox.\n- Note 121: local shop sandbox.\n- Note 122: local shop sandbox.\n- Note 123: local shop sandbox.\n- Note 124: local shop sandbox.\n- Note 125: local shop sandbox.\n- Note 126: local shop sandbox.\n- Note 127: local shop sandbox.\n- Note 128: local shop sandbox.\n- Note 129: local shop sandbox.\n- Note 130: local shop sandbox.\n- Note 131: local shop sandbox.\n- Note 132: local shop sandbox.\n- Note 133: local shop sandbox.\n- Note 134: local shop sandbox.\n- Note 135: local shop sandbox.\n- Note 136: local shop sandbox.\n- Note 137: local shop sandbox.\n- Note 138: local shop sandbox.\n- Note 139: local shop sandbox.\n- Note 140: local shop sandbox.\n- Note 141: local shop sandbox.\n- Note 142: local shop sandbox.\n- Note 143: local shop sandbox.\n- Note 144: local shop sandbox.\n- Note 145: local shop sandbox.\n- Note 146: local shop sandbox.\n- Note 147: local shop sandbox.\n- Note 148: local shop sandbox.\n- Note 149: local shop sandbox.\n- Note 150: local shop sandbox.\n- Note 151: local shop sandbox.\n- Note 152: local shop sandbox.\n- Note 153: local shop sandbox.\n- Note 154: local shop sandbox.\n- Note 155: local shop sandbox.\n- Note 156: local shop sandbox.\n- Note 157: local shop sandbox.\n- Note 158: local shop sandbox.\n- Note 159: local shop sandbox.\n- Note 160: local shop sandbox.\n- Note 161: local shop sandbox.\n- Note 162: local shop sandbox.\n- Note 163: local shop sandbox.\n- Note 164: local shop sandbox.\n- Note 165: local shop sandbox.\n- Note 166: local shop sandbox.\n- Note 167: local shop sandbox.\n- Note 168: local shop sandbox.\n- Note 169: local shop sandbox.\n- Note 170: local shop sandbox.\n- Note 171: local shop sandbox.\n- Note 172: local shop sandbox.\n- Note 173: local shop sandbox.\n- Note 174: local shop sandbox.\n- Note 175: local shop sandbox.\n- Note 176: local shop sandbox.\n- Note 177: local shop sandbox.\n- Note 178: local shop sandbox.\n- Note 179: local shop sandbox.\n- Note 180: local shop sandbox.\n- Note 181: local shop sandbox.\n- Note 182: local shop sandbox.\n- Note 183: local shop sandbox.\n- Note 184: local shop sandbox.\n- Note 185: local shop sandbox.\n- Note 186: local shop sandbox.\n- Note 187: local shop sandbox.\n- Note 188: local shop sandbox.\n- Note 189: local shop sandbox.\n- Note 190: local shop sandbox.\n- Note 191: local shop sandbox.\n- Note 192: local shop sandbox.\n- Note 193: local shop sandbox.\n- Note 194: local shop sandbox.\n- Note 195: local shop sandbox.\n- Note 196: local shop sandbox.\n- Note 197: local shop sandbox.\n- Note 198: local shop sandbox.\n- Note 199: local shop sandbox.\n- Note 200: local shop sandbox.\n- Note 201: local shop sandbox.\n- Note 202: local shop sandbox.\n- Note 203: local shop sandbox.\n- Note 204: local shop sandbox.\n- Note 205: local shop sandbox.\n- Note 206: local shop sandbox.\n- Note 207: local shop sandbox.\n- Note 208: local shop sandbox.\n- Note 209: local shop sandbox.\n- Note 210: local shop sandbox.\n- Note 211: local shop sandbox.\n- Note 212: local shop sandbox.\n- Note 213: local shop sandbox.\n- Note 214: local shop sandbox.\n- Note 215: local shop sandbox.\n- Note 216: local shop sandbox.\n- Note 217: local shop sandbox.\n- Note 218: local shop sandbox.\n- Note 219: local shop sandbox.\n- Note 220: local shop sandbox.\n- Note 221: local shop sandbox.\n- Note 222: local shop sandbox.\n- Note 223: local shop sandbox.\n- Note 224: local shop sandbox.\n- Note 225: local shop sandbox.\n- Note 226: local shop sandbox.\n- Note 227: local shop sandbox.\n- Note 228: local shop sandbox.\n- Note 229: local shop sandbox.\n- Note 230: local shop sandbox.\n- Note 231: local shop sandbox.\n- Note 232: local shop sandbox.\n- Note 233: local shop sandbox.\n- Note 234: local shop sandbox.\n- Note 235: local shop sandbox.\n- Note 236: local shop sandbox.\n- Note 237: local shop sandbox.\n- Note 238: local shop sandbox.\n- Note 239: local shop sandbox.\n- Note 240: local shop sandbox.\n- Note 241: local shop sandbox.\n- Note 242: local shop sandbox.\n- Note 243: local shop sandbox.\n- Note 244: local shop sandbox.\n- Note 245: local shop sandbox.\n- Note 246: local shop sandbox.\n- Note 247: local shop sandbox.\n- Note 248: local shop sandbox.\n- Note 249: local shop sandbox.\n- Note 250: local shop sandbox.\n- Note 251: local shop sandbox.\n- Note 252: local shop sandbox.\n- Note 253: local shop sandbox.\n- Note 254: local shop sandbox.\n- Note 255: local shop sandbox.\n- Note 256: local shop sandbox.\n- Note 257: local shop sandbox.\n- Note 258: local shop sandbox.\n- Note 259: local shop sandbox.\n- Note 260: local shop sandbox.\n- Note 261: local shop sandbox.\n- Note 262: local shop sandbox.\n- Note 263: local shop sandbox.\n- Note 264: local shop sandbox.\n- Note 265: local shop sandbox.\n- Note 266: local shop sandbox.\n- Note 267: local shop sandbox.\n- Note 268: local shop sandbox.\n- Note 269: local shop sandbox.\n- Note 270: local shop sandbox.\n- Note 271: local shop sandbox.\n- Note 272: local shop sandbox.\n- Note 273: local shop sandbox.\n- Note 274: local shop sandbox.\n- Note 275: local shop sandbox.\n- Note 276: local shop sandbox.\n- Note 277: local shop sandbox.\n- Note 278: local shop sandbox.\n- Note 279: local shop sandbox.\n- Note 280: local shop sandbox.\n- Note 281: local shop sandbox.\n- Note 282: local shop sandbox.\n- Note 283: local shop sandbox.\n- Note 284: local shop sandbox.\n- Note 285: local shop sandbox.\n- Note 286: local shop sandbox.\n- Note 287: local shop sandbox.\n- Note 288: local shop sandbox.\n- Note 289: local shop sandbox.\n- Note 290: local shop sandbox.\n- Note 291: local shop sandbox.\n- Note 292: local shop sandbox.\n- Note 293: local shop sandbox.\n- Note 294: local shop sandbox.\n- Note 295: local shop sandbox.\n- Note 296: local shop sandbox.\n- Note 297: local shop sandbox.\n- Note 298: local shop sandbox.\n- Note 299: local shop sandbox.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-lines",
+     "WARN",
+     1
+    ]
+   ],
+   "gitignore": "CLAUDE.local.md\n"
+  },
+  {
+   "id": "01-claude-md-linked-once",
+   "files": {
+    "CLAUDE.md": "- Rule 0: keep shop handlers typed.\n- Rule 1: keep shop handlers typed.\n- Rule 2: keep shop handlers typed.\n- Rule 3: keep shop handlers typed.\n- Rule 4: keep shop handlers typed.\n- Rule 5: keep shop handlers typed.\n- Rule 6: keep shop handlers typed.\n- Rule 7: keep shop handlers typed.\n- Rule 8: keep shop handlers typed.\n- Rule 9: keep shop handlers typed.\n- Rule 10: keep shop handlers typed.\n- Rule 11: keep shop handlers typed.\n- Rule 12: keep shop handlers typed.\n- Rule 13: keep shop handlers typed.\n- Rule 14: keep shop handlers typed.\n- Rule 15: keep shop handlers typed.\n- Rule 16: keep shop handlers typed.\n- Rule 17: keep shop handlers typed.\n- Rule 18: keep shop handlers typed.\n- Rule 19: keep shop handlers typed.\n- Rule 20: keep shop handlers typed.\n- Rule 21: keep shop handlers typed.\n- Rule 22: keep shop handlers typed.\n- Rule 23: keep shop handlers typed.\n- Rule 24: keep shop handlers typed.\n- Rule 25: keep shop handlers typed.\n- Rule 26: keep shop handlers typed.\n- Rule 27: keep shop handlers typed.\n- Rule 28: keep shop handlers typed.\n- Rule 29: keep shop handlers typed.\n- Rule 30: keep shop handlers typed.\n- Rule 31: keep shop handlers typed.\n- Rule 32: keep shop handlers typed.\n- Rule 33: keep shop handlers typed.\n- Rule 34: keep shop handlers typed.\n- Rule 35: keep shop handlers typed.\n- Rule 36: keep shop handlers typed.\n- Rule 37: keep shop handlers typed.\n- Rule 38: keep shop handlers typed.\n- Rule 39: keep shop handlers typed.\n- Rule 40: keep shop handlers typed.\n- Rule 41: keep shop handlers typed.\n- Rule 42: keep shop handlers typed.\n- Rule 43: keep shop handlers typed.\n- Rule 44: keep shop handlers typed.\n- Rule 45: keep shop handlers typed.\n- Rule 46: keep shop handlers typed.\n- Rule 47: keep shop handlers typed.\n- Rule 48: keep shop handlers typed.\n- Rule 49: keep shop handlers typed.\n- Rule 50: keep shop handlers typed.\n- Rule 51: keep shop handlers typed.\n- Rule 52: keep shop handlers typed.\n- Rule 53: keep shop handlers typed.\n- Rule 54: keep shop handlers typed.\n- Rule 55: keep shop handlers typed.\n- Rule 56: keep shop handlers typed.\n- Rule 57: keep shop handlers typed.\n- Rule 58: keep shop handlers typed.\n- Rule 59: keep shop handlers typed.\n- Rule 60: keep shop handlers typed.\n- Rule 61: keep shop handlers typed.\n- Rule 62: keep shop handlers typed.\n- Rule 63: keep shop handlers typed.\n- Rule 64: keep shop handlers typed.\n- Rule 65: keep shop handlers typed.\n- Rule 66: keep shop handlers typed.\n- Rule 67: keep shop handlers typed.\n- Rule 68: keep shop handlers typed.\n- Rule 69: keep shop handlers typed.\n- Rule 70: keep shop handlers typed.\n- Rule 71: keep shop handlers typed.\n- Rule 72: keep shop handlers typed.\n- Rule 73: keep shop handlers typed.\n- Rule 74: keep shop handlers typed.\n- Rule 75: keep shop handlers typed.\n- Rule 76: keep shop handlers typed.\n- Rule 77: keep shop handlers typed.\n- Rule 78: keep shop handlers typed.\n- Rule 79: keep shop handlers typed.\n- Rule 80: keep shop handlers typed.\n- Rule 81: keep shop handlers typed.\n- Rule 82: keep shop handlers typed.\n- Rule 83: keep shop handlers typed.\n- Rule 84: keep shop handlers typed.\n- Rule 85: keep shop handlers typed.\n- Rule 86: keep shop handlers typed.\n- Rule 87: keep shop handlers typed.\n- Rule 88: keep shop handlers typed.\n- Rule 89: keep shop handlers typed.\n- Rule 90: keep shop handlers typed.\n- Rule 91: keep shop handlers typed.\n- Rule 92: keep shop handlers typed.\n- Rule 93: keep shop handlers typed.\n- Rule 94: keep shop handlers typed.\n- Rule 95: keep shop handlers typed.\n- Rule 96: keep shop handlers typed.\n- Rule 97: keep shop handlers typed.\n- Rule 98: keep shop handlers typed.\n- Rule 99: keep shop handlers typed.\n- Rule 100: keep shop handlers typed.\n- Rule 101: keep shop handlers typed.\n- Rule 102: keep shop handlers typed.\n- Rule 103: keep shop handlers typed.\n- Rule 104: keep shop handlers typed.\n- Rule 105: keep shop handlers typed.\n- Rule 106: keep shop handlers typed.\n- Rule 107: keep shop handlers typed.\n- Rule 108: keep shop handlers typed.\n- Rule 109: keep shop handlers typed.\n- Rule 110: keep shop handlers typed.\n- Rule 111: keep shop handlers typed.\n- Rule 112: keep shop handlers typed.\n- Rule 113: keep shop handlers typed.\n- Rule 114: keep shop handlers typed.\n- Rule 115: keep shop handlers typed.\n- Rule 116: keep shop handlers typed.\n- Rule 117: keep shop handlers typed.\n- Rule 118: keep shop handlers typed.\n- Rule 119: keep shop handlers typed.\n- Rule 120: keep shop handlers typed.\n- Rule 121: keep shop handlers typed.\n- Rule 122: keep shop handlers typed.\n- Rule 123: keep shop handlers typed.\n- Rule 124: keep shop handlers typed.\n- Rule 125: keep shop handlers typed.\n- Rule 126: keep shop handlers typed.\n- Rule 127: keep shop handlers typed.\n- Rule 128: keep shop handlers typed.\n- Rule 129: keep shop handlers typed.\n- Rule 130: keep shop handlers typed.\n- Rule 131: keep shop handlers typed.\n- Rule 132: keep shop handlers typed.\n- Rule 133: keep shop handlers typed.\n- Rule 134: keep shop handlers typed.\n- Rule 135: keep shop handlers typed.\n- Rule 136: keep shop handlers typed.\n- Rule 137: keep shop handlers typed.\n- Rule 138: keep shop handlers typed.\n- Rule 139: keep shop handlers typed.\n- Rule 140: keep shop handlers typed.\n- Rule 141: keep shop handlers typed.\n- Rule 142: keep shop handlers typed.\n- Rule 143: keep shop handlers typed.\n- Rule 144: keep shop handlers typed.\n- Rule 145: keep shop handlers typed.\n- Rule 146: keep shop handlers typed.\n- Rule 147: keep shop handlers typed.\n- Rule 148: keep shop handlers typed.\n- Rule 149: keep shop handlers typed.\n- Rule 150: keep shop handlers typed.\n- Rule 151: keep shop handlers typed.\n- Rule 152: keep shop handlers typed.\n- Rule 153: keep shop handlers typed.\n- Rule 154: keep shop handlers typed.\n- Rule 155: keep shop handlers typed.\n- Rule 156: keep shop handlers typed.\n- Rule 157: keep shop handlers typed.\n- Rule 158: keep shop handlers typed.\n- Rule 159: keep shop handlers typed.\n- Rule 160: keep shop handlers typed.\n- Rule 161: keep shop handlers typed.\n- Rule 162: keep shop handlers typed.\n- Rule 163: keep shop handlers typed.\n- Rule 164: keep shop handlers typed.\n- Rule 165: keep shop handlers typed.\n- Rule 166: keep shop handlers typed.\n- Rule 167: keep shop handlers typed.\n- Rule 168: keep shop handlers typed.\n- Rule 169: keep shop handlers typed.\n- Rule 170: keep shop handlers typed.\n- Rule 171: keep shop handlers typed.\n- Rule 172: keep shop handlers typed.\n- Rule 173: keep shop handlers typed.\n- Rule 174: keep shop handlers typed.\n- Rule 175: keep shop handlers typed.\n- Rule 176: keep shop handlers typed.\n- Rule 177: keep shop handlers typed.\n- Rule 178: keep shop handlers typed.\n- Rule 179: keep shop handlers typed.\n- Rule 180: keep shop handlers typed.\n- Rule 181: keep shop handlers typed.\n- Rule 182: keep shop handlers typed.\n- Rule 183: keep shop handlers typed.\n- Rule 184: keep shop handlers typed.\n- Rule 185: keep shop handlers typed.\n- Rule 186: keep shop handlers typed.\n- Rule 187: keep shop handlers typed.\n- Rule 188: keep shop handlers typed.\n- Rule 189: keep shop handlers typed.\n- Rule 190: keep shop handlers typed.\n- Rule 191: keep shop handlers typed.\n- Rule 192: keep shop handlers typed.\n- Rule 193: keep shop handlers typed.\n- Rule 194: keep shop handlers typed.\n- Rule 195: keep shop handlers typed.\n- Rule 196: keep shop handlers typed.\n- Rule 197: keep shop handlers typed.\n- Rule 198: keep shop handlers typed.\n- Rule 199: keep shop handlers typed.\n- Rule 200: keep shop handlers typed.\n- Rule 201: keep shop handlers typed.\n- Rule 202: keep shop handlers typed.\n- Rule 203: keep shop handlers typed.\n- Rule 204: keep shop handlers typed.\n- Rule 205: keep shop handlers typed.\n- Rule 206: keep shop handlers typed.\n- Rule 207: keep shop handlers typed.\n- Rule 208: keep shop handlers typed.\n- Rule 209: keep shop handlers typed.\n- Rule 210: keep shop handlers typed.\n- Rule 211: keep shop handlers typed.\n- Rule 212: keep shop handlers typed.\n- Rule 213: keep shop handlers typed.\n- Rule 214: keep shop handlers typed.\n- Rule 215: keep shop handlers typed.\n- Rule 216: keep shop handlers typed.\n- Rule 217: keep shop handlers typed.\n- Rule 218: keep shop handlers typed.\n- Rule 219: keep shop handlers typed.\n- Rule 220: keep shop handlers typed.\n- Rule 221: keep shop handlers typed.\n- Rule 222: keep shop handlers typed.\n- Rule 223: keep shop handlers typed.\n- Rule 224: keep shop handlers typed.\n- Rule 225: keep shop handlers typed.\n- Rule 226: keep shop handlers typed.\n- Rule 227: keep shop handlers typed.\n- Rule 228: keep shop handlers typed.\n- Rule 229: keep shop handlers typed.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-lines",
+     "WARN",
+     1
+    ]
+   ],
+   "links": {
+    ".claude/CLAUDE.md": "../CLAUDE.md"
+   }
+  },
+  {
+   "id": "01-claude-md-missing",
+   "files": {
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"Read\"\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-exists",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "01-comment-in-fence",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n```html\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n<!-- kept -->\n```\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-lines",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "01-html-comment",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n<!--\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\nmaintainer note, stripped before injection\n-->\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-size",
+     "OK",
+     1
+    ],
+    [
+     "01-claude-md-lines",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "01-import-from-dot-claude",
+   "files": {
+    ".claude/CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/guide.md for the release steps.\n",
+    "docs/guide.md": "# Guide\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "01-import-indented-code-and-escaped-space",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nAn example import:\n\n    @docs/missing.md\n\nSee @docs/Dev\\ Guide.md for the workflow.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "01-claude-md-import",
+     "missing\\.md"
+    ]
+   ]
+  },
+  {
+   "id": "01-import-missing",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/shop-conventions.md.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "01-import-present",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nSee @docs/shop-conventions.md.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "docs/shop-conventions.md": "#\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-import",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "01-lowercase-claude-local-md",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "claude.local.md": "Use the staging database.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-case",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "01-lowercase-claude-local-md-alone",
+   "files": {
+    "claude.local.md": "@AGENTS.md\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-case",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "01-lowercase-claude-md-alone",
+   "files": {
+    "claude.md": "# shop-api\n\nRun `make test` before any change.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-case",
+     "WARN",
+     1
+    ],
+    [
+     "00-layout",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "01-no-claude-md",
+   "files": {
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-exists",
+     "INFO",
+     1
+    ]
+   ]
+  }
+ ]
+}

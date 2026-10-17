@@ -8,7 +8,9 @@ import re
 # or field the harness adds becomes a false positive in every project, with no
 # change to this plugin. Each list names its source page; `derive.py` on the
 # maintainer side compares them to the live docs before a release.
-# Source: code.claude.com/docs/en/tools-reference, read 2026-09-23 (46 names).
+# Source: code.claude.com/docs/en/tools-reference, read 2026-09-23 (46 names). The table
+# still lists TaskOutput, as "Removed in v2.1.277" (2026-10-17): it stays a name the docs
+# know, and every check that grants or approves through it reads TOOL_REMOVED first.
 KNOWN_TOOLS = {
     "Agent", "Artifact", "AskUserQuestion", "Bash", "CronCreate", "CronDelete", "CronList",
     "Edit", "EndConversation", "EnterPlanMode", "EnterWorktree", "ExitPlanMode",
@@ -28,10 +30,13 @@ KNOWN_TOOLS = {
 TOOL_ALIASES = {"Task": "Agent"}
 
 
-# The docs disagree with themselves: tools-reference lists TaskOutput as
-# "Deprecated in favor of Read on the task's output file path", permissions lists
-# it among "tools Claude Code has removed". Accepted, with a note - never an error.
-TOOL_DEPRECATED = {"TaskOutput": "Read on the task's output file path"}
+# Tools Claude Code has removed: the name resolves to nothing. tools-reference, read
+# 2026-10-17: "TaskOutput | Removed in v2.1.277 ... Claude reads a background task's output
+# file with `Read` instead". Tested on 2.1.302 (claude -p, Haiku): an agent with
+# `tools: TaskOutput` is refused ("would be spawned with zero tools ... unrecognized
+# [TaskOutput]"), one with `tools: Read, TaskOutput` runs with Read alone. The permissions
+# page exempts these names from the startup warning on deny and ask rules.
+TOOL_REMOVED = {"TaskOutput": ("2.1.277", "Claude reads a background task's output file with Read instead")}
 
 
 # Source: code.claude.com/docs/en/sub-agents, `model` field, read 2026-09-23.

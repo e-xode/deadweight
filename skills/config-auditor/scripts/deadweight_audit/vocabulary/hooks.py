@@ -76,6 +76,14 @@ HOOK_EVENT_TYPES = {
 }
 
 
+# `onFailure` (2.1.295+): "continue", the default, or "block", on a `command` or `http`
+# hook. "The field has no effect on these hooks: Stop, SubagentStop, TaskCompleted, and
+# TeammateIdle hooks [...] Background command hooks: command hooks that set `async` or
+# `asyncRewake`" (hooks, Block the action when a hook fails, read 2026-10-17).
+HOOK_ONFAILURE_VALUES = ("continue", "block")
+HOOK_ONFAILURE_NO_EFFECT_EVENTS = frozenset({"Stop", "SubagentStop", "TaskCompleted", "TeammateIdle"})
+
+
 HOOK_PLUGIN_ROOT_VARS = ("${CLAUDE_PLUGIN_ROOT}", "$CLAUDE_PLUGIN_ROOT")
 
 

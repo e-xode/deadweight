@@ -246,9 +246,13 @@ Contents: [A. `CLAUDE.md`](#a-claudemd) · [B. Skills](#b-skills) · [C. Sub-age
 
 - **Symptom.** `api-handler-shape.md` with `paths: ["src/api/**/*.ts"]`, written to govern how new
   handlers are created.
-- **Why bad.** [memory](https://code.claude.com/docs/en/memory): path-scoped rules "trigger when
-  Claude reads files matching the pattern, not on every tool use". Creating a file is not reading
-  one; the rule does not fire for it (measured 2.1.280, `anthropics/claude-code#93248`).
+- **Why bad.** On 2.1.280 creating a file did not load the rule at all (reported in
+  `anthropics/claude-code#93248`; not measured here). Since 2.1.288 [memory](https://code.claude.com/docs/en/memory)
+  says a path-scoped rule "loads when Claude uses the Read, Write, or Edit tool on a matching
+  file". Measured on 2.1.302 (one run, `InstructionsLoaded` log): a `Write` creating a matching
+  file loads it, and the model reported the rule in the Write's result - after the file was
+  written. So the rule still does not shape the first version of a new file; it can at best
+  correct it on the next edit.
 - **Fix.** Put a creation constraint where it is always present — a rule without `paths:`,
   `CLAUDE.md`, or the skill that scaffolds handlers — or enforce it with a hook.
 

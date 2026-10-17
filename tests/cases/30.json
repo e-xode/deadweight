@@ -1,0 +1,22 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "30-overrides-no-effect-on-plugin",
+   "files": {
+    ".claude-plugin/plugin.json": "{\"name\": \"shop-kit\", \"version\": \"1.0.0\", \"description\": \"Shop tools.\"}\n",
+    "settings.json": "{\"skillOverrides\": {\"shop-s1\": \"off\", \"shop-s2\": \"off\"}}\n",
+    "skills/shop-s1/SKILL.md": "---\nname: shop-s1\ndescription: Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, charHandle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds,\n---\n\nRun it.\n",
+    "skills/shop-s2/SKILL.md": "---\nname: shop-s2\ndescription: Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, charHandle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds, chargebacks, refund windows, receipts. Handle the shop refund desk: partial refunds,\n---\n\nRun it.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "30-plugin-cost",
+     "NOTICE",
+     1
+    ]
+   ]
+  }
+ ]
+}

@@ -34,14 +34,14 @@ TWO DESIGN RULES, both learned the hard way.
    forever. This line compares two shas and cannot tell which is newer; the
    `deadweight` command can, and says which remedy applies.
 
-3. A NUMBER IS SHOWN ONLY WHEN IT CHANGES WHAT YOU DO. Zero counts are dropped
+2. A NUMBER IS SHOWN ONLY WHEN IT CHANGES WHAT YOU DO. Zero counts are dropped
    (`19W`, not `0E 19W`; `✓` when both are zero). The version is shown only as a
    DIFFERENCE - installed against available - because a version on its own names
    the state, and a difference names an action. Both are read from files Claude
    Code keeps on disk: no network, no subprocess, and nothing shown when the local
    catalogue was never refreshed.
 
-2. FRESHNESS IS MEASURED, AND THE AGE IS SHOWN BESIDE IT. The audit runs once, at
+3. FRESHNESS IS MEASURED, AND THE AGE IS SHOWN BESIDE IT. The audit runs once, at
    session start; this reads a frozen number that looks live. Fix five warnings and it
    still shows the old count; add a broken rule and it still shows zero errors. Age
    alone is a proxy - a three-day-old measurement in a repository nobody touched is

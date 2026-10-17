@@ -66,7 +66,9 @@ Facts that change what a declaration means:
   Settings Error dialog; a `-p` run shows nothing and skips the file (`settings § Fix a broken
   settings file`).
 - **`35-hooks-shape`** — `hooks` is not an object of event → list, an entry is not an object, an
-  entry has no `hooks` list, a handler is not an object or has an unknown `type`.
+  entry has no `hooks` list, a handler is not an object or has an unknown `type`. In a skill's or
+  an agent's frontmatter, `hooks: []` is a NOTICE: an empty list declares no hook, and the skill
+  still loads (2.1.302, one run, a skill only; `evidence.json` `35-hooks-shape`) [measured].
 - **`35-hooks-event`** — an event name outside the 33. [doc] It is dropped as a *Settings Warning*
   at interactive start-up, the rest of the file staying in effect (`settings § Fix a broken settings
   file`); in `-p` nothing is shown. The hook never fires. Casing counts: `preToolUse` is a typo.
@@ -89,6 +91,13 @@ What fails silently:
 - **Regex by accident.** One dot or bracket and the whole matcher becomes an unanchored regex:
   `Edit.*` also matches `NotebookEdit`. Anchor with `^…$` [doc]. A matcher written in permission
   syntax, `Bash(git *)`, is a regex that no tool name satisfies [inference] — use `if` for that.
+  The same holds for one alternative of a list: on Claude Code 2.1.302 (`claude -p`, one run,
+  2026-10-17) `Bash(git *)|Write` fired on `Write` and not on `git status` [measured, `evidence.json` `35-hooks-matcher`], and
+  `Write|Edit(*.ts)`, not a valid regular expression, fired on neither [measured; the page does not
+  say what an invalid matcher does]. `35-hooks-matcher` reports the first as a NOTICE (the other
+  alternatives still fire) and the second as an ERROR (the group never fired), as it does a matcher
+  made only of rules, `Bash(git push *)|Bash(git commit *)` [doc]. Only a `|` outside parentheses
+  splits alternatives; two rules to move means two handlers (`if` "holds exactly one" [doc]).
 - **Hyphens.** In the exact set only since v2.1.195; earlier, `api-socket` was a regex and also hit
   `legacy-api-socket` [doc].
 - **`FileChanged` and `StopFailure`** use a narrower exact set (letters, digits, `_`, `|`): a hyphen,
@@ -159,11 +168,14 @@ Silent failures by type [doc]:
   to the longest per-hook `timeout` set, up to 60 s. audit.py reports a NOTICE, not a WARN:
   `timeout` is optional, the docs recommend no value, and no harm from the default is documented or
   measured. A hook with `async: true` (without `asyncRewake`) is not reported: the timeout is not
-  enforced on it.
+  enforced on it - in frontmatter too, where `async: true` is read as a YAML boolean since 0.26.0.
 - [doc] A timed-out `command`/`http`/`mcp_tool` hook is cancelled and its output discarded. On
   `PreToolUse` it **does not block**: the call continues through the normal permission flow — a
   stalled gate is an open gate (`hooks § Timeouts`). On `UserPromptSubmit` its `additionalContext`
   is lost and the prompt goes through without it. On `PreModelSwitch` a timeout **blocks**.
+  **Remedy** (2.1.295+): `"onFailure": "block"` on a `command` or `http` hook makes a timeout, a
+  failure to start, an exit code other than 0 or 2, an HTTP error or invalid output do what exit 2
+  does on that event (deny on `PermissionRequest`) — see below.
 
 ## Exit codes: what blocks and what only looks like it
 
@@ -175,9 +187,19 @@ Silent failures by type [doc]:
   notice and the action proceeds. A policy script written in the Unix habit (`exit 1` on violation)
   **gates nothing**.
 - **A script that cannot start** (missing, not executable) exits 127 — the same non-blocking
-  bucket. The doc's own words: "a mistyped path in `settings.json` leaves the gate silently
-  disabled". **`35-hooks-command`** (ERROR) catches the missing file, and (WARN) a script invoked
+  bucket. The doc's own words: "a mistyped path in `settings.json` means the hook never runs".
+  **`35-hooks-command`** (ERROR) catches the missing file, and (WARN) a script invoked
   directly without `+x`.
+- **The remedy: `"onFailure": "block"`** (hooks § Block the action when a hook fails, 2.1.295+), on
+  a `command` or `http` hook; `"continue"` is the default. Then any failure — cannot start, exit
+  code other than 0 or 2 (even with a JSON `allow`), HTTP error or non-2xx, timeout, unparsable or
+  invalid output — does what exit 2 does on that event; on `PermissionRequest` it denies. **No
+  effect** on `Stop`, `SubagentStop`, `TaskCompleted`, `TeammateIdle`, nor on a command hook with
+  `async` or `asyncRewake`. **Measured** (2026-10-17, Claude Code 2.1.302, Haiku, one run each): a
+  `PreToolUse` `Bash` hook running `node <missing>.js` blocked `ls` with `failed; blocking because
+  onFailure is "block"`; without the field, `ls` ran. **`35-hooks-shape`** (NOTICE) flags
+  `"block"` where the page says it does nothing, on a handler type the page does not document it
+  for, and a value other than `continue` or `block` - in settings and in frontmatter alike.
 - **Events that cannot block**: exit 2 on `PermissionRequest` is not honoured — deny through the
   `decision` object; on `PostToolUse` it only shows stderr to Claude; on `SessionStart`,
   `SubagentStart`, `PostModelSwitch` it only shows a notice to the user (`hooks § Exit code 2

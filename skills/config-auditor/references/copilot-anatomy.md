@@ -134,13 +134,14 @@ Copilot cloud agent on GitHub.com" (org-instructions).
 
 Between several files of the same type in VS Code, no tie-break is documented: "Applicable
 instruction sources are additive. Do not depend on a file order or precedence rule to resolve
-conflicts because discovery and merge behavior can differ by harness" (vscode-instructions). One
-documented exception: several `AGENTS.md` files do resolve by nearest match — "the nearest
-`AGENTS.md` file in the directory tree will take precedence" (vscode-instructions).
+conflicts because discovery and merge behavior can differ by harness" (vscode-instructions). The
+nearest-match rule for several `AGENTS.md` files is not on that page as read on 2026-10-17; it is
+documented for Copilot on GitHub: "When Copilot is working, the nearest `AGENTS.md` file in the
+directory tree will take precedence" (repo-instructions).
 
 ## What Copilot reads from a Claude Code configuration
 
-| File | coding agent | CLI | code review | VS Code (Local agent) |
+| File | coding agent | CLI | code review | VS Code (Local harness) |
 | --- | --- | --- | --- | --- |
 | `AGENTS.md` | yes, incl. nested | yes, incl. intermediate dirs | yes | gated, nested off by default |
 | `CLAUDE.md` | yes | yes | not documented | gated |
@@ -161,24 +162,28 @@ directories between them, and any directories nested in the path of a file it is
 Code review: `AGENTS.md` is listed — "`AGENTS.md`: Repository-level agent-specific instructions"
 (code-review-tutorial). Whether it reads `CLAUDE.md` or `GEMINI.md` is not documented.
 
-VS Code Local agent: "For the Local agent, configure the `chat.useAgentsMdFile` setting to enable
-or disable support for `AGENTS.md` files." For nested files, "The setting is disabled by default"
-(`chat.useNestedAgentsMdFiles`). For `CLAUDE.md`: "configure the `chat.useClaudeMdFile` setting"
-(vscode-instructions). Whether `chat.useAgentsMdFile` and `chat.useClaudeMdFile` default to on or
-off is **not documented** on the page read. `GEMINI.md` is not mentioned on that page at all —
-silence, not a confirmed absence. The same page separately recognizes Claude Code's own rule
+VS Code Local harness (this reference earlier quoted it as the Local agent; as read on
+2026-10-17 the page speaks of harnesses: "Each harness uses its own discovery rules and file
+formats"): "For the Local harness, configure the `chat.useAgentsMdFile` setting to enable or disable support
+for `AGENTS.md` files." For nested files: "The `chat.useNestedAgentsMdFiles` setting controls
+support for nested `AGENTS.md` files and is disabled by default." For `CLAUDE.md`: "configure the
+`chat.useClaudeMdFile` setting" (vscode-instructions). Whether `chat.useAgentsMdFile` and
+`chat.useClaudeMdFile` default to on or off is **not documented** on the page as read on
+2026-10-17. These settings are scoped to the Local harness; for the page's Anthropic Claude
+harness: "For Anthropic Claude sessions, use `CLAUDE.md` at the repository root for project-wide
+guidance." `GEMINI.md` is not mentioned on that page at all — silence, not a confirmed absence. The same page separately recognizes Claude Code's own rule
 files: "For `.claude/rules` instructions files, use a `paths` property instead of `applyTo` for
 glob patterns" (vscode-instructions).
 
 **Consequence for a Claude Code user** (reading, not a quote): a repository's `CLAUDE.md` reaches
 Copilot's cloud coding agent and Copilot CLI without any change on the repository's part — both
 list it as a supported format next to `AGENTS.md`. Inside VS Code, the same file only reaches
-Copilot Chat's Local agent if `chat.useClaudeMdFile` is turned on, and whether that ships on or
+Copilot Chat's Local harness if `chat.useClaudeMdFile` is turned on, and whether that ships on or
 off is not documented here, so a Claude Code user cannot assume that opening the same repository
 in VS Code gives Copilot Chat the instructions Claude Code uses. Directory-scoped guidance fares
 worse: nested `AGENTS.md` files are off by default in VS Code, and no equivalent nested toggle for
 `CLAUDE.md` is documented in these sources — so instructions that Claude Code picks up from a
-subdirectory may not reach VS Code's Copilot agent at all.
+subdirectory may not reach VS Code's Local harness at all.
 
 ## What audit.py checks, and what it does not
 
@@ -199,7 +204,7 @@ These ids are implemented in `audit.py` (0.20.0), measured on public repositorie
   30,000-character body limit.
 - `excludeAgent` values outside the two documented strings.
 - Personal- or organisation-level instructions: both live outside the repository.
-- Whether the VS Code settings that gate `AGENTS.md`/`CLAUDE.md` reading
+- Whether the VS Code Local-harness settings that gate `AGENTS.md`/`CLAUDE.md` reading
   (`chat.useAgentsMdFile`, `chat.useClaudeMdFile`, `chat.useNestedAgentsMdFiles`) are turned on —
   user- or workspace-level settings, not repository files.
 - `applyTo` comma-in-brace parsing — not documented, so nothing is asserted about it.

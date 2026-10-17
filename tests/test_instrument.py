@@ -203,6 +203,11 @@ class Overlay(unittest.TestCase):
         from deadweight_audit.overlay import UNEXEMPTABLE
         self.assertEqual(sorted(UNEXEMPTABLE - self.emitted()), [])
 
+    def test_every_emitted_id_is_known(self) -> None:
+        # Until 0.26.0 known_check_ids() read `\d{2}-` only: an exemption for the emitted
+        # `08b-agent-description` excused the finding and was still reported as never emitted.
+        self.assertEqual(sorted(self.emitted() - known_check_ids()), [])
+
     def test_no_check_group_reads_as_an_id_nothing_emits(self) -> None:
         # "43-mcp" in CHECKS made an exemption for `43-mcp` pass the typo guard and excuse nothing.
         import re

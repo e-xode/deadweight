@@ -1,0 +1,122 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "layout-dual-role",
+   "files": {
+    ".claude-plugin/plugin.json": "{\"name\": \"shop-kit\", \"version\": \"1.0.0\"}\n",
+    "skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/agents/shop-reviewer.md": "---\nname: shop-reviewer\n---\n\nReview shop code.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "08-agent-frontmatter",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "layout-library-with-sign",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "shop-a/SKILL.md": "---\nname: shop-a\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "40-skill-not-loaded",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "layout-library-without-sign",
+   "files": {
+    "shop-a/SKILL.md": "---\nname: shop-a\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "README.md": "#\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-exists",
+     "ERROR",
+     0
+    ],
+    [
+     "40-skill-not-loaded",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "layout-none-nested-claude-md",
+   "files": {
+    "api/CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "api/index.php": "<?php\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "00-layout",
+     "INFO",
+     1
+    ],
+    [
+     "01-claude-md-exists",
+     "ERROR",
+     0
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "00-layout",
+     "nothing is missing"
+    ]
+   ]
+  },
+  {
+   "id": "layout-none-other-tool",
+   "files": {
+    ".devin/skills/shop-a/SKILL.md": "---\nname: shop-a\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-exists",
+     "ERROR",
+     0
+    ],
+    [
+     "40-skill-not-loaded",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "layout-plugin-without-manifest",
+   "files": {
+    "skills/shop-a/SKILL.md": "---\nname: shop-a\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "README.md": "#\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "01-claude-md-exists",
+     "ERROR",
+     0
+    ],
+    [
+     "40-skill-not-loaded",
+     "WARN",
+     0
+    ]
+   ]
+  }
+ ]
+}

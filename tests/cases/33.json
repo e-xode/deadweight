@@ -1,0 +1,389 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "33-clause-as-list",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refund/SKILL.md": "---\nname: shop-refund\ndescription: |\n  Handle customer order refund requests for the shop, checking order status, payment and stock records.\n  Don't use for:\n  - shop-return\n---\n\nBody.\n",
+    ".claude/skills/shop-return/SKILL.md": "---\nname: shop-return\ndescription: |\n  Handle customer order return requests for the shop, checking order status, payment and stock records.\n  Don't use for:\n  - shop-refund\n---\n\nBody.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "NOTICE",
+     1
+    ],
+    [
+     "33-description-overlap",
+     "WARN",
+     0
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "33-description-overlap",
+     "share much of their wording"
+    ]
+   ]
+  },
+  {
+   "id": "33-clause-wrapped-over-lines",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refund/SKILL.md": "---\nname: shop-refund\ndescription: Handle customer order refund requests for the shop, checking order status,\n  payment and stock records. Do not use for returned parcels, which belong to\n  shop-return.\n---\n\nBody.\n",
+    ".claude/skills/shop-return/SKILL.md": "---\nname: shop-return\ndescription: Handle customer order return requests for the shop, checking order status, payment and stock records. Do not use for money back to the card, see shop-refund.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "NOTICE",
+     1
+    ],
+    [
+     "33-description-overlap",
+     "WARN",
+     0
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "33-description-overlap",
+     "share much of their wording"
+    ]
+   ]
+  },
+  {
+   "id": "33-declared-pair-notice",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for: merchant receipts (→ shop-payouts).\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-payouts/SKILL.md": "---\nname: shop-payouts\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for merchants. Do not use for: customer receipts (→ shop-refunds).\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "NOTICE",
+     1
+    ],
+    [
+     "33-description-overlap",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "33-exclusion-capital-eg",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for merchant receipts (E.g. payouts, use shop-payouts).\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-payouts/SKILL.md": "---\nname: shop-payouts\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for merchants. Do not use for customer refunds (use shop-refunds).\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "33-description-overlap",
+     "only one side"
+    ]
+   ]
+  },
+  {
+   "id": "33-exclusion-eg-or-list",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-orders/SKILL.md": "---\nname: shop-orders\ndescription: Handle shop customer order questions, order status, order tracking and order history for the shop. Do not use for refunds, e.g. partial refunds (use shop-refunds).\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: |\n  Handle shop customer refund questions, refund status, refund tracking and order history for the shop.\n  Do not use for:\n  - shop-orders (order tracking)\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "33-description-overlap",
+     "naming the other"
+    ]
+   ]
+  },
+  {
+   "id": "33-exclusion-etc",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for merchant receipts, payouts, etc. (use shop-payouts).\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-payouts/SKILL.md": "---\nname: shop-payouts\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for merchants. Do not use for customer refunds (use shop-refunds).\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "33-description-overlap",
+     "only one side"
+    ]
+   ]
+  },
+  {
+   "id": "33-exclusion-in-next-sentence",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for merchant receipts. Those go to shop-payouts.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-payouts/SKILL.md": "---\nname: shop-payouts\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for merchants. Do not use for: customer receipts (→ shop-refunds).\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "WARN",
+     0
+    ],
+    [
+     "33-description-overlap",
+     "NOTICE",
+     1
+    ]
+   ],
+   "known_failure": true
+  },
+  {
+   "id": "33-exclusion-in-when-to-use",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers.\nwhen_to_use: Do not use for merchant receipts (use shop-payouts).\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-payouts/SKILL.md": "---\nname: shop-payouts\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for merchants.\nwhen_to_use: Do not use for customer receipts (use shop-refunds).\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "NOTICE",
+     1
+    ],
+    [
+     "33-description-overlap",
+     "WARN",
+     0
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "33-description-overlap",
+     "share much of their wording"
+    ]
+   ]
+  },
+  {
+   "id": "33-literal-block-next-line",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refund/SKILL.md": "---\nname: shop-refund\ndescription: |\n  Handle customer order refund requests for the shop, checking order status, payment and stock records.\n  Don't use for card disputes\n  Works with shop-return\n---\n\nBody.\n",
+    ".claude/skills/shop-return/SKILL.md": "---\nname: shop-return\ndescription: |\n  Handle customer order return requests for the shop, checking order status, payment and stock records.\n  Don't use for card disputes\n  Works with shop-refund\n---\n\nBody.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "33-description-overlap",
+     "each excludes the other"
+    ]
+   ]
+  },
+  {
+   "id": "33-mutual-exclusion",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for: merchant receipts (→ shop-payouts).\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-payouts/SKILL.md": "---\nname: shop-payouts\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for merchants. Do not use for: customer receipts (→ shop-refunds).\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "33-one-way-exclusion",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for: invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-payouts/SKILL.md": "---\nname: shop-payouts\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for merchants. Do not use for: customer receipts (→ shop-refunds).\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "33-overlap-through-when-to-use",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Refunds.\nwhen_to_use: Use when a customer or a merchant asks about a refund, a chargeback, a refund window, a partial refund or a receipt in the shop checkout.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-receipts/SKILL.md": "---\nname: shop-receipts\ndescription: Receipts.\nwhen_to_use: Use when a customer or a merchant asks about a refund, a chargeback, a refund window, a partial refund or a receipt in the shop checkout.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "33-paragraph-after-exclusion",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing\n\n  See also shop-payouts for merchant payouts.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-payouts/SKILL.md": "---\nname: shop-payouts\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for merchants. Do not use for customer refunds (use shop-refunds).\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "33-description-overlap",
+     "each excludes the other"
+    ]
+   ]
+  },
+  {
+   "id": "33-plain-mention",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: See also shop-payouts. Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for: invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-payouts/SKILL.md": "---\nname: shop-payouts\ndescription: See also shop-refunds. Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for merchants. Do not use for: tax.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "NOTICE",
+     1
+    ],
+    [
+     "33-description-overlap",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "33-positive-reference-outside-clause",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for shipping labels. Works with shop-payouts on merchant flows.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-payouts/SKILL.md": "---\nname: shop-payouts\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for merchants. Do not use for shipping labels. Works with shop-refunds on customer flows.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "33-description-overlap",
+     "each excludes the other"
+    ]
+   ]
+  },
+  {
+   "id": "33-typographic-apostrophe",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Don’t use for merchant receipts (use shop-payouts).\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-payouts/SKILL.md": "---\nname: shop-payouts\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for merchants. Don’t use for customer receipts (use shop-refunds).\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "NOTICE",
+     1
+    ],
+    [
+     "33-description-overlap",
+     "WARN",
+     0
+    ],
+    [
+     "04-skill-description-antitrigger",
+     "NOTICE",
+     0
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "33-description-overlap",
+     "share much of their wording"
+    ]
+   ]
+  },
+  {
+   "id": "33-unseparated-pair-notice",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-migrate/SKILL.md": "---\nname: shop-migrate\ndescription: Run database migrations for the shop-api service in the shop monorepo, using the shop toolchain and shop conventions. Do not use for tests.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-tests/SKILL.md": "---\nname: shop-tests\ndescription: Run the test suite for the shop-api service in the shop monorepo, using the shop toolchain and shop conventions. Do not use for migrations.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "NOTICE",
+     1
+    ],
+    [
+     "33-description-overlap",
+     "WARN",
+     0
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "33-description-overlap",
+     "merge them"
+    ]
+   ]
+  }
+ ]
+}

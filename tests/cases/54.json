@@ -1,0 +1,89 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "54-agents-local-no-reader",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "AGENTS.local.md": "# Shop notes\n\nUse the staging database.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "54-agents-md-variant",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "54-agents-md-variant",
+     "read by Codex"
+    ]
+   ]
+  },
+  {
+   "id": "54-agents-md-alone",
+   "files": {
+    "CLAUDE.md": "@AGENTS.md\n",
+    "AGENTS.md": "# Shop agents\n\nRun `npm test` before every commit.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "54-agents-md-variant",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "54-agents-override",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "AGENTS.md": "# Shop agents\n\nRun `npm test` before every commit.\n",
+    "api/AGENTS.override.md": "# Shop agents\n\nRun `npm test` before every commit.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "54-agents-md-variant",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "54-override-and-agents-md-both-imported",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\n@AGENTS.md\n@AGENTS.override.md\n",
+    "AGENTS.md": "# Shop agents\n\nRun `npm test` before every commit.\n",
+    "AGENTS.override.md": "# Shop agents\n\nRun `pnpm test` instead.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "54-agents-md-variant",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "54-override-imported-by-claude-md",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\n@AGENTS.override.md\n",
+    "AGENTS.override.md": "# Shop agents\n\nRun `npm test` before every commit.\n",
+    "api/AGENTS.override.md": "# Shop agents\n\nRun `npm test` before every commit.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "54-agents-md-variant",
+     "NOTICE",
+     1
+    ]
+   ]
+  }
+ ]
+}

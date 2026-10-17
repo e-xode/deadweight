@@ -116,4 +116,6 @@ def known_check_ids() -> set[str]:
         src = "".join(f.read_text(encoding="utf-8") for f in instrument_files())
     except OSError:
         return set()
-    return set(re.findall(r'"(\d{2}-[a-z0-9-]+)"', src))
+    # `\d{2}[a-z]?`: `08b-agent-description` is emitted, and an exemption naming it was
+    # reported as never emitted while it excused the finding.
+    return set(re.findall(r'"(\d{2}[a-z]?-[a-z0-9-]+)"', src))

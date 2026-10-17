@@ -1,0 +1,332 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "42-absolute-path-with-one-slash",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"permissions\": {\"deny\": [\"Write(/home/dev/shop-legacy/**)\", \"Edit(/opt/shop-secrets/**)\"]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "42-permissions-rule",
+     "ERROR",
+     1
+    ],
+    [
+     "42-permissions-path-anchor",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "42-permissions-rule",
+     "Edit\\(/home/"
+    ]
+   ]
+  },
+  {
+   "id": "42-allow-and-deny",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"Bash(rm -rf dist)\"\n    ],\n    \"deny\": [\n      \"Bash(rm -rf dist)\"\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "42-permissions-conflict",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "42-allow-mcp-double-underscore-name",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".mcp.json": "{\n  \"mcpServers\": {\n    \"reports__v2\": {\n      \"type\": \"stdio\",\n      \"command\": \"shop-reports\"\n    },\n    \"shop.ledger_\": {\n      \"type\": \"stdio\",\n      \"command\": \"shop-ledger\"\n    }\n  }\n}",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"mcp__reports__v2\",\n      \"mcp__reports__v2__*\",\n      \"mcp__shop_ledger_\",\n      \"mcp__shop_ledger___*\"\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "42-permissions-rule",
+     "WARN",
+     2
+    ]
+   ]
+  },
+  {
+   "id": "42-allow-taskoutput",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"TaskOutput\",\n      \"Read\"\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "42-permissions-rule",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "42-permissions-rule",
+     "mistyped"
+    ]
+   ]
+  },
+  {
+   "id": "42-bare-agent-allow-rule",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"Agent\",\n      \"Bash(npm test)\"\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "42-permissions-rule",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "50-security-broad-allow",
+     "'Agent'"
+    ]
+   ]
+  },
+  {
+   "id": "42-colon-star-outside-commands",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"permissions\": {\"deny\": [\"WebFetch(domain:*.shop.example)\"], \"allow\": [\"Bash(git:* push)\"]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "42-permissions-rule",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "42-home-variable-in-rule",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"Write($HOME/notes/**)\"\n    ],\n    \"deny\": [\n      \"Read($HOME/.ssh/**)\",\n      \"Read(~/.aws/**)\"\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "42-permissions-rule",
+     "WARN",
+     1
+    ],
+    [
+     "42-permissions-rule",
+     "ERROR",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "42-permissions-rule",
+     "Edit\\(\\$HOME"
+    ],
+    [
+     "42-permissions-rule",
+     "~/\\.aws"
+    ]
+   ]
+  },
+  {
+   "id": "42-multiedit-single-message",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"MultiEdit(/home/a/**)\",\n      \"Bash(npm test)\"\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "42-permissions-rule",
+     "ERROR",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "42-permissions-rule",
+     "names no known tool"
+    ]
+   ]
+  },
+  {
+   "id": "42-named-agent-rules-not-flagged",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"Agent(vue)\",\n      \"WebFetch\"\n    ],\n    \"deny\": [\n      \"Agent(Explore)\"\n    ],\n    \"ask\": [\n      \"Agent(model:opus)\"\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "50-security-broad-allow",
+     "WARN",
+     1
+    ],
+    [
+     "42-permissions-rule",
+     "NOTICE",
+     0
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "50-security-broad-allow",
+     "Agent"
+    ],
+    [
+     "42-permissions-rule",
+     "Agent"
+    ]
+   ]
+  },
+  {
+   "id": "42-parentheses-in-rule",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"permissions\": {\"allow\": [\"Bash(grep -rn \\\"^.*[);}]$\\\" src --include=*.ts)\"]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "42-permissions-rule",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "42-project-home-folder",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "home/index.md": "x\n",
+    ".claude/settings.json": "{\"permissions\": {\"deny\": [\"Edit(/home/**)\"]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "42-permissions-path-anchor",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "42-project-path-legitimate",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"permissions\": {\"deny\": [\"Edit(/src/**)\", \"Read(//etc/hosts)\", \"Read(./.env)\"]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "42-permissions-path-anchor",
+     "WARN",
+     0
+    ],
+    [
+     "42-permissions-rule",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "42-unanchored-glob",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"*\"\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "42-permissions-rule",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "42-unknown-tool-in-allow",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"LS\"\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "42-permissions-rule",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "42-valid-rules",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"Bash(npm test)\",\n      \"mcp__github__get_*\",\n      \"Read\"\n    ],\n    \"deny\": [\n      \"Bash(git push *)\"\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "42-permissions-rule",
+     "ERROR",
+     0
+    ],
+    [
+     "42-permissions-rule",
+     "WARN",
+     0
+    ],
+    [
+     "42-permissions-conflict",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "42-write-rule-never-consulted",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"deny\": [\n      \"Write(secrets/**)\"\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "42-permissions-rule",
+     "ERROR",
+     1
+    ]
+   ]
+  }
+ ]
+}

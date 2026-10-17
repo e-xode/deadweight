@@ -1,0 +1,468 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "23-agent-key-typo",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-reviewer.md": "---\nname: shop-reviewer\ndescription: Review shop refund code for errors. Do not use for invoices.\ndisallowed-tools: Bash\nmaxturns: 3\nobserver: true\n---\n\nReview the diff.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-frontmatter-keys",
+     "WARN",
+     3
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "23-agent-frontmatter-keys",
+     "'(?:disallowed-tools|maxturns)'.*nothing guarantees"
+    ],
+    [
+     "23-agent-frontmatter-keys",
+     "'disallowed-tools'(?!.*Rename it 'disallowedTools')"
+    ],
+    [
+     "23-agent-frontmatter-keys",
+     "'maxturns'(?!.*Rename it 'maxTurns')"
+    ]
+   ]
+  },
+  {
+   "id": "23-agent-list-in-parentheses",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/agents/shop-lead.md": "---\nname: shop-lead\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\ntools: Agent(shop-worker, shop-researcher), Read, Bash\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-tools",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "23-agent-tools",
+     "unknown tool"
+    ]
+   ]
+  },
+  {
+   "id": "23-agent-permission-mode",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-reviewer.md": "---\nname: shop-reviewer\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\npermissionMode: readonly\n---\n\nReview.\n",
+    ".claude/agents/shop-fixer.md": "---\nname: shop-fixer\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\npermissionMode: bypassPermissions\n---\n\nReview.\n",
+    ".claude/agents/shop-planner.md": "---\nname: shop-planner\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\npermissionMode: plan\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-permission-mode",
+     "WARN",
+     2
+    ]
+   ]
+  },
+  {
+   "id": "23-autocompactwindow",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-reviewer.md": "---\nname: shop-reviewer\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nautoCompactWindow: 200000\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-frontmatter-keys",
+     "WARN",
+     0
+    ],
+    [
+     "08-agents-dir",
+     "INFO",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "23-autocompactwindow-200k",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-reviewer.md": "---\nname: shop-reviewer\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nautoCompactWindow: 200k\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-frontmatter-keys",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "23-agent-frontmatter-keys",
+     "not a documented subagent field"
+    ]
+   ]
+  },
+  {
+   "id": "23-autocompactwindow-out-of-range",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-reviewer.md": "---\nname: shop-reviewer\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nautoCompactWindow: 50000\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-frontmatter-keys",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "23-agent-frontmatter-keys",
+     "not a documented subagent field"
+    ]
+   ]
+  },
+  {
+   "id": "23-autocompactwindow-wrong-case",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-reviewer.md": "---\nname: shop-reviewer\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nautocompactWindow: 200000\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-frontmatter-keys",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "23-agent-frontmatter-keys",
+     "'autocompactWindow'(?!.*Rename it 'autoCompactWindow')"
+    ]
+   ]
+  },
+  {
+   "id": "23-main-agent-by-setting",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\n  \"agent\": \"shop-lead\"\n}",
+    ".claude/agents/shop-lead.md": "---\nname: shop-lead\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\ntools: Agent(shop-worker), Read, Bash\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-frontmatter-keys",
+     "INFO",
+     1
+    ],
+    [
+     "23-agent-tools",
+     "WARN",
+     0
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "23-agent-tools",
+     "in a subagent definition it is ignored"
+    ]
+   ]
+  },
+  {
+   "id": "23-misspelt-plugin-ignored-field",
+   "files": {
+    ".claude-plugin/plugin.json": "{\n  \"name\": \"shop-kit\"\n}",
+    "skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "agents/shop-reviewer.md": "---\nname: shop-reviewer\ndescription: Review shop refund code for errors. Do not use for invoices.\npermission-mode: plan\nmcp_servers: [shop-db]\ninitial-prompt: hi\nmaxturns: 3\n---\n\nReview the diff.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-frontmatter-keys",
+     "WARN",
+     4
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "23-agent-frontmatter-keys",
+     "Rename it '(?:permissionMode|mcpServers|initialPrompt)'"
+    ],
+    [
+     "23-agent-frontmatter-keys",
+     "'maxturns'(?!.*Rename it 'maxTurns')"
+    ]
+   ]
+  },
+  {
+   "id": "23-model-claude-prefix-any-casing",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/agents/shop-a.md": "---\nname: shop-a\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nmodel: Claude-Opus-4-8\n---\n\nReview.\n",
+    ".claude/agents/shop-b.md": "---\nname: shop-b\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nmodel: CLAUDE-SONNET-4-6[1M]\n---\n\nReview.\n",
+    ".claude/agents/shop-c.md": "---\nname: shop-c\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nmodel: shop-model-x\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-model",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "23-agent-model",
+     "model '(?i:claude-)"
+    ]
+   ]
+  },
+  {
+   "id": "23-model-documented-values",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/agents/shop-a.md": "---\nname: shop-a\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nmodel: sonnet[1m]\n---\n\nReview.\n",
+    ".claude/agents/shop-b.md": "---\nname: shop-b\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nmodel: opusplan\n---\n\nReview.\n",
+    ".claude/agents/shop-c.md": "---\nname: shop-c\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nmodel: best\n---\n\nReview.\n",
+    ".claude/agents/shop-d.md": "---\nname: shop-d\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nmodel: us.anthropic.claude-sonnet-4-5-20250929-v1:0\n---\n\nReview.\n",
+    ".claude/agents/shop-e.md": "---\nname: shop-e\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nmodel: arn:aws:bedrock:us-east-1:111122223333:application-inference-profile/shop\n---\n\nReview.\n",
+    ".claude/agents/shop-f.md": "---\nname: shop-f\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nmodel: shop-foundry-deploy\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-model",
+     "NOTICE",
+     1
+    ],
+    [
+     "23-agent-model",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "23-model-inherit-1m-or-substring",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/agents/shop-a.md": "---\nname: shop-a\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nmodel: inherit[1m]\n---\n\nReview.\n",
+    ".claude/agents/shop-b.md": "---\nname: shop-b\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nmodel: shop-claude-x\n---\n\nReview.\n",
+    ".claude/agents/shop-c.md": "---\nname: shop-c\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nmodel: us.anthropic.claude-opus-5-5\n---\n\nReview.\n",
+    ".claude/agents/shop-d.md": "---\nname: shop-d\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nmodel: opusplan[1m]\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-model",
+     "NOTICE",
+     2
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "23-agent-model",
+     "optionally with \\[1m\\]"
+    ]
+   ]
+  },
+  {
+   "id": "23-preload-missing",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-review.md": "---\nname: shop-review\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nskills:\n  - shop-invoices\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-skills-preload",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "23-preload-no-workaround",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-deploy/SKILL.md": "---\nname: shop-deploy\ndescription: Deploy the shop to production. Do not use for previews.\ndisable-model-invocation: true\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-release.md": "---\nname: shop-release\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nskills: shop-deploy\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-skills-preload",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "23-agent-skills-preload",
+     "by path"
+    ]
+   ]
+  },
+  {
+   "id": "23-task-alias-in-tools",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/agents/shop-lead.md": "---\nname: shop-lead\ndescription: Coordinate the shop release checks. Do not use for refunds.\ntools: Read, Task(shop-tests), Task(shop-lint)\n---\n\nCoordinate.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-tools",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "23-taskoutput-alone",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-reviewer.md": "---\nname: shop-reviewer\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\ntools: TaskOutput\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-tools",
+     "ERROR",
+     1
+    ],
+    [
+     "23-agent-tools",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "23-taskoutput-beside-read",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-reviewer.md": "---\nname: shop-reviewer\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\ntools: Read, TaskOutput\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-tools",
+     "WARN",
+     1
+    ],
+    [
+     "23-agent-tools",
+     "NOTICE",
+     0
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "23-agent-tools",
+     "deprecated"
+    ]
+   ]
+  },
+  {
+   "id": "23-tools-removed-from-subagents",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/agents/shop-ask.md": "---\nname: shop-ask\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\ntools: AskUserQuestion\n---\n\nReview.\n",
+    ".claude/agents/shop-read.md": "---\nname: shop-read\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\ntools: Read, AskUserQuestion\n---\n\nReview.\n",
+    ".claude/agents/shop-plan.md": "---\nname: shop-plan\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\ntools: Read, ExitPlanMode\npermissionMode: plan\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-tools",
+     "ERROR",
+     1
+    ],
+    [
+     "23-agent-tools",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "23-undocumented-agent-key",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/agents/shop-terse.md": "---\nname: shop-terse\ndescription: Answer tersely about the shop catalogue. Do not use for refunds.\nobserver: true\n---\n\nBe terse.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-frontmatter-keys",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "23-agent-frontmatter-keys",
+     "ignored without a word"
+    ]
+   ]
+  },
+  {
+   "id": "23-undocumented-key-no-verdict",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-reviewer.md": "---\nname: shop-reviewer\ndescription: Review shop refund code for errors. Do not use for invoices.\nobserver: true\n---\n\nReview the diff.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-frontmatter-keys",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "23-agent-frontmatter-keys",
+     "'observer'.*ignores a field"
+    ]
+   ]
+  },
+  {
+   "id": "23-unknown-model",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-review.md": "---\nname: shop-review\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nmodel: shop-large\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-model",
+     "NOTICE",
+     1
+    ]
+   ]
+  }
+ ]
+}

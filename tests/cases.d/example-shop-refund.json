@@ -1,0 +1,20 @@
+{
+ "cases": [
+  {
+   "id": "contrib-28-dead-script-beside-live-reference",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: \"Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\"\n---\n\nTo issue a refund, run `scripts/issue-refund.py <order-id>`.\nThe refund window is in `references/refund-window.md`.\n",
+    ".claude/skills/shop-refunds/references/refund-window.md": "# Refund window\n\nThirty days from delivery.\n"
+   },
+   "git": true,
+   "expected": [
+    ["28-skill-anchors", "WARN", 1],
+    ["19-frontmatter-quoting", "WARN", 0]
+   ],
+   "forbidden_messages": [
+    ["28-skill-anchors", "refund-window\\.md"]
+   ]
+  }
+ ]
+}

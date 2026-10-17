@@ -1,0 +1,27 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "32-plugin-prefix",
+   "files": {
+    ".claude-plugin/plugin.json": "{\"name\": \"shop-kit\", \"version\": \"1.0.0\"}\n",
+    "README.md": "# shop-kit\n",
+    "skills/shop-fancy/SKILL.md": "---\nname: shop-kit:shop-fancy\ndescription: Render the shop product cards. Do not use for checkout.\n---\n\nSee `README.md`.\n",
+    "skills/shop-cart/SKILL.md": "---\nname: Shop_Cart\ndescription: Edit the shop cart and its totals. Do not use for checkout.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "32-skill-name-shape",
+     "ERROR",
+     0
+    ],
+    [
+     "32-skill-name-shape",
+     "WARN",
+     1
+    ]
+   ]
+  }
+ ]
+}

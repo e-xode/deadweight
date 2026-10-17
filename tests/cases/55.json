@@ -1,0 +1,360 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "55-56-dot-claude-claude-md-only",
+   "files": {
+    ".claude/CLAUDE.md": "# shop-api\n\nRun /doctor when a hook misbehaves.\n",
+    ".cursor/rules/shop-api.mdc": "---\nalwaysApply: true\n---\nValidate bodies.\n",
+    ".github/copilot-instructions.md": "Use TypeScript.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursor-reads-claude-md",
+     "NOTICE",
+     0
+    ],
+    [
+     "56-copilot-reads-claude-md",
+     "NOTICE",
+     0
+    ],
+    [
+     "01-claude-md-size",
+     "OK",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "55-claude-md-without-other-agent",
+   "files": {
+    "CLAUDE.md": "# Shop\n\nUse the Task tool for research.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursor-reads-claude-md",
+     "NOTICE",
+     0
+    ],
+    [
+     "56-copilot-reads-claude-md",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "55-command-in-inline-code",
+   "files": {
+    "CLAUDE.md": "# shop-mcp\n\nRun `/hooks` to check the shop-db guard is registered before a migration.\n",
+    ".cursor/rules/shop-api.mdc": "---\nalwaysApply: true\n---\nValidate bodies.\n",
+    ".github/copilot-instructions.md": "Use TypeScript.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursor-reads-claude-md",
+     "NOTICE",
+     1
+    ],
+    [
+     "56-copilot-reads-claude-md",
+     "NOTICE",
+     1
+    ]
+   ],
+   "known_failure": true
+  },
+  {
+   "id": "55-cursor-dead-glob",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "src/cart.ts": "export {}\n",
+    ".cursor/rules/shop-api.mdc": "---\nglobs: api/**/*.ts\n---\nValidate request bodies.\n",
+    ".cursor/rules/shop-ts.mdc": "---\nglobs: *.ts\n---\nValidate request bodies.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursor-rule-glob",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "55-cursor-glob-braces",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "src/cart.tsx": "export {}\n",
+    ".cursor/rules/README.md": "# Our rules\n",
+    ".cursor/rules/shop-ui.mdc": "---\nglobs: **/*.{ts,tsx,css}\n---\nUse the design tokens.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursor-rule-glob",
+     "NOTICE",
+     0
+    ],
+    [
+     "55-cursor-rule-ignored",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "55-cursor-manual",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".cursor/rules/shop-api.mdc": "---\nalwaysApply: false\n---\nValidate request bodies.\n",
+    ".cursor/rules/shop-style.mdc": "---\nalwaysApply: true\n---\nValidate request bodies.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursor-rule-manual",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "55-cursor-md-ignored",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".cursor/rules/shop-api.md": "Validate request bodies.\n",
+    ".cursor/rules/ui-components.mdc": "---\ndescription: Vue components of the shop storefront\n---\nValidate request bodies.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursor-rule-ignored",
+     "WARN",
+     1
+    ],
+    [
+     "55-cursor-rule-manual",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "55-cursor-nested-skills",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".cursor/rules/skills/shop-release/SKILL.md": "---\nname: shop-release\ndescription: Release the shop storefront. Do not use for refunds.\n---\n\nSteps.\n",
+    ".cursor/rules/skills/shop-release/references/checklist.md": "# Checklist\n",
+    ".cursor/rules/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".cursor/rules/skills/shop-refunds/references/windows.md": "# Windows\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursor-rule-ignored",
+     "WARN",
+     2
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "55-cursor-rule-ignored",
+     "plain \\.md"
+    ]
+   ]
+  },
+  {
+   "id": "55-cursor-reads-claude-md",
+   "files": {
+    "CLAUDE.md": "# Shop\n\nDelegate reviews to specialist agents via the Task tool. Run `/compact` when context grows.\n",
+    ".cursor/rules/shop-api.mdc": "---\nalwaysApply: true\n---\nValidate bodies.\n",
+    ".github/copilot-instructions.md": "Use TypeScript.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursor-reads-claude-md",
+     "NOTICE",
+     1
+    ],
+    [
+     "56-copilot-reads-claude-md",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "55-cursor-reads-generic-claude-md",
+   "files": {
+    "CLAUDE.md": "# Shop\n\nSpawn subagents for research. Skills live in `.claude/skills/`.\n",
+    ".cursor/rules/shop-api.mdc": "---\nalwaysApply: true\n---\nValidate bodies.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursor-reads-claude-md",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "55-cursor-rule-md-folder",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".cursor/rules/shop-api/RULE.md": "---\ndescription: Shop API conventions\n---\nValidate bodies.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursor-rule-ignored",
+     "WARN",
+     0
+    ],
+    [
+     "55-cursor-rule-ignored",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "55-cursor-shared-agents-and-hooks",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nReviewers live in .claude/agents/ and the guard hook is declared in .claude/settings.json. Use the Task tool for research.\n",
+    ".cursor/rules/shop-api.mdc": "---\nalwaysApply: true\n---\nValidate bodies.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursor-reads-claude-md",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "55-cursor-reads-claude-md",
+     "\\.claude/agents|\\.claude/settings"
+    ]
+   ]
+  },
+  {
+   "id": "55-cursor-shared-cli-commands",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun /clear between tasks and /model to switch models. Run /compact when context grows.\n",
+    ".cursor/rules/shop-api.mdc": "---\nalwaysApply: true\n---\nValidate bodies.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursor-reads-claude-md",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "55-cursor-reads-claude-md",
+     "'/clear'|'/model'"
+    ]
+   ]
+  },
+  {
+   "id": "55-cursor-skill-in-rules",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".cursor/rules/shop-release/SKILL.md": "---\nname: shop-release\ndescription: Release the shop storefront. Do not use for refunds.\n---\n\nSteps.\n",
+    ".cursor/rules/shop-release/references/checklist.md": "# Checklist\n",
+    ".cursor/rules/shop-release/references/rollback.md": "# Rollback\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursor-rule-ignored",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "55-cursorrules",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".cursorrules": "Use TypeScript.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursorrules-legacy",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "55-mcp-http-route",
+   "files": {
+    "CLAUDE.md": "# shop-mcp\n\n- HTTP (shop API :8080, MCP at /mcp): `npm run serve`\n- Port 8081 (backend API + MCP /mcp)\n- Streaming: `POST /mcp/messages`\n",
+    ".cursor/rules/shop-api.mdc": "---\nalwaysApply: true\n---\nValidate bodies.\n",
+    ".github/copilot-instructions.md": "Use TypeScript.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursor-reads-claude-md",
+     "NOTICE",
+     0
+    ],
+    [
+     "56-copilot-reads-claude-md",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "55-plain-md-beside-skills",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".cursor/rules/skills/shop-release/SKILL.md": "---\nname: shop-release\ndescription: Release the shop storefront. Do not use for refunds.\n---\n\nSteps.\n",
+    ".cursor/rules/skills/conventions.md": "Use TypeScript.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursor-rule-ignored",
+     "WARN",
+     2
+    ]
+   ]
+  },
+  {
+   "id": "55-real-mcp-command",
+   "files": {
+    "CLAUDE.md": "# shop-mcp\n\nRun /hooks to check the shop-db guard is registered before a migration.\n",
+    ".cursor/rules/shop-api.mdc": "---\nalwaysApply: true\n---\nValidate bodies.\n",
+    ".github/copilot-instructions.md": "Use TypeScript.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "55-cursor-reads-claude-md",
+     "NOTICE",
+     1
+    ],
+    [
+     "56-copilot-reads-claude-md",
+     "NOTICE",
+     1
+    ]
+   ]
+  }
+ ]
+}

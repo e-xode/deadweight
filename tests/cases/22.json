@@ -1,0 +1,175 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "22-escaped-or-invalid-bracket",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "photos [2024/shop-banner.jpg": "x\n",
+    ".claude/rules/shop-photos-escaped.md": "---\npaths:\n  - 'photos \\[2024/**'\n---\nKeep the shop originals.\n",
+    ".claude/rules/shop-photos-plain.md": "---\npaths:\n  - 'photos [2024/**'\n---\nKeep the shop originals.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "22-rule-glob-match",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "22-rule-glob-match",
+     "glob 'photos \\\\\\[2024"
+    ]
+   ]
+  },
+  {
+   "id": "22-flow-list-brace-glob",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "src/checkout/cart.ts": "export const cart = 1;\n",
+    ".claude/rules/shop-ts.md": "---\npaths: [\"src/**/*.{ts,tsx}\", \"docs/**/*.{md,mdx}\"]\n---\nUse strict types in the shop code.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "22-rule-glob-match",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "22-generated-glob-without-prefix",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/rules/generated.md": "---\npaths:\n  - \"**/*.gen.ts\"\n---\nRegenerate, never edit.\n",
+    ".claude/rules/deploy.md": "---\npaths:\n  - \"deploy/**\"\n---\nNever deploy on Friday.\n",
+    "src/api.gen.ts": "export {};\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "22-rule-glob-match",
+     "WARN",
+     1
+    ]
+   ],
+   "gitignore": "*.gen.ts\n",
+   "forbidden_messages": [
+    [
+     "22-rule-glob-match",
+     "gen\\.ts"
+    ]
+   ]
+  },
+  {
+   "id": "22-glob-in-ignored-dir",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/rules/assets.md": "---\npaths:\n  - masters/**\n---\n\nKeep masters lossless.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "22-rule-glob-match",
+     "WARN",
+     0
+    ]
+   ],
+   "gitignore": "masters/\n"
+  },
+  {
+   "id": "22-glob-matches-nothing",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/rules/api.md": "---\npaths:\n  - src/payments/**\n---\n\nValidate amounts.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "22-rule-glob-match",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "22-glob-on-ignored-files-present",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/rules/gen.md": "---\npaths:\n  - \"src/**/*.generated.ts\"\n---\nDo not edit generated clients.\n",
+    ".claude/rules/deploy.md": "---\npaths:\n  - \"deploy/**\"\n---\nNever deploy on Friday.\n",
+    "src/index.ts": "export {};\n",
+    "src/api/client.generated.ts": "export {};\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "22-rule-glob-match",
+     "WARN",
+     1
+    ]
+   ],
+   "gitignore": "*.generated.ts\n",
+   "forbidden_messages": [
+    [
+     "22-rule-glob-match",
+     "generated"
+    ]
+   ]
+  },
+  {
+   "id": "22-glob-on-ignored-local-files",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/rules/local.md": "---\npaths:\n  - \"**/*.local.yaml\"\n---\nNever commit local overrides.\n",
+    ".claude/rules/deploy.md": "---\npaths:\n  - \"deploy/**\"\n---\nNever deploy on Friday.\n",
+    "config/db.local.yaml": "host: localhost\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "22-rule-glob-match",
+     "WARN",
+     1
+    ]
+   ],
+   "gitignore": "*.local.yaml\n",
+   "forbidden_messages": [
+    [
+     "22-rule-glob-match",
+     "local\\.yaml"
+    ]
+   ]
+  },
+  {
+   "id": "22-glob-under-tracked-build-folder",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/rules/vhost.md": "---\npaths:\n  - \"docker/build/nginx/**/*.conf\"\n---\nOne server block per file.\n",
+    ".claude/rules/deploy.md": "---\npaths:\n  - \"deploy/**\"\n---\nNever deploy on Friday.\n",
+    "docker/build/nginx/sites/shop.conf": "server { listen 80; }\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "22-rule-glob-match",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "22-rule-glob-match",
+     "docker/build"
+    ]
+   ]
+  }
+ ]
+}

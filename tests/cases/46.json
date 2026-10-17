@@ -1,0 +1,163 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "46-business-vocabulary",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee references/api.md.\n",
+    ".claude/skills/shop-refunds/references/api.md": "# Refund API\n\n- `order`: field of the refund payload.\n- `refund`: field of the refund payload.\n- `amount`: field of the refund payload.\n- `total`: field of the refund payload.\n- `status`: field of the refund payload.\n- `user`: field of the refund payload.\n- `create`: field of the refund payload.\n- `update`: field of the refund payload.\n- `delete`: field of the refund payload.\n- `list`: field of the refund payload.\n- `query`: field of the refund payload.\n- `cache`: field of the refund payload.\n- `token`: field of the refund payload.\n- `retry`: field of the refund payload.\n- `limit`: field of the refund payload.\n- `page`: field of the refund payload.\n- `item`: field of the refund payload.\n- `price`: field of the refund payload.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "46-doctrine-copy",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "46-copy-by-name",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-claude/SKILL.md": "---\nname: shop-claude\ndescription: How Claude Code is configured in the shop API. Do not use for refunds.\n---\n\nSee `references/skill-anatomy.md`.\n",
+    ".claude/skills/shop-claude/references/skill-anatomy.md": "# Skill anatomy\n\nA skill has a `name` and a `description`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "46-doctrine-copy",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "46-copy-by-terms",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-hooks/SKILL.md": "---\nname: shop-hooks\ndescription: Configure hooks for the shop repository. Do not use for refunds.\n---\n\nSee references/hooks.md.\n",
+    ".claude/skills/shop-hooks/references/hooks.md": "# How hooks work\n\n- `PreToolUse` is how Claude Code does it.\n- `SessionStart` is how Claude Code does it.\n- `UserPromptSubmit` is how Claude Code does it.\n- `disable-model-invocation` is how Claude Code does it.\n- `skillOverrides` is how Claude Code does it.\n- `allowed-tools` is how Claude Code does it.\n- `CLAUDE.md` is how Claude Code does it.\n- `paths:` is how Claude Code does it.\n- `permissions.allow` is how Claude Code does it.\n- `.claude/settings.json` is how Claude Code does it.\n- `.claude/settings.local.json` is how Claude Code does it.\n- `${CLAUDE_PLUGIN_ROOT}` is how Claude Code does it.\n- `${CLAUDE_PROJECT_DIR}` is how Claude Code does it.\n- `when_to_use` is how Claude Code does it.\n- `context: fork` is how Claude Code does it.\n- `InstructionsLoaded` is how Claude Code does it.\n- `PostToolUse` is how Claude Code does it.\n- `Stop` is how Claude Code does it.\n- `order` is how Claude Code does it.\n- `refund` is how Claude Code does it.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "46-doctrine-copy",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "46-copy-under-data-name",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-claude/SKILL.md": "---\nname: shop-claude\ndescription: How Claude Code is configured in the shop API. Do not use for refunds.\n---\n\nSee `references/semantic-layer.md`.\n",
+    ".claude/skills/shop-claude/references/semantic-layer.md": "# The semantic layer — what a reader sees and a parser does not\n\nEvery other check reads files mechanically. Two defects need a reader:\n\n- `58-semantic-contradiction`: two instructions that cannot both be followed.\n- `59-semantic-duplicate`: the same rule written in two files, in different words.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "46-doctrine-copy",
+     "NOTICE",
+     1
+    ]
+   ],
+   "known_failure": true
+  },
+  {
+   "id": "46-decision-log",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-governance/SKILL.md": "---\nname: shop-governance\ndescription: Why the shop API configuration is the way it is. Do not use for refunds.\n---\n\nSee `references/decisions.md`.\n",
+    ".claude/skills/shop-governance/references/decisions.md": "# Decisions\n\n- `shop-rule-0`: kept because `make test-0` is slow.\n- `shop-rule-1`: kept because `make test-1` is slow.\n- `shop-rule-2`: kept because `make test-2` is slow.\n- `shop-rule-3`: kept because `make test-3` is slow.\n- `shop-rule-4`: kept because `make test-4` is slow.\n- `shop-rule-5`: kept because `make test-5` is slow.\n- `shop-rule-6`: kept because `make test-6` is slow.\n- `shop-rule-7`: kept because `make test-7` is slow.\n- `shop-rule-8`: kept because `make test-8` is slow.\n- `shop-rule-9`: kept because `make test-9` is slow.\n- `shop-rule-10`: kept because `make test-10` is slow.\n- `shop-rule-11`: kept because `make test-11` is slow.\n- `shop-rule-12`: kept because `make test-12` is slow.\n- `shop-rule-13`: kept because `make test-13` is slow.\n- `shop-rule-14`: kept because `make test-14` is slow.\n- `shop-rule-15`: kept because `make test-15` is slow.\n- `shop-rule-16`: kept because `make test-16` is slow.\n- `shop-rule-17`: kept because `make test-17` is slow.\n- `shop-rule-18`: kept because `make test-18` is slow.\n- `shop-rule-19`: kept because `make test-19` is slow.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "46-doctrine-copy",
+     "NOTICE",
+     0
+    ],
+    [
+     "01-claude-md-size",
+     "OK",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "46-domain-semantic-layer",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-metrics/SKILL.md": "---\nname: shop-metrics\ndescription: Define the shop sales metrics in the warehouse. Do not use for refunds.\n---\n\nSee `references/semantic-layer.md`.\n",
+    ".claude/skills/shop-metrics/references/semantic-layer.md": "# Semantic layer\n\n- `net_revenue`: orders minus refunds, per day.\n- `orders_count`: paid orders, per day.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "46-doctrine-copy",
+     "NOTICE",
+     0
+    ],
+    [
+     "01-claude-md-size",
+     "OK",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "46-fragment-under-reference-name",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-refunds/references/skill-runtime-mechanisms.md": "# How skills load\n\nThe listing shows each `description`; the body loads on use.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "46-doctrine-copy",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "46-generic-name",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/ui-review/SKILL.md": "---\nname: ui-review\ndescription: Review the shop storefront React components. Do not use for the API.\n---\n\nSee references/antipatterns.md.\n",
+    ".claude/skills/ui-review/references/antipatterns.md": "# Antipatterns\n\n- `useEffect` without dependencies.\n- `key={index}` in lists.\n",
+    ".claude/skills/shop-refunds/references/skill-anatomy.md": "# Refund skill notes\n\nThe `refund` flow.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "46-doctrine-copy",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "46-repository-layout-note",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-deploy/SKILL.md": "---\nname: shop-deploy\ndescription: Deploy the shop services and configure their hooks. Do not use for refunds.\n---\n\nSee references/layout.md and references/hooks.md.\n",
+    ".claude/skills/shop-deploy/references/layout.md": "# Repository layout\n\n- `src/`: part of the shop deploy.\n- `lib/`: part of the shop deploy.\n- `app/`: part of the shop deploy.\n- `tests/`: part of the shop deploy.\n- `scripts/`: part of the shop deploy.\n- `config/`: part of the shop deploy.\n- `*.json`: part of the shop deploy.\n- `docker/`: part of the shop deploy.\n- `packages/`: part of the shop deploy.\n- `*.md`: part of the shop deploy.\n- `*.js`: part of the shop deploy.\n- `GITHUB_TOKEN`: part of the shop deploy.\n- `NODE_AUTH_TOKEN`: part of the shop deploy.\n- `AWS_ACCESS_KEY_ID`: part of the shop deploy.\n- `AWS_SECRET_ACCESS_KEY`: part of the shop deploy.\n- `shop-api`: part of the shop deploy.\n- `shop-web`: part of the shop deploy.\n- `refunds.ts`: part of the shop deploy.\n- `make deploy`: part of the shop deploy.\n",
+    ".claude/skills/shop-deploy/references/hooks.md": "# How hooks work\n\n- `PreToolUse` is how Claude Code does it.\n- `SessionStart` is how Claude Code does it.\n- `UserPromptSubmit` is how Claude Code does it.\n- `disable-model-invocation` is how Claude Code does it.\n- `skillOverrides` is how Claude Code does it.\n- `allowed-tools` is how Claude Code does it.\n- `CLAUDE.md` is how Claude Code does it.\n- `paths:` is how Claude Code does it.\n- `permissions.allow` is how Claude Code does it.\n- `.claude/settings.json` is how Claude Code does it.\n- `.claude/settings.local.json` is how Claude Code does it.\n- `${CLAUDE_PLUGIN_ROOT}` is how Claude Code does it.\n- `${CLAUDE_PROJECT_DIR}` is how Claude Code does it.\n- `when_to_use` is how Claude Code does it.\n- `context: fork` is how Claude Code does it.\n- `InstructionsLoaded` is how Claude Code does it.\n- `PostToolUse` is how Claude Code does it.\n- `Stop` is how Claude Code does it.\n- `order` is how Claude Code does it.\n- `refund` is how Claude Code does it.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "46-doctrine-copy",
+     "NOTICE",
+     1
+    ]
+   ]
+  }
+ ]
+}

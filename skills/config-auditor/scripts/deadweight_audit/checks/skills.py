@@ -578,7 +578,7 @@ def check_frontmatter_quoting(ctx: AuditContext, report: Report) -> None:
 
     for path in targets:
         try:
-            text = path.read_text(encoding="utf-8")
+            text = path.read_text(encoding="utf-8-sig")
         except (OSError, UnicodeDecodeError):
             continue
         if not text.startswith("---"):

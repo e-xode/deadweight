@@ -1,0 +1,90 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "11-english-it-suffix",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-refunds/references/ship-it.md": "# Notes\n\nCe fichier doit toujours etre lu avant, parce que les notes changent souvent selon le client.\n",
+    ".claude/skills/shop-refunds/references/it/runbook.md": "# Notes\n\nCe fichier doit toujours etre lu avant, parce que les notes changent souvent selon le client.\n",
+    ".claude/skills/shop-refunds/references/guide-fr.md": "# Notes\n\nCe fichier doit toujours etre lu avant, parce que les notes changent souvent selon le client.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "11-english-only",
+     "NOTICE",
+     2
+    ]
+   ]
+  },
+  {
+   "id": "11-english-pour",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-batches/SKILL.md": "---\nname: shop-batches\ndescription: Load shop order batches into the refund queue. Do not use for invoicing.\n---\n\nPour the batch into the queue.\n\nPour the refunds into the ledger.\n\nPour the receipts into the archive.\n",
+    ".claude/skills/shop-notes/SKILL.md": "---\nname: shop-notes\ndescription: Keep the shop team's working notes on refunds and payouts. Do not use for customer-facing text.\n---\n\nCe fichier doit toujours etre lu avant, parce que les notes changent souvent selon le client.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "11-english-only",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "11-locale-in-a-skill",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-refunds/references/guide-fr.md": "# Notes\n\nCe fichier doit toujours etre lu avant, parce que les notes changent souvent selon le client.\n",
+    ".claude/skills/shop-refunds/references/fr/faq.md": "# Notes\n\nCe fichier doit toujours etre lu avant, parce que les notes changent souvent selon le client.\n",
+    ".claude/skills/shop-refunds/references/notes.md": "# Notes\n\nCe fichier doit toujours etre lu avant, parce que les notes changent souvent selon le client.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "11-english-only",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "11-pour-short-french",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-refunds/references/notes.md": "Pour déployer, lancez le script avec le fichier de configuration.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "11-english-only",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "11-ship-it-not-italian",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-refunds/references/ship-it.md": "Ce fichier explique comment livrer. Vous devez toujours lancer les tests avant, puis le script doit tagger la version.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "11-english-only",
+     "NOTICE",
+     1
+    ]
+   ]
+  }
+ ]
+}

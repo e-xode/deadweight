@@ -1,0 +1,218 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "08-agent-name-dash-or-too-long",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/agents/shop-dash.md": "---\nname: -shop-dash\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\n---\n\nReview.\n",
+    ".claude/agents/shop-long.md": "---\nname: shop-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "08-agent-frontmatter",
+     "ERROR",
+     2
+    ]
+   ]
+  },
+  {
+   "id": "08-agent-opening-not-on-line-1",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/agents/shop-review.md": "\n---\nname: shop-review\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "08-agent-frontmatter",
+     "ERROR",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "08-agent-frontmatter",
+     "does not parse"
+    ]
+   ]
+  },
+  {
+   "id": "08-agent-type-restriction",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-review.md": "---\nname: shop-review\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\ntools: Read, Agent(shop-review)\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-tools",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "08-agent-unknown-key",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-review.md": "---\nname: shop-review\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\ntemperature: 0.2\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-frontmatter-keys",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "08-agent-yaml-comment-or-flow",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/agents/shop-rev-a.md": "---\nname: shop-rev-a\ndescription: Review shop code changes before merge. Do not use for writing code.\n  # TODO: tighten this\ntools: Read, Grep\n---\n\nReview.\n",
+    ".claude/agents/shop-rev-b.md": "---\nname: shop-rev-b\ndescription: Review shop code changes before merge. Do not use for writing code.\nmodel: sonnet # was opus:\ntools: Read, Grep\n---\n\nReview.\n",
+    ".claude/agents/shop-rev-c.md": "---\nname: shop-rev-c\ndescription: Review shop code changes before merge. Do not use for writing code.\nskills: [\n  shop-a,\n  shop-b\n]\n---\n\nReview.\n",
+    ".claude/agents/shop-rev-d.md": "---\nname: shop-rev-d\ndescription: Review shop code\n  before merge. Example: a PR\ntools: Read\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "08-agent-frontmatter",
+     "ERROR",
+     1
+    ],
+    [
+     "23-agent-skills-preload",
+     "WARN",
+     2
+    ]
+   ]
+  },
+  {
+   "id": "08-agent-yaml-does-not-parse",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/agents/shop-rev.md": "---\nname: shop-rev\ndescription: Review shop code: checks style\n  tools: [Read\n---\n\nReview.\n",
+    ".claude/agents/shop-rev2.md": "---\nname: shop-rev2\ndescription: \"Review shop code\n---\n\nReview.\n",
+    ".claude/agents/shop-rev3.md": "---\nname: shop-rev3\ndescription: Review shop code.\ntools: Read, Grep\n\tmodel: sonnet\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "08-agent-frontmatter",
+     "ERROR",
+     3
+    ],
+    [
+     "23-agent-tools",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "08-document-in-agents",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/ROUTING.md": "# Which agent for which task\n\nUse shop-review for reviews.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "08-agent-frontmatter",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "08-plugin-agent-empty-frontmatter",
+   "files": {
+    ".claude-plugin/plugin.json": "{\"name\": \"shop-kit\", \"version\": \"1.0.0\"}\n",
+    "skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "agents/shop-review.md": "---\n---\n\nReview shop code.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "08-agent-frontmatter",
+     "WARN",
+     1
+    ],
+    [
+     "08-agent-frontmatter",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "08-plugin-agent-without-name",
+   "files": {
+    ".claude-plugin/plugin.json": "{\"name\": \"shop-kit\", \"version\": \"1.0.0\"}\n",
+    "skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "agents/shop-review.md": "---\ndescription: Review shop code changes. Do not use for writing code.\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "08-agent-frontmatter",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "08-plugin-without-agents",
+   "files": {
+    ".claude-plugin/plugin.json": "{\n  \"name\": \"shop-kit\",\n  \"version\": \"1.2.0\"\n}",
+    "skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "08-agents-dir",
+     "INFO",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "08-project-without-agents",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "08-agents-dir",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "08-tool-old-name",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-review.md": "---\nname: shop-review\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\ntools: Read, MultiEdit\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "23-agent-tools",
+     "WARN",
+     1
+    ]
+   ]
+  }
+ ]
+}

@@ -3,12 +3,17 @@ from __future__ import annotations
 
 
 
-# Source: code.claude.com/docs/en/sub-agents, supported frontmatter fields (18).
+# Source: code.claude.com/docs/en/sub-agents, supported frontmatter fields (18; 19 on
+# 2026-10-17 with `autoCompactWindow`, "Requires Claude Code v2.1.296 or later").
 AGENT_KNOWN_KEYS = {
     "name", "description", "tools", "disallowedTools", "model", "permissionMode",
-    "maxTurns", "skills", "mcpServers", "hooks", "memory", "background", "omitClaudeMd",
+    "maxTurns", "autoCompactWindow", "skills", "mcpServers", "hooks", "memory", "background", "omitClaudeMd",
     "effort", "isolation", "color", "initialPrompt", "experimental",
 }
+
+
+# sub-agents and settings-reference, read 2026-10-17: "a token count from `100000` to `1000000`".
+AUTO_COMPACT_WINDOW_MIN, AUTO_COMPACT_WINDOW_MAX = 100_000, 1_000_000
 
 
 AGENT_PERMISSION_MODES = {"default", "manual", "acceptEdits", "auto", "dontAsk",

@@ -1,5 +1,149 @@
 # Changelog
 
+## 0.26.0 — 2026-10-17
+
+**`audit.py` changed: floors set with 0.25.0 no longer compare** (`34-floor` refuses two auditors). Run `audit.py --set-floor` once and commit `floor.json`. What can **raise** a count: a hook matcher holding a permission rule as one of its `|` alternatives (new `35-hooks-matcher` NOTICE, or ERROR when no alternative can fire or the matcher is not a valid regular expression), an `autoCompactWindow` outside its documented range (`23-agent-frontmatter-keys` WARN in an agent, new `24-settings-value` NOTICE in settings), an async frontmatter hook with `onFailure: "block"` (`35-hooks-shape` NOTICE), and the findings of any check on a skill, agent or rule file that opens with a UTF-8 byte order mark, whose frontmatter is now read. What can **lower** one: on such a file, the `02-skill-frontmatter` or `08-agent-frontmatter` WARN saying it has no frontmatter; `35-hooks-timeout` on an async frontmatter hook; `24-settings-unknown-subkey` on each model name under `modelSettings`. Measured on the 23 folders of one workspace (22 private repositories, and this one) with the 0.25.0 auditor and this one on the same files, 2026-10-17: errors 0 → 0, warnings 60 → 60, notices 113 → 113. The alignment with Claude Code 2.1.270-2.1.302 below can raise a count too (`TaskOutput`, `taskOutputMaxChars`, `onFailure`, `"type": "sdk"`, `mcp__<server>` allow rules, plugin paths) and lower one (`autoCompactWindow`, `idleCompaction`); on the same 23 folders it changed none: 0 / 60 / 113.
+
+### Fixed
+
+- **`31-overlay-unknown-check`: an exemption for `08b-agent-description` was called inert.** The
+  ids the auditor knows were read as two digits then a dash, so the one id it emits with a letter
+  after its number was not among them: the exemption excused the finding, and a WARN still said
+  the audit never emits that id. A letter after the two digits is now read; no other id changed.
+  This can **lower** a WARN count, in a project that exempts `08b-agent-description`.
+- **`worktree.location` (Claude Desktop SSH sessions) in a project's `.claude/settings.json`** got
+  `24-settings-unknown-subkey` (NOTICE): the fields of `worktree` lacked `location`. Its Scope is
+  `User`, "in `~/.claude/settings.json` on the remote machine" (settings-reference, read
+  2026-10-17): in the project file it is now `24-settings-scope` (ERROR), "takes effect from user
+  settings (~/.claude/settings.json) only". `settings.local.json` is barred the same way, as for the
+  *User or managed* keys: the Scope names no Local file (not probed). Found by the drift check
+  against the docs, not by a user. This **raises** an ERROR count where a shared or local file sets it.
+- **`forceLoginGatewayUrl` was read as *Managed* only.** Its Scope is *User or managed*
+  (settings-reference, read 2026-10-17; Claude Code 2.1.295+ also reads it from user settings on a
+  machine with no managed source). In a project or local file it is still `24-settings-scope`
+  (ERROR), same count; the message now names "user or managed settings" instead of "managed
+  settings". Every *User or managed* key's message changed the same way: it said "user settings
+  only", leaving managed settings out. `forceLoginMethod`, `forceLoginOrgUUID` (*Any file*) and
+  `gatewayInternalNetworks` (*Managed*) are unchanged.
+- **`35-hooks-matcher`: a permission rule as one alternative of a matcher.** `Bash(git *)` written
+  as the whole matcher was reported since 0.23.0; `Bash(git *)|Write` and `Write|Edit(*.ts)`
+  produced no finding. The hooks page says a matcher holding any character outside letters, digits,
+  `_`, `-`, spaces, `,` and `|` is one JavaScript regular expression tested on the tool name, and
+  that argument patterns belong in the `if` field. Probe, Claude Code 2.1.302 (`claude -p`, a
+  single run, recorded in `evidence.json` under `35-hooks-matcher`): `Bash(git *)|Write` fired on `Write` and not on
+  `git status`; `Write|Edit(*.ts)`, not a valid regular expression, fired on neither. The hooks
+  page does not say what Claude Code does with an invalid matcher: that ERROR rests on this one run
+  and says so. The first is now a NOTICE, as a dead alternative is (the others still fire), the
+  second an ERROR, each naming the matcher to write and the rule to move into `if`. A matcher
+  whose alternatives are all rules that match no tool name (`Bash(git push *)|Bash(git commit *)`)
+  is an ERROR, the group never fires. Alternatives are split on the `|` outside parentheses:
+  `Write|Bash(npm run lint|npm test)` has two, and its `Bash(...)` one gets the NOTICE. Before,
+  `Bash(git *)|Edit(*.ts)` was read as one rule and advised a matcher `Bash` (dropping `Edit`) with
+  both rules in one `if`, which holds "exactly one permission rule" (hooks); with two rules the
+  advice is now one handler per rule.
+- **A UTF-8 byte order mark before the opening `---`** hid the frontmatter: a SKILL.md got
+  `02-skill-frontmatter` "has no YAML frontmatter" (WARN), an agent `08-agent-frontmatter` (WARN),
+  and the checks reading their fields, a rule's `paths:` and frontmatter hooks saw nothing. Probe,
+  Claude Code 2.1.302 (`claude -p`, one run, recorded in `evidence.json` under `frontmatter-bom`): such a
+  SKILL.md is listed with its description, such an agent loads. A rule opening with the mark was
+  probed in the same run: its `paths:` was read (it loaded on reading a matching file, not at session start). The frontmatter
+  readers now skip the mark, as the JSON readers already did.
+- **`hooks: []` in a skill's or an agent's frontmatter** was read "only in part (multi-line scalars,
+  flow mappings)" (`35-hooks-shape` NOTICE). It is an empty list and declares no hook; the NOTICE
+  now says that. Same count. The skill still loads (Claude Code 2.1.302, one run, a skill only: an agent's `hooks: []` was
+  not run; `evidence.json`, `35-hooks-shape`). `"hooks": []` at the
+  top of a settings file is unchanged (`35-hooks-shape` ERROR, not an object).
+- **`TaskOutput` in an agent's `tools:`** was a NOTICE, "deprecated". tools-reference says
+  "Removed in v2.1.277". Probe, Claude Code 2.1.302 (`claude -p`, one run each): `tools: TaskOutput`
+  alone is refused ("would be spawned with zero tools"), beside `Read` it grants nothing. Now WARN,
+  ERROR when no entry is left (`23-agent-tools`); an allow rule `TaskOutput` approves nothing
+  (`42-permissions-rule` WARN); `taskOutputMaxChars` has no effect (`24-settings-unknown-key` NOTICE).
+- **`autoCompactWindow` in an agent** (sub-agents, 2.1.296+, the nineteenth field) was an unknown key
+  (`23-agent-frontmatter-keys` WARN, whatever its value); a misspelling of it now names the field.
+  Its value is now checked: the field takes "a token count from `100000` to `1000000`", and "in
+  frontmatter Claude Code reads `200k` as 200, which is outside the allowed range. The subagent
+  still loads and compacts as if the field were absent" (sub-agents). A value that is not a plain
+  integer in that range is a `23-agent-frontmatter-keys` WARN. In a settings file, the top-level
+  key and `modelSettings.<model>.autoCompactWindow` take "a number of tokens from `100000` to
+  `1000000`" (the second also `"auto"`, settings-reference); another value is a new
+  `24-settings-value` NOTICE, which says the page does not tell what Claude Code does with it. The
+  INFO that listed agent keys "this script does not validate" now says "outside the documented
+  fields": it never judged values.
+- **`modelSettings` was read as an object with two fields**, `effortLevel` and `maxEffortLevel`: each
+  model name under it was `24-settings-unknown-subkey` (NOTICE). It maps a model name to "an object
+  with any of these fields" (settings-reference); the fields of each entry are now checked
+  (`autoCompactWindow`, `effortLevel`, `maxEffortLevel`). This **lowers** a NOTICE count wherever a
+  settings file sets it.
+- **`idleCompaction` in settings** (settings-reference: "requires Claude Code v2.1.290 or later";
+  announced in the 2.1.299 changelog) was an unknown key (`24-settings-unknown-key` NOTICE).
+- **`onFailure` on a hook** (hooks, 2.1.295+) is a `35-hooks-shape` NOTICE in two kinds of case.
+  `"block"` on `Stop`, `SubagentStop`, `TaskCompleted`, `TeammateIdle` or on an `async` /
+  `asyncRewake` command hook: "The field has no effect on these hooks" (hooks). `"block"` on a
+  handler other than command/http, or a value other than `continue`/`block`: the page documents the
+  field, and those two values, for command and http hooks only, and says nothing of the rest.
+- **`async: true` in a skill's or an agent's frontmatter hook** was read as the text `true`: the
+  `onFailure` NOTICE above was never given there, and `35-hooks-timeout` (NOTICE) was given on an
+  async hook, whose timeout "Claude Code doesn't enforce" (hooks). The boolean handler fields
+  (`async`, `asyncRewake`, `once`) of a frontmatter hook are now read as YAML booleans.
+- **`"type": "sdk"` in `.mcp.json`** is skipped by Claude Code (mcp; `claude mcp list`, 2.1.302):
+  `43-mcp-shape` ERROR.
+- **An allow rule `mcp__<server>` for a `.mcp.json` server whose name contains `__` or ends in `_`**
+  approves none of its tools (permissions, 2.1.299): `42-permissions-rule` WARN, naming
+  `mcp__<server>__*`.
+- **`44-plugin-path` skipped `workflows`, `themes`, `monitors` and `experimental.themes` /
+  `experimental.monitors`**: a path without `./` or escaping the plugin there was not reported;
+  `claude plugin validate` 2.1.302 refuses both.
+
+
+### Changed
+
+- **`skill-anatomy.md` said `04-skill-description-brackets` "warns"**: it is a WARN in a plugin and
+  a NOTICE in a project; the checklist says so too. `hooks-anatomy.md` and the checklist describe
+  the two matcher findings above and the empty frontmatter list.
+- **Labelled cases** (`tests/cases/`, 437): three documented limits are now cases marked
+  `known_failure`, each stating the right verdict - an exclusion in the next sentence
+  (`33-description-overlap`), a command in inline code (`55`/`56-*-reads-claude-md`), and a copy of
+  a reference under the name `semantic-layer.md` (`46-doctrine-copy`, with a case where a data
+  repository's own `semantic-layer.md` stays silent). They are reported, not failed.
+- **References aligned with Claude Code 2.1.270-2.1.302**, each against its doc page (2026-10-17):
+  path-scoped rules load on Write, Edit and a single-file `cat`/`head`/`grep` too (measured on
+  2.1.302 with an `InstructionsLoaded` log: a `Write` creating a matching file loads the rule, with
+  the tool's result; the 2.1.280 behaviour is kept as reported upstream, not measured here) - `rules-anatomy.md`, F4, the
+  checklist, `official-links.md`; MCP description cap 4,096 characters upfront, 16,384 through tool search, and
+  `alwaysLoad: false`; `"attribution": false` (2.1.281+); `onFailure: "block"` as the remedy for a
+  hook that cannot start or times out; `Bash(git:* status)` measured on 2.1.302 (the colon is
+  literal: it did not stop `git status`). Probes are in `skills/config-auditor/evidence.json`.
+  Labelled cases: 453 (16 added, 13 of them failing on 0.25.0).
+- **Labelled cases after the external audit of 2026-10-17**: 465 in all (402 in 0.25.0). Nine added,
+  each failing on 0.25.0: the three matcher shapes above, an async frontmatter hook, `autoCompactWindow`
+  at `200k`, below the range and in settings, `modelSettings` per model, and a rule alone behind a
+  byte order mark (its verdict assumes the rule is read as the probed skill and agent are). The
+  plugin-paths case's monitor gained the `description` plugins-reference requires.
+- **The generated labelled cases moved from `tests/cases.json` to `tests/cases/`**, one file per
+  check family (`35.json`, `fp.json`...), cases sorted by id: the single file had grown to 851 KiB,
+  and the Claude plugin directory holds for a reviewer any file that is not an image or font from
+  256 KiB up. Every file now stays under 200 KiB; a family that outgrows it is split
+  (`29-1.json`, `29-2.json`). `tests/test_cases.py` reads the folder and fails if it holds no case.
+  `tests/cases.d/` is unchanged.
+- **Credential-shaped test values are placeholders**: the literal secrets that cases and tests
+  feed to `43-mcp-secret` and `50-security-secret` are now `sk-xxxxxxxxxxxxxxxxxxxxxxxx` and
+  `Bearer xxxxxxxxxxxxxxxxxxxxxxxx` - the vendor's prefix followed only by `x`, the form the plugin
+  directory accepts for a sample value. The checks fire on them as before: same expected counts.
+
+### Added
+
+- `.claude-plugin/icon.png`: the icon of the plugin's listing in Anthropic's directory (a 1,024-pixel square PNG, 13 KB; the portal reads it from this path).
+- A daily Claude Code release watch (`.github/workflows/claude-code-watch.yml`, `.github/scripts/claude_code_watch.py`): reads npm `latest` and the upstream `CHANGELOG.md`, and opens one `claude-code-drift` issue per range of new versions with the camelCase keys the plugin has never named, the removals and deprecations, and the lines touching frontmatter, settings, hooks, permissions or plugin manifests. Deterministic: no model, no API key, the issues are its state. Backtest on 2.1.270-2.1.302 against 0.25.0: it flags `idleCompaction` and `onFailure` by name and reaches `autoCompactWindow`, the `TaskOutput` removal and `"attribution": false` by line; it does not see the MCP description cap change.
+- `tests/test_claude_code_watch.py`, with invented fixtures under `tests/fixtures/watch/`.
+- A guard that every check id the auditor emits is fired by a labelled case or named, with the test that holds it, in `NOT_FIRED_BY_A_CASE`; 26 cases added to the corpus for the 14 ids that had none, and a test for `38-unreadable`.
+- Contributed labelled cases: `tests/cases.d/*.json`, in the format of `tests/cases/*.json`, replayed by `tests/test_cases.py` with the generated ones (the two guard tests read the union), and checked for format, unique ids across both sources, relative paths and leaks (a non-fictional home folder, a real email, a provider token). One example, `tests/cases.d/example-shop-refund.json`; how to add one in `CONTRIBUTING.md`.
+- A vocabulary drift check (`.github/scripts/vocabulary_drift.py`), run daily by the release watch: 17 lists of `deadweight_audit/vocabulary` against names extracted from the raw docs pages - tools, agent and skill frontmatter keys, hook events, model tiers, settings keys with their prose aliases, hook handler types, the two bullet lists of events by handler type, agent permission modes, and the settings keys of each documented Scope. Exit 10 on drift, and its section goes into the watch's `claude-code-drift` issue (or one standing, version-less issue, replaced in place); a page that cannot be downloaded is reported as "could not check" (exit 3), never as drift. Deterministic, no model, no key. On 2026-10-17 its first run finds `forceLoginGatewayUrl` documented as "User or managed" and listed as managed-only, and `worktree.location` documented with a scope ("User") no list holds. Tests offline on invented pages: `tests/test_vocabulary_drift.py`, `tests/fixtures/drift/`.
+- `skills/config-auditor/probes/run_probes.py`: replays against the local `claude` the facts `evidence.json` records as tested, PASS/FAIL/ERROR/SKIP next to `claude --version`, each in a temporary directory, and names the recorded tests it does not replay and why. Eight probes: `44-plugin-path`, `43-mcp-shape`, `35-hooks-shape` (`onFailure`, and a skill with `hooks: []`), `23-agent-tools` (TaskOutput), `42-permissions-rule` (mid-pattern `:*`), `35-hooks-matcher` (`Bash(git *)|Write` fires on `Write` only, `Write|Edit(*.ts)` on nothing, a `Bash|Write` control on both) and `frontmatter-bom` (a skill, an agent and a path-scoped rule behind a UTF-8 byte order mark: listed, frontmatter read, the rule loads only on a matching read). On 2.1.302 they all hold (8 Haiku runs, about $0.014 in total; the `42-permissions-rule` verdict read from its saved streams after a parser fix, not from a second run). Without `claude`, every probe is SKIP and it exits 0. A probe that cannot run as written (timeout, empty output, unknown subcommand, a model that did not make the calls asked for, more `claude` calls than declared) is ERROR, not FAIL; `--only` with no matching probe exits 2.
+- `tests/test_probes.py` holds the runner's safety and cost properties with a fake `claude`: no write outside a probe's temporary directory or under `HOME`, a temporary config directory for every local call, a bounded timeout on every call, no billed call under `--no-model`, the declared number of calls, and each probe's PASS/FAIL on the recorded behaviour and on its opposite.
+- Release watch hardening: `vocabulary_drift.py` exits 10 on drift (1 is a Python traceback, 3 a page it could not fetch), a partial download is "unchecked", `--attach` refuses an empty or marker-less file and the workflow attaches only on 10; lines of the drift section are no longer cut at 400 characters; upstream lines quoted in an issue no longer create backlinks (`owner/repo#N`, `#N`, `GH-N` and URLs become code); a malformed webhook no longer prints its URL; a changelog whose version headings stop parsing fails the run (exit 4) instead of reporting "nothing new".
+- Contributed cases: ids and regular expressions of `forbidden_messages` and the boolean flags are validated; a `known_failure` case is reported as a skip naming its gaps, and fails once it passes or if a check crashes on it; e-mail addresses on `.md`, `.sh` and `.py` domains are caught by the leak filter.
+- `evidence.json`: the 2.1.280 rule-creation behaviour is recorded as reported upstream, not measured here.
+
 ## 0.25.0 — 2026-10-09
 
 ### Added

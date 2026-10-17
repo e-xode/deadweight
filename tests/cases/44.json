@@ -1,0 +1,201 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "44-agents-folder",
+   "files": {
+    ".claude-plugin/plugin.json": "{\"name\": \"shop-kit\", \"version\": \"1.0.0\", \"agents\": \"./agents\"}\n",
+    "skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "agents/shop-review.md": "---\nname: shop-review\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "44-plugin-path",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "44-default-dirs-not-md",
+   "files": {
+    ".claude-plugin/plugin.json": "{\"name\": \"shop-tools\", \"workflows\": [\"./workflows/release.js\"], \"experimental\": {\"themes\": \"./themes/dark.json\", \"monitors\": \"./config/monitors.json\"}}\n",
+    "skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "workflows/release.js": "export default {};\n",
+    "workflows/nightly.js": "export default {};\n",
+    "themes/dark.json": "{}\n",
+    "themes/light.json": "{}\n",
+    "config/monitors.json": "[]\n",
+    "monitors/monitors.json": "[]\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "44-plugin-path",
+     "WARN",
+     3
+    ]
+   ]
+  },
+  {
+   "id": "44-experimental-paths-valid",
+   "files": {
+    ".claude-plugin/plugin.json": "{\n  \"name\": \"shop-kit\",\n  \"version\": \"1.2.0\",\n  \"experimental\": {\n    \"themes\": \"./themes/\",\n    \"evals\": \"quality/evals\",\n    \"monitors\": [\n      {\n        \"name\": \"shop-log\",\n        \"command\": \"tail -f shop.log\",\n        \"description\": \"Shop log errors\"\n      }\n    ]\n  }\n}",
+    "skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: \"Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\"\n---\n\nSee `README.md`.\n",
+    "themes/shop.json": "{}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "44-plugin-path",
+     "ERROR",
+     0
+    ],
+    [
+     "44-plugin-path",
+     "WARN",
+     0
+    ],
+    [
+     "44-plugin-version",
+     "WARN",
+     0
+    ],
+    [
+     "19-frontmatter-quoting",
+     "WARN",
+     0
+    ],
+    [
+     "00-layout",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "44-folder-inside-claude-plugin",
+   "files": {
+    ".claude-plugin/plugin.json": "{\n  \"name\": \"shop-kit\"\n}",
+    ".claude-plugin/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "44-plugin-layout",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "44-monitors-path-outside-plugin",
+   "files": {
+    ".claude-plugin/plugin.json": "{\n  \"name\": \"shop-kit\",\n  \"version\": \"1.2.0\",\n  \"monitors\": \"./../shop-shared/monitors.json\"\n}",
+    "skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "44-plugin-path",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "44-path-without-dot",
+   "files": {
+    ".claude-plugin/plugin.json": "{\n  \"name\": \"shop-kit\",\n  \"agents\": \"agents/\"\n}",
+    "skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "44-plugin-path",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "44-skills-dot",
+   "files": {
+    ".claude-plugin/plugin.json": "{\"name\": \"shop-kit\", \"version\": \"1.0.0\", \"skills\": \".\"}\n",
+    "SKILL.md": "---\nname: shop-kit\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "44-plugin-path",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "44-themes-path-without-dot",
+   "files": {
+    ".claude-plugin/plugin.json": "{\n  \"name\": \"shop-kit\",\n  \"version\": \"1.2.0\",\n  \"experimental\": {\n    \"themes\": \"themes/\"\n  }\n}",
+    "skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "44-plugin-path",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "44-version-aligned",
+   "files": {
+    ".claude-plugin/plugin.json": "{\n  \"name\": \"shop-kit\",\n  \"version\": \"1.2.0\"\n}",
+    ".claude-plugin/marketplace.json": "{\n  \"name\": \"shop-market\",\n  \"owner\": {\n    \"name\": \"shop\"\n  },\n  \"plugins\": [\n    {\n      \"name\": \"shop-kit\",\n      \"source\": \"./\",\n      \"version\": \"1.2.0\"\n    }\n  ]\n}",
+    "skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "44-plugin-version",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "44-version-mismatch",
+   "files": {
+    ".claude-plugin/plugin.json": "{\n  \"name\": \"shop-kit\",\n  \"version\": \"1.2.0\"\n}",
+    ".claude-plugin/marketplace.json": "{\n  \"name\": \"shop-market\",\n  \"owner\": {\n    \"name\": \"shop\"\n  },\n  \"plugins\": [\n    {\n      \"name\": \"shop-kit\",\n      \"source\": \"./\",\n      \"version\": \"1.1.0\"\n    }\n  ]\n}",
+    "skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "44-plugin-version",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "44-workflows-path-without-dot",
+   "files": {
+    ".claude-plugin/plugin.json": "{\n  \"name\": \"shop-kit\",\n  \"version\": \"1.2.0\",\n  \"workflows\": [\n    \"workflows/refund.js\"\n  ]\n}",
+    "skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "44-plugin-path",
+     "ERROR",
+     1
+    ]
+   ]
+  }
+ ]
+}

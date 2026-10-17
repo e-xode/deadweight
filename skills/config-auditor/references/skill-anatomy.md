@@ -147,7 +147,8 @@ The description is the trigger surface: Claude decides whether to load a skill f
    Insistent is defensible; shouted is not — see [Tone](#tone-of-a-description).
 4. **Doc — no XML, no angle brackets.** The spec forbids XML tags in `description`; skill-creator's
    `quick_validate.py` rejects any `<` or `>`. Claude Code loads it anyway, which is why
-   `04-skill-description-brackets` warns rather than errors.
+   `04-skill-description-brackets` is never an error: a WARN in a plugin, which may be uploaded,
+   and a NOTICE in a project, which is not.
 5. **House convention — anti-triggered where two skills compete.** When a skill has a confusable
    twin, or has been seen loading on requests that are not its own, end with a `Don't use for:`
    clause naming the right alternative. Reason: a near-miss request is where two skills collide,

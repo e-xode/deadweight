@@ -11,6 +11,7 @@ from ..context import AuditContext
 from ..parsing.frontmatter import parse_frontmatter
 from ..repo import readable_files, git_ignores, git_tracked
 from ..report import Report
+from ..vocabulary.frontmatter import AUTO_COMPACT_WINDOW_MAX, AUTO_COMPACT_WINDOW_MIN
 from ..vocabulary.hooks import HOOK_PROJECT_DIR_VARS
 from ..vocabulary.settings import (
     BUILTIN_OUTPUT_STYLES,
@@ -19,14 +20,17 @@ from ..vocabulary.settings import (
     SETTINGS_KEYS_IGNORED_SILENTLY,
     SETTINGS_KEYS_IGNORED_WITH_WARNING,
     SETTINGS_KEYS_MANAGED,
+    SETTINGS_KEYS_USER,
     SETTINGS_KEYS_USER_LOCAL_MANAGED,
     SETTINGS_KEYS_USER_MANAGED,
+    SETTINGS_KEYS_REMOVED,
     SETTINGS_KNOWN_KEYS,
     SETTINGS_OBJECT_FIELDS,
+    SETTINGS_MAP_FIELDS,
     SETTINGS_PROJECT_IGNORED_FALSE,
     SETTINGS_PROJECT_TURNS_OFF,
 )
-from ..vocabulary.tools import KNOWN_TOOLS, TOOL_ALIASES
+from ..vocabulary.tools import KNOWN_TOOLS, TOOL_ALIASES, TOOL_REMOVED
 
 
 def check_settings_scope(ctx: AuditContext, report: Report) -> None:
@@ -119,6 +123,12 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
         for key in sorted(data):
             if key.startswith("$"):
                 continue
+            if key in SETTINGS_KEYS_REMOVED:
+                report.add("24-settings-unknown-key", "NOTICE",
+                           f"'{key}' in '{name}' was removed in {SETTINGS_KEYS_REMOVED[key]}: it has "
+                           "no effect on current versions. Delete the line (settings-reference).",
+                           str(path))
+                continue
             if key not in SETTINGS_KNOWN_KEYS:
                 report.add("24-settings-unknown-key", "NOTICE",
                            f"'{key}' in '{name}' is not in the settings reference ({len(SETTINGS_KNOWN_KEYS)} keys, "
@@ -132,7 +142,20 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                                f"settings reference ({', '.join(sorted(fields))}): it is ignored "
                                "without a word, so whatever it was meant to turn off stays on.",
                                str(path))
-            barred = (SETTINGS_KEYS_MANAGED | SETTINGS_KEYS_USER_MANAGED | SETTINGS_KEYS_GLOBAL
+            inner_fields = SETTINGS_MAP_FIELDS.get(key)
+            if inner_fields and isinstance(data[key], dict):
+                for entry_name, entry in sorted(data[key].items()):
+                    for sub in sorted(set(entry) - inner_fields) if isinstance(entry, dict) else []:
+                        report.add("24-settings-unknown-subkey", "NOTICE",
+                                   f"'{key}.{entry_name}.{sub}' in '{name}' is not a field of a "
+                                   f"`{key}` entry in the settings reference "
+                                   f"({', '.join(sorted(inner_fields))}): it is ignored without a "
+                                   "word, so whatever it was meant to turn off stays on.",
+                                   str(path))
+            # Scope "User" is barred from local too, as "User or managed" is: the docs' scope
+            # names the files a key may go in, and Local is not among them (not probed).
+            barred = (SETTINGS_KEYS_MANAGED | SETTINGS_KEYS_USER_MANAGED | SETTINGS_KEYS_USER
+                      | SETTINGS_KEYS_GLOBAL
                       | (SETTINGS_KEYS_USER_LOCAL_MANAGED if shared else frozenset()))
             if shared and key in SETTINGS_PROJECT_IGNORED_FALSE and data[key] is False:
                 # One misplaced line, one finding: this one is the more precise of the two.
@@ -166,8 +189,9 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                     continue
                 where = ("managed settings" if dotted in SETTINGS_KEYS_MANAGED else
                          "~/.claude.json" if dotted in SETTINGS_KEYS_GLOBAL else
-                         "user settings" + ("" if dotted in SETTINGS_KEYS_USER_MANAGED
-                                            else " or .claude/settings.local.json"))
+                         "user settings (~/.claude/settings.json)" if dotted in SETTINGS_KEYS_USER else
+                         "user or managed settings" if dotted in SETTINGS_KEYS_USER_MANAGED else
+                         "user settings or .claude/settings.local.json")
                 loud = (", with a warning" if dotted in SETTINGS_KEYS_IGNORED_WITH_WARNING
                         else ", without a word" if dotted in SETTINGS_KEYS_IGNORED_SILENTLY
                         else "")
@@ -221,8 +245,20 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                 report.add("42-permissions-conflict", "WARN",
                            f"'{rule}' is both allowed and denied/asked in '{name}': deny, then ask, "
                            "then allow - the allow entry never applies (permissions).", str(path))
+            odd_mcp = _mcp_names_needing_wildcard(root)
             for rule in lists["allow"]:
                 tool = _rule_tool(rule)
+                # "A `<server>` that contains `__` or ends in `_`: write the wildcard form
+                # ... The bare `mcp__reports__v2` and the shorter `mcp__reports` don't match
+                # its tools as allow rules" (permissions, read 2026-10-17; 2.1.299). Only the
+                # servers of this repository's .mcp.json are known here.
+                if rule.strip() in odd_mcp:
+                    server = odd_mcp[rule.strip()]
+                    report.add("42-permissions-rule", "WARN",
+                               f"allow rule '{rule}' in '{name}' approves no tool of the .mcp.json "
+                               f"server '{server}': a server name that contains `__` or ends in `_` "
+                               f"is matched only by `{rule.strip()}__*` (permissions).", str(path))
+                    continue
                 # The specifier runs from the FIRST `(` to the closing one: `[^)]*` stopped at
                 # the first `)` inside `Bash(grep "[\);}]" ...)` and read the rest of the
                 # command as a bare glob (2 false ERRORs, second public sample, 2026-09-27).
@@ -250,6 +286,12 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                 # `MultiEdit(<path>)` is a path rule for the legacy tool: the never-consulted
                 # ERROR below says what to write. Two findings, "write it Edit(...)" and "names
                 # no known tool", contradicted each other (user report, 2026-10-09).
+                if tool in TOOL_REMOVED:
+                    report.add("42-permissions-rule", "WARN",
+                               f"allow rule '{rule}' in '{name}' names '{tool}', which Claude Code "
+                               f"removed in v{TOOL_REMOVED[tool][0]}: it approves nothing. "
+                               f"{TOOL_REMOVED[tool][1]} (tools-reference).", str(path))
+                    continue
                 if (tool not in KNOWN_TOOLS and tool not in TOOL_ALIASES
                         and not tool.startswith("mcp__")
                         and not re.match(r"^MultiEdit\(.+\)$", rule.strip())):
@@ -310,6 +352,7 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                                    "the end of a pattern; here the colon is literal and the rule "
                                    "matches nothing it seems to (permissions).", str(path))
 
+        _check_auto_compact_window(report, data, name, path)
         sl = data.get("statusLine")
         if isinstance(sl, dict):
             ri = sl.get("refreshInterval")
@@ -358,11 +401,54 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                                   "it is a user or plugin style."), str(path))
 
 
+def _check_auto_compact_window(report: Report, data: dict, name: str, path: Path) -> None:
+    """`autoCompactWindow` outside its documented type and range (external audit 2026-10-17, E-00).
+
+    settings-reference: "number of tokens, from `100000` to `1000000`" at the top level, and
+    the same "or `\"auto\"`" under `modelSettings.<model>`. The page does not say what Claude
+    Code does with another value in a settings file, so this is a NOTICE that says only that.
+    """
+    found = [("autoCompactWindow", data.get("autoCompactWindow"), False)] if "autoCompactWindow" in data else []
+    ms = data.get("modelSettings")
+    if isinstance(ms, dict):
+        found += [(f"modelSettings.{model}.autoCompactWindow", entry["autoCompactWindow"], True)
+                  for model, entry in sorted(ms.items())
+                  if isinstance(entry, dict) and "autoCompactWindow" in entry]
+    for key, value, auto_ok in found:
+        if auto_ok and value == "auto":
+            continue
+        if (isinstance(value, (int, float)) and not isinstance(value, bool)
+                and AUTO_COMPACT_WINDOW_MIN <= value <= AUTO_COMPACT_WINDOW_MAX):
+            continue
+        report.add("24-settings-value", "NOTICE",
+                   f"'{key}: {json.dumps(value)}' in '{name}' is not what the settings reference "
+                   f"documents: a number of tokens from {AUTO_COMPACT_WINDOW_MIN} to "
+                   f"{AUTO_COMPACT_WINDOW_MAX}" + (", or \"auto\"" if auto_ok else "")
+                   + ". The page does not say what Claude Code does with this value "
+                   "(settings-reference).", str(path))
+
+
 # Top-level folders of an absolute path on macOS, Linux or WSL. A rule that starts with one of
 # them after a SINGLE slash almost always meant the filesystem root (permissions: "A pattern like
 # `/Users/alice/file` isn't an absolute path ... Use `//Users/alice/file`").
 SYSTEM_ROOTS = ("Users", "home", "opt", "tmp", "private", "var", "etc", "mnt", "srv", "root",
                 "Volumes", "usr", "Library", "Applications")
+
+
+def _mcp_names_needing_wildcard(root) -> dict[str, str]:
+    """`mcp__<normalized name>` -> server, for the .mcp.json servers whose normalized name
+    contains `__` or ends in `_`. Characters such as `.` or spaces "become `_`" (permissions)."""
+    try:
+        data = json.loads((root / ".mcp.json").read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return {}
+    servers = data.get("mcpServers") if isinstance(data, dict) else None
+    out = {}
+    for srv in servers if isinstance(servers, dict) else ():
+        norm = re.sub(r"[^A-Za-z0-9_-]", "_", srv)
+        if "__" in norm or norm.endswith("_"):
+            out[f"mcp__{norm}"] = srv
+    return out
 
 
 def _settings_source(name: str) -> str:

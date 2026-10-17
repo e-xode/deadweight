@@ -96,7 +96,7 @@ def check_plugin_vars_in_project(ctx: AuditContext, report: Report) -> None:
     root = ctx.root
     for skill_md in readable_files((root / ctx.skills_dir).glob("*/SKILL.md")):
         try:
-            text = skill_md.read_text(encoding="utf-8")
+            text = skill_md.read_text(encoding="utf-8-sig")
         except (OSError, UnicodeDecodeError):
             continue
         # Uses only: in `allowed-tools`, or a `${CLAUDE_PLUGIN_ROOT}/<path>` whose file exists
@@ -119,8 +119,14 @@ def check_plugin_vars_in_project(ctx: AuditContext, report: Report) -> None:
 
 
 # --- Plugin manifest ----------------------------------------------------------
+# Every component key of the Fields table (plugins-reference, read 2026-10-17): `workflows`,
+# `experimental.themes` and `experimental.monitors` too, and `themes` / `monitors` at the top
+# level, which "still load, with a `claude plugin validate` warning". `experimental.evals` is
+# "not a component path". Validate refuses `themes/` without `./` and a `..` in `monitors`
+# (claude plugin validate, 2.1.302, 2026-10-17).
 PLUGIN_PATH_FIELDS = ("skills", "agents", "commands", "hooks", "mcpServers", "outputStyles",
-                      "lspServers")
+                      "lspServers", "workflows", "themes", "monitors",
+                      "experimental.themes", "experimental.monitors")
 
 
 def check_plugin_manifest(ctx: AuditContext, report: Report) -> None:
@@ -139,7 +145,11 @@ def check_plugin_manifest(ctx: AuditContext, report: Report) -> None:
     except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         return
     for key in PLUGIN_PATH_FIELDS:
-        vals = data.get(key)
+        if key.startswith("experimental."):
+            box = data.get("experimental")
+            vals = box.get(key.split(".", 1)[1]) if isinstance(box, dict) else None
+        else:
+            vals = data.get(key)
         vals = vals if isinstance(vals, list) else [vals]
         for v in vals:
             if not isinstance(v, str):

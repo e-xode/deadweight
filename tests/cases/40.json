@@ -1,0 +1,43 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "40-library-and-project",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "shop-skill-0/SKILL.md": "---\nname: shop-skill-0\ndescription: Shop task number 0 for the storefront team. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "shop-skill-1/SKILL.md": "---\nname: shop-skill-1\ndescription: Shop task number 1 for the storefront team. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "shop-skill-2/SKILL.md": "---\nname: shop-skill-2\ndescription: Shop task number 2 for the storefront team. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "shop-skill-3/SKILL.md": "---\nname: shop-skill-3\ndescription: Shop task number 3 for the storefront team. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "40-skill-not-loaded",
+     "ERROR",
+     0
+    ],
+    [
+     "40-skill-not-loaded",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "40-stray-skill-in-project",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "shop-release/SKILL.md": "---\nname: shop-release\ndescription: Cut a shop release. Do not use for refunds.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "40-skill-not-loaded",
+     "ERROR",
+     1
+    ]
+   ]
+  }
+ ]
+}

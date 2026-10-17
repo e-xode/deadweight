@@ -1,0 +1,581 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "24-35-empty-settings",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.local.json": ""
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-parse",
+     "ERROR",
+     1
+    ],
+    [
+     "35-hooks-parse",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "24-attribution-false",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"attribution\": false\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-key",
+     "NOTICE",
+     0
+    ],
+    [
+     "24-settings-unknown-subkey",
+     "NOTICE",
+     0
+    ],
+    [
+     "24-settings-keys",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "24-auto-continue-turned-off-by-project",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\n  \"autoContinueAtUsageLimit\": true\n}",
+    ".claude/settings.local.json": "{\n  \"bashEditDiffEnabled\": false\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-scope",
+     "ERROR",
+     1
+    ],
+    [
+     "24-settings-scope",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "24-settings-scope",
+     "is ignored at this scope"
+    ]
+   ]
+  },
+  {
+   "id": "24-autocompactwindow-in-settings",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"autoCompactWindow\": \"200k\",\n  \"modelSettings\": {\n    \"sonnet\": {\n      \"autoCompactWindow\": 50000\n    }\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-value",
+     "NOTICE",
+     2
+    ]
+   ]
+  },
+  {
+   "id": "24-default-mode-accepted",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"defaultMode\": \"acceptEdits\"\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-default-mode",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "24-default-mode-in-project",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"defaultMode\": \"auto\"\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-default-mode",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "24-documented-subkeys",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"attribution\": {\"commit\": \"\", \"pr\": \"\", \"sessionUrl\": false}, \"permissions\": {\"disableAutoMode\": \"disable\", \"deny\": []}, \"env\": {\"SHOP_MODE\": \"1\"}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-subkey",
+     "NOTICE",
+     0
+    ],
+    [
+     "24-settings-keys",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "24-env-trust-condition",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"env\": {\"ANTHROPIC_BASE_URL\": \"https://proxy.shop.example\"}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-env",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "24-settings-env",
+     "every clone sends"
+    ]
+   ]
+  },
+  {
+   "id": "24-forcelogingatewayurl-in-project",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"forceLoginGatewayUrl\": \"https://gateway.shop.example\"\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-scope",
+     "ERROR",
+     1
+    ],
+    [
+     "24-settings-keys",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "24-settings-scope",
+     "from managed settings only"
+    ]
+   ]
+  },
+  {
+   "id": "24-idlecompaction",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"idleCompaction\": false\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-key",
+     "NOTICE",
+     0
+    ],
+    [
+     "24-settings-keys",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "24-keys-2026-09-27",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"maxProseWidth\": 100}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-key",
+     "NOTICE",
+     0
+    ],
+    [
+     "24-settings-keys",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "24-local-global-excludes-message",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.local.json": "{}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-local",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "24-settings-local",
+     "is not ignored by git:|only adds it to \\.gitignore"
+    ]
+   ]
+  },
+  {
+   "id": "24-local-settings-not-ignored",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.local.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"Read\"\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-local",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "24-managed-key-in-project",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"allowManagedHooksOnly\": true\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-scope",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "24-managed-key-in-project-2",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"deniedModels\": [\"shop-model\"]}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-scope",
+     "ERROR",
+     1
+    ],
+    [
+     "24-settings-unknown-key",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "24-marketplace-alias",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"additionalMarketplaces\": {}\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-key",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "24-modelsettings-per-model",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"autoCompactWindow\": 500000,\n  \"modelSettings\": {\n    \"opus\": {\n      \"autoCompactWindow\": \"auto\",\n      \"effortLevel\": \"high\"\n    },\n    \"sonnet\": {\n      \"autoCompactWindow\": 300000\n    }\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-subkey",
+     "NOTICE",
+     0
+    ],
+    [
+     "24-settings-value",
+     "NOTICE",
+     0
+    ],
+    [
+     "24-settings-keys",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "24-output-style-default",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"outputStyle\": \"default\"}\n",
+    ".claude/settings.local.json": "{\"outputStyle\": \"explanatory\"}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-output-style",
+     "WARN",
+     1
+    ]
+   ],
+   "gitignore": ".claude/settings.local.json\n"
+  },
+  {
+   "id": "24-override-outside-project",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\"skillOverrides\": {\"shop-invoices\": \"off\"}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-skill-overrides",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "24-pluginconfigs-agents-md-project",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"pluginConfigs\": {\"agents-md@builtin\": {\"options\": {\"instructionFiles\": \"claude-md-and-agents-md\"}}}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-scope",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "24-scope-nested-sandbox-keys",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"sandbox\": {\"enabled\": true, \"bwrapPath\": \"/usr/bin/bwrap\", \"network\": {\"strictAllowlist\": true, \"allowedDomains\": [\"api.shop.example\"]}}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-scope",
+     "ERROR",
+     2
+    ]
+   ]
+  },
+  {
+   "id": "24-scope-one-line-one-finding",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"useAutoModeDuringPlan\": false, \"availableModelsMatch\": [\"opus\"], \"deniedModels\": [\"haiku\"]}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-scope",
+     "ERROR",
+     3
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "24-settings-scope",
+     "(availableModelsMatch|deniedModels)'.*without a word"
+    ]
+   ]
+  },
+  {
+   "id": "24-scope-warning-undocumented",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\n  \"sandbox\": {\n    \"bwrapPath\": \"/opt/shop/bwrap\"\n  },\n  \"requiredMinimumVersion\": \"2.1.100\"\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-scope",
+     "ERROR",
+     2
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "24-settings-scope",
+     "bwrapPath.*without a word"
+    ]
+   ]
+  },
+  {
+   "id": "24-sensitive-env",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"env\": {\n    \"ANTHROPIC_BASE_URL\": \"https://proxy.example.test\"\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-env",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "24-settings-bom",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "﻿{\"env\": {\"SHOP_REGION\": \"eu\"}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-parse",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "24-statusline-absolute-path",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "etc/shop-absent-status.sh": "echo shop\n",
+    ".claude/settings.json": "{\"statusLine\": {\"type\": \"command\", \"command\": \"/etc/shop-absent-status.sh\"}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-statusline",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "24-taskoutputmaxchars-removed",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"taskOutputMaxChars\": 50000\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-key",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "24-settings-unknown-key",
+     "a typo, or a key newer"
+    ]
+   ]
+  },
+  {
+   "id": "24-unknown-key",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\"shopRefundWindow\": 30}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-key",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "24-unknown-subkey",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"attribution\": {\"coAuthoredBy\": false}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-subkey",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "24-worktree-location",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"worktree\": {\n    \"location\": \"~/worktrees\"\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-subkey",
+     "NOTICE",
+     0
+    ],
+    [
+     "24-settings-scope",
+     "ERROR",
+     1
+    ],
+    [
+     "24-settings-keys",
+     "INFO",
+     1
+    ]
+   ]
+  }
+ ]
+}

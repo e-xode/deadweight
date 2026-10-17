@@ -1,0 +1,19 @@
+# camelCase words the Claude Code release watch never reports as drift.
+# One word per line; what follows '#' is the reason. An entry belongs here only when the
+# word can never be a key a user writes in a configuration file - a payload field the
+# harness sends, a protocol field a server sends, a language built-in. A key that is
+# merely out of scope (an IDE setting, a keybinding action) stays reported: scope is
+# a judgement to make on the issue, not a filter to hide.
+
+agentId                      # field of hook and status-line payloads, written by the harness
+agentType                    # field of hook and status-line payloads, written by the harness
+toString                     # JavaScript Object built-in, cited when a name collides with it
+valueOf                      # JavaScript Object built-in, same reason
+hasOwnProperty               # JavaScript Object built-in, same reason
+uXXXX                        # notation of a JSON unicode escape, not a name
+resultType                   # MCP protocol field returned by a server, not configuration
+ttlMs                        # MCP protocol field returned by a server, not configuration
+cacheScope                   # MCP protocol field returned by a server, not configuration
+listChanged                  # MCP capability a server declares, not configuration
+modelTimeoutException        # error type returned by a cloud provider, not configuration
+serviceUnavailableException  # error type returned by a cloud provider, not configuration

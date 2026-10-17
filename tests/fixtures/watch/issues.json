@@ -1,0 +1,2 @@
+[{"number": 3, "title": "Claude Code drift: 7.4.9..7.4.11", "labels": [{"name": "claude-code-drift"}], "url": "https://example.invalid/issues/3"},
+ {"number": 5, "title": "Unrelated: 9.9.9", "labels": [{"name": "question"}], "url": "https://example.invalid/issues/5"}]

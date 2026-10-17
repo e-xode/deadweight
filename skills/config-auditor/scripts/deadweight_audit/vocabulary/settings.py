@@ -23,7 +23,7 @@ SETTINGS_KEYS_ANY = frozenset({
     "enabledMcpjsonServers", "enabledPlugins", "enforceAvailableModels", "env",
     "extraKnownMarketplaces", "additionalMarketplaces", "fallbackModel", "fastMode", "fastModePerSessionOptIn",
     "feedbackSurveyRate", "fileCheckpointingEnabled", "fileSuggestion", "forceLoginMethod",
-    "forceLoginOrgUUID", "gcpAuthRefresh", "hooks", "httpHookAllowedEnvVars",
+    "forceLoginOrgUUID", "gcpAuthRefresh", "hooks", "httpHookAllowedEnvVars", "idleCompaction",
     "includeCoAuthoredBy", "includeGitInstructions", "inputNeededNotifEnabled",
     "isolatePeerMachines", "keybindingFlavor", "language", "maxEffortLevel", "maxProseWidth", "minimumVersion",
     "model", "modelOverrides", "modelSettings", "otelHeadersHelper", "outputStyle",
@@ -65,12 +65,18 @@ SETTINGS_KEYS_USER_LOCAL_MANAGED = frozenset({
 SETTINGS_KEYS_USER_MANAGED = frozenset({
     "appendPlugins", "askUserQuestionTimeout", "autoContinueAtUsageLimit", "autoMode", "prependPlugins",
     "autoMode.classifyAllShell", "bashEditDiffEnabled", "desktopSessionCleanupPeriodDays",
-    "dialogExpiry", "feedbackDrafts", "footerLinksRegexes", "modelPicker", "pluginConfigs",
+    "dialogExpiry", "feedbackDrafts", "footerLinksRegexes", "forceLoginGatewayUrl", "modelPicker",
+    "pluginConfigs",
     "processWrapper", "sandbox.allowAppleEvents", "sandbox.credentials.allowPlaintextInject",
     "sandbox.credentials.awsPairs", "sandbox.credentials.sigv4", "sandbox.filesystem.disabled",
     "sandbox.network.strictAllowlist", "sandbox.network.tlsTerminate", "sandbox.ripgrep",
     "skipAutoPermissionPrompt", "spellcheck", "sshConfigs", "vimInsertModeRemaps"
 })
+
+
+# Scope "User": `~/.claude/settings.json` only (settings-reference, read 2026-10-17). Like the
+# "User or managed" keys, barred from the project file and from settings.local.json.
+SETTINGS_KEYS_USER = frozenset({"worktree.location"})
 
 
 SETTINGS_KEYS_MANAGED = frozenset({
@@ -80,7 +86,7 @@ SETTINGS_KEYS_MANAGED = frozenset({
     "deniedModels",
     "disableBrowserExternalNavigation", "disableCommandPluginSources",
     "disableDesktopLocalSessions", "disableMobileSimulatorTools", "disableSideloadFlags",
-    "forceLoginGatewayUrl", "forceRemoteSettingsRefresh", "gatewayInternalNetworks",
+    "forceRemoteSettingsRefresh", "gatewayInternalNetworks",
     "managedMcpServers", "managedSourcesBehavior", "modelPricing", "parentSettingsBehavior",
     "pluginSuggestionMarketplaces", "pluginTrustMessage", "policyHelper", "policyHelper.path",
     "policyHelper.refreshIntervalMs", "policyHelper.timeoutMs", "requiredMaximumVersion",
@@ -102,8 +108,14 @@ SETTINGS_KEYS_GLOBAL = frozenset({
 })
 
 
+# Keys the settings reference still lists, as removed: "Setting it has no effect on current
+# versions" (settings-reference, taskOutputMaxChars, read 2026-10-17).
+SETTINGS_KEYS_REMOVED = {"taskOutputMaxChars": "v2.1.277, together with the TaskOutput tool it sized"}
+
+
 SETTINGS_KNOWN_KEYS = (SETTINGS_KEYS_ANY | SETTINGS_KEYS_USER_LOCAL_MANAGED
-                       | SETTINGS_KEYS_USER_MANAGED | SETTINGS_KEYS_MANAGED | SETTINGS_KEYS_GLOBAL)
+                       | SETTINGS_KEYS_USER_MANAGED | SETTINGS_KEYS_USER | SETTINGS_KEYS_MANAGED
+                       | SETTINGS_KEYS_GLOBAL)
 
 
 # Objects whose fields the settings reference lists as a closed set ("Type: object
@@ -117,7 +129,7 @@ SETTINGS_OBJECT_FIELDS = {
     "permissions": {"additionalDirectories", "allow", "ask", "blockReadsOutsideWorkingDirectories",
                     "defaultMode", "deny", "disableAutoMode", "disableBypassPermissionsMode"},
     "policyHelper": {"path", "refreshIntervalMs", "timeoutMs"},
-    "worktree": {"baseRef", "bgIsolation", "sparsePaths", "symlinkDirectories"},
+    "worktree": {"baseRef", "bgIsolation", "location", "sparsePaths", "symlinkDirectories"},
     "sandbox": {"allowAppleEvents", "allowUnsandboxedCommands", "autoAllowBashIfSandboxed",
                 "bwrapPath", "credentials", "enableWeakerNestedSandbox",
                 "enableWeakerNetworkIsolation", "enabled", "excludedCommands",
@@ -127,8 +139,15 @@ SETTINGS_OBJECT_FIELDS = {
     "subagentStatusLine": {"command", "type"},
     "fileSuggestion": {"command", "type"},
     "spinnerVerbs": {"mode", "verbs"},
-    "modelSettings": {"effortLevel", "maxEffortLevel"},
     "voice": {"autoSubmit", "enabled", "mode"},
+}
+
+
+# Objects keyed by a free name whose VALUES are closed objects: `modelSettings` maps a model
+# name to "an object with any of these fields" (settings-reference, read 2026-10-17). Read as
+# a closed object until 0.26.0, every model name in it was an "unknown field".
+SETTINGS_MAP_FIELDS = {
+    "modelSettings": {"autoCompactWindow", "effortLevel", "maxEffortLevel"},
 }
 
 

@@ -1,0 +1,278 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "28-absolute-path",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-deploy/SKILL.md": "---\nname: shop-deploy\ndescription: Deploy the shop API to production and roll it back. Do not use for local development.\n---\n\nOn the server, run `/srv/shop-api/scripts/deploy.sh`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "28-anchor-in-claude-md",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nCart rules live in `src/shop/cart.ts`. Copy `src/shop/yourModule.ts`. See `~/workspace/shop-docs/src/index.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-config-anchors",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "28-bold-example",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\n- **Example**: `scripts/rotate_receipts.py` for receipt tasks.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "28-dead-anchor",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nThe rules live in `src/refunds/policy.ts`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "28-dead-anchor-in-example",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nExample output:\n\n```\nFound: fetch wrapper in src/lib/api.ts\n```\n\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "28-docs-checked-by-20",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-cart/SKILL.md": "---\nname: shop-cart\ndescription: Build the shop cart page and its totals. Do not use for refunds.\n---\n\nRead [the guide](../../../docs/missing-guide.md) first.\n\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "20-relative-links",
+     "ERROR",
+     1
+    ],
+    [
+     "28-skill-anchors",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "28-skill-anchors",
+     "by this tool|Paths elsewhere \\(`docs/`, `config/`\\.\\.\\.\\) are not checked"
+    ]
+   ]
+  },
+  {
+   "id": "28-elided-path-and-uri",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nRule: `core/testing/src/.../RefundRule.kt`. Import only `package:shop/src/refunds.dart`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "28-falsifiable-outside-read-dirs",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "docs/shop-payments.md": "x\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nRead `docs/shop-payments.md` first.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "28-skill-anchors",
+     "names nothing verifiable"
+    ]
+   ]
+  },
+  {
+   "id": "28-folder-to-create",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-qa/SKILL.md": "---\nname: shop-qa\ndescription: Exploratory QA of the shop pages. Do not use for refunds.\n---\n\nPlace every screenshot and report below `tests/e2e/.qa/report.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     0
+    ]
+   ],
+   "known_failure": true
+  },
+  {
+   "id": "28-generated-file",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nThe SSR entry is `./dist/server/entry-server.js`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     0
+    ]
+   ],
+   "gitignore": "dist/\n"
+  },
+  {
+   "id": "28-monorepo-subpackage",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nThe base class is `src/refunds/policy.ts`.\n",
+    "packages/api/src/refunds/policy.ts": "export {}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     0
+    ],
+    [
+     "28-skill-anchors",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "28-path-cited-from-another-skill",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-checkout/SKILL.md": "---\nname: shop-checkout\ndescription: Build the shop checkout pages and their layout. Do not use for refunds.\n---\n\nMeasure with `.claude/skills/shop-refunds/scripts/measure.mjs` first.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-refunds/scripts/measure.mjs": "//\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "28-relative-to-skills",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-checkout/SKILL.md": "---\nname: shop-checkout\ndescription: Build the shop checkout pages and their layout. Do not use for refunds.\n---\n\nMeasure with `shop-refunds/scripts/measure.mjs` first.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-refunds/scripts/measure.mjs": "//\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "28-relative-to-skills-dead",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-checkout/SKILL.md": "---\nname: shop-checkout\ndescription: Build the shop checkout pages and their layout. Do not use for refunds.\n---\n\nMeasure with `shop-ledger/scripts/measure.mjs` first.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-refunds/scripts/measure.mjs": "//\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "28-skill-dir-variable",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nRun `python3 ${CLAUDE_SKILL_DIR}/scripts/check.py`.\n",
+    ".claude/skills/shop-refunds/scripts/check.py": "#\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "28-truncated-extension",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nServices are in tests/stack/docker-compose.yml.template (lines 1-3).\n",
+    "tests/stack/docker-compose.yml.template": "services: {}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     0
+    ]
+   ]
+  }
+ ]
+}

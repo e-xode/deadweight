@@ -1,0 +1,141 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "12-adjacent-inline-code",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nPlatform files:\n  `_unix.go`/`_windows.go`/`_linux.go` build per target.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nFields to track:\n  `Status`/`Blocker`/`Owner` for each refund.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "12-no-code-comments",
+     "NOTICE",
+     0
+    ],
+    [
+     "12-no-code-comments",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "12-block-comment-in-prose",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\n/* shop handlers return typed errors */\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "12-no-code-comments",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "12-four-backtick-fence",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-style/SKILL.md": "---\nname: shop-style\ndescription: Shop code style rules. Do not use for refunds.\n---\n\n````markdown\n```ts\n// minimal counter-example\n```\n````\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "12-no-code-comments",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "12-glob-and-bold",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\n| **api/** | 1,200 | HTTP layer |\n\nWhen lib/*.ts changes, run the tests.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "12-no-code-comments",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "12-indented-block",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nExample:\n\n    // shop handler\n    export const a = 1;\n",
+    ".claude/rules/js.md": "# js\n\nExample:\n\n    // shop handler\n    export const a = 1;\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nExample:\n\n    // shop handler\n    export const a = 1;\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "12-no-code-comments",
+     "NOTICE",
+     0
+    ],
+    [
+     "14-rule-code-comments",
+     "NOTICE",
+     0
+    ],
+    [
+     "01-claude-md-size",
+     "OK",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "12-indented-inside-paragraph",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nKeep handlers small\n    // and comment them here\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "12-no-code-comments",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "12-real-comment",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\n// TODO: document the refund flow\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "12-no-code-comments",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "12-root-glob-in-prose",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nNever commit /*.env files from the shop root.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "12-no-code-comments",
+     "NOTICE",
+     0
+    ],
+    [
+     "01-claude-md-size",
+     "OK",
+     1
+    ]
+   ]
+  }
+ ]
+}

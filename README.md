@@ -408,6 +408,30 @@ A plugin is the same bytes in every project that installs it, so it holds no pro
 Templates are in `skills/config-auditor/templates/`. All three are optional: absent means "this
 project has recorded nothing", a valid state.
 
+## Staying in step with Claude Code
+
+The auditor holds lists copied from Claude Code's documentation (tools, frontmatter fields, hook events,
+settings keys and their scope). Claude Code ships about one release a day, so those lists age.
+`.github/workflows/claude-code-watch.yml` runs once a day, with no model and no API key:
+
+- it reads the `latest` version of `@anthropic-ai/claude-code` on npm, and the upstream `CHANGELOG.md`
+  for the versions it has not covered;
+- it lists the camelCase keys the plugin has never named, the lines about removals and deprecations, and
+  the lines touching frontmatter, `settings.json`, hooks, permissions, `plugin.json` or marketplaces;
+- `.github/scripts/vocabulary_drift.py` compares 17 lists of the plugin with the raw documentation pages;
+- one issue labelled `claude-code-drift` per range of new versions carries the result. The issues are
+  the watch's only state.
+
+An optional Google Chat message needs a `GOOGLE_CHAT_WEBHOOK` repository secret; without it the step
+does nothing. GitHub disables a scheduled workflow in a public repository after 60 days without
+activity: re-enable it from the Actions tab. Run `python3 .github/scripts/claude_code_watch.py` without
+`--create-issue` to print the issue body locally. The watch reads names, not meaning: a known key
+that gains a new place or a new value range is caught only by the lines that mention a surface.
+
+To add a labelled test case without access to the maintainer's corpus, see `CONTRIBUTING.md` and
+`tests/cases.d/`. `python3 skills/config-auditor/probes/run_probes.py` replays, against your own
+`claude`, the facts the auditor states as measured.
+
 ## Check ids are a public API
 
 A consuming project names check ids in its `.claude/audit.local.json`, so ids are **never renamed**.
@@ -445,7 +469,7 @@ registry's lists if it does not apply everywhere, and add its line to `catalog.C
 python3 -m unittest discover -s tests    # labelled cases + the auditor's assumptions about itself
 ```
 
-`tests/cases.json` holds fictional repositories with the exact findings each must produce, checked
+`tests/cases/` holds fictional repositories with the exact findings each must produce, checked
 by hand; most began as a false positive on a real repository. It is generated from the maintainer's
 labelled source — to propose a case, describe the repository and the verdict in an issue or a PR.
 A published case checks the current auditor's counts; it does not prove the case discriminates.

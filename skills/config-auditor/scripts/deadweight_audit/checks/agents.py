@@ -18,13 +18,15 @@ from ..report import Report
 from ..vocabulary.frontmatter import (
     AGENT_PERMISSION_MODES,
     AGENT_VALIDATED_KEYS,
+    AUTO_COMPACT_WINDOW_MAX,
+    AUTO_COMPACT_WINDOW_MIN,
     PLUGIN_AGENT_IGNORED_KEYS,
 )
 from ..vocabulary.tools import (
     KNOWN_MODEL_ALIASES,
     SUBAGENT_REMOVED_TOOLS,
     TOOL_ALIASES,
-    TOOL_DEPRECATED,
+    TOOL_REMOVED,
     is_documented_model,
     is_known_tool,
 )
@@ -187,12 +189,11 @@ def check_agent_frontmatter_validity(ctx: AuditContext, report: Report, skills: 
         declared_tools = frontmatter_list(fm.get("tools", ""))
         unknown = []
         removed = []
+        gone = []
         for tool in declared_tools:
             base = tool.split("(", 1)[0].strip()
-            if base in TOOL_DEPRECATED:
-                report.add("23-agent-tools", "NOTICE",
-                           f"Agent '{entry.stem}' grants '{base}', deprecated in favor of "
-                           f"{TOOL_DEPRECATED[base]} (tools-reference).", str(entry))
+            if base in TOOL_REMOVED:
+                gone.append(base)
                 continue
             if base in TOOL_ALIASES:
                 report.add("23-agent-tools", "NOTICE",
@@ -209,7 +210,18 @@ def check_agent_frontmatter_validity(ctx: AuditContext, report: Report, skills: 
         # an agent left with NO tool "fails to launch". Severity follows that. A tool
         # removed from every subagent resolves to nothing there either: "names a tool
         # that isn't available to subagents" is one of the docs' two examples.
-        none_left = bool(declared_tools) and len(unknown) + len(removed) == len(declared_tools)
+        none_left = bool(declared_tools) and len(unknown) + len(removed) + len(gone) == len(declared_tools)
+        for tool in gone:
+            since, instead = TOOL_REMOVED[tool]
+            report.add(
+                "23-agent-tools",
+                "ERROR" if none_left else "WARN",
+                f"Agent '{entry.stem}' grants '{tool}', which Claude Code removed in v{since}: "
+                f"the entry grants nothing; {instead} (tools-reference)" + (
+                    ". No entry is left, and Claude Code refuses to launch a subagent with "
+                    "nothing resolvable." if none_left else "."),
+                str(entry),
+            )
         for tool in unknown:
             report.add(
                 "23-agent-tools",
@@ -291,6 +303,24 @@ def check_agent_frontmatter_validity(ctx: AuditContext, report: Report, skills: 
                        f"Agent '{entry.stem}' declares bypassPermissions: since 2.1.267 a subagent "
                        "that declares it keeps the main conversation's mode instead (sub-agents).",
                        str(entry))
+        # sub-agents: "a token count from `100000` to `1000000`", and "Write the value as a
+        # plain integer such as `200000`, because in frontmatter Claude Code reads `200k` as 200,
+        # which is outside the allowed range. The subagent still loads and compacts as if the
+        # field were absent." Until 0.26.0, 23 only knew the key (external audit 2026-10-17, E-00).
+        window = fm.get("autoCompactWindow")
+        if window is not None:
+            window = window.strip()
+            plain = re.fullmatch(r"\d+", window) is not None
+            if not plain or not AUTO_COMPACT_WINDOW_MIN <= int(window) <= AUTO_COMPACT_WINDOW_MAX:
+                report.add("23-agent-frontmatter-keys", "WARN",
+                           f"Agent '{entry.stem}' sets autoCompactWindow: {window or '(empty)'}, "
+                           + ("which is not a plain integer" if not plain else "outside the range")
+                           + f": the field takes a token count from {AUTO_COMPACT_WINDOW_MIN} to "
+                           f"{AUTO_COMPACT_WINDOW_MAX}, and with `200k`, read as 200, \"the subagent "
+                           "still loads and compacts as if the field were absent\" (sub-agents). Write "
+                           "a plain integer such as 200000; the `claude --debug` log says "
+                           "`invalid autoCompactWindow` when the value is ignored.",
+                           str(entry))
         # `Task(...)` too: the old name of the tool still resolves to Agent (tested 2026-10-08,
         # 2.1.293: a `deny: ["Task"]` rule removes the Agent tool), and anthropics/claude-code
         # #28277 restricts a subagent with `Task(a), Task(b)`.
@@ -334,7 +364,7 @@ def check_agent_frontmatter_validity(ctx: AuditContext, report: Report, skills: 
         report.add(
             "23-agent-frontmatter-keys",
             "INFO",
-            f"Agent frontmatter keys in use: {seen}. Keys this script does not validate: {drift}.",
+            f"Agent frontmatter keys in use: {seen}. Keys outside the documented fields: {drift}.",
             str(agents_dir),
         )
 

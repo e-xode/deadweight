@@ -30,7 +30,9 @@ jobs:
       - name: Lint (pyflakes rules only - undefined names, unused imports)
         run: |
           python3 -m pip install --quiet ruff==0.16.8
-          ruff check --select E9,F skills/config-auditor/scripts skills/config-auditor/templates hooks bin/deadweight docs .github/smoke tests
+          ruff check --select E9,F skills/config-auditor/scripts skills/config-auditor/templates hooks bin/deadweight docs .github/smoke .github/scripts tests
+      - name: Compile every Python file under 3.11 (a syntax newer than 3.11 fails here, not on a user's machine)
+        run: python3 -m compileall -q skills hooks docs .github/smoke .github/scripts tests
       - name: Audit this plugin against its own floor
         run: python3 skills/config-auditor/scripts/audit.py --root . --check-floor
       - name: Report as JSON

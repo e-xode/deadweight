@@ -70,7 +70,7 @@ model: sonnet
 ---
 ```
 
-### The eighteen fields
+### The nineteen fields
 
 Doc, [sub-agents]: the list below. Field names "must match the table exactly: Claude Code ignores a
 field it doesn't recognize without reporting an error". `[23-agent-frontmatter-keys]` reports any other
@@ -92,6 +92,7 @@ after an update.
 | `model` | `sonnet`, `opus`, `haiku`, `fable`, `best`, `opusplan`, `inherit` (an alias other than `inherit`, or a full model name, may take `[1m]`), a full model id, or a provider value (Bedrock ARN, a Vertex or Foundry deployment name). | See [Model resolution](#model-resolution). `[23-agent-model]`: NOTICE outside these values, since a provider deployment name is free-form. |
 | `permissionMode` | `default`, `acceptEdits`, `auto`, `dontAsk`, `bypassPermissions`, `plan`, or `manual`. | See [Permission mode](#permission-mode). `[23-agent-permission-mode]` |
 | `maxTurns` | Hard stop; output marked partial (2.1.246+), resumable. | The cheapest guard on a loop that can fail to converge. |
+| `autoCompactWindow` | Lowers this agent's auto-compact window to a token count from `100000` to `1000000`. 2.1.296+. | Write a plain integer: `200k` reads as 200, out of range, and the agent compacts as if the field were absent (`claude --debug`: `invalid autoCompactWindow`). `23-agent-frontmatter-keys` (WARN) flags a value that is not a plain integer in range. `CLAUDE_CODE_AUTO_COMPACT_WINDOW`, when set, wins. |
 | `skills` | Preloads the **full content** of the named skills at startup. | Controls preloading, **not access** — see [Tools](#tools). `[23-agent-skills-preload]` |
 | `mcpServers` | Server names or inline definitions scoped to this agent. | Inline servers from a project agent load only once the folder is trusted. |
 | `hooks` | Lifecycle hooks scoped to the agent; `Stop` becomes `SubagentStop`. | Project-agent hooks are **skipped until the folder is trusted**; a `-p` session does not count as trusted. |
@@ -117,9 +118,13 @@ Parameterised forms (`Bash(git diff *)`) and `mcp__*` names are accepted.
 definitions and settings still works as an alias ([sub-agents]). `[23-agent-tools]` reports it as NOTICE.
 In the SDK the tool still appears as `"Task"` in the `system:init` list ([sdk-subagents]).
 
-**`TaskOutput` — the docs disagree.** [tools-reference] lists it as *deprecated in favor of `Read` on
-the task's output file path*; [permissions] calls it one of "the tools Claude Code has removed". Either
-way, do not grant it. `[23-agent-tools]` reports it as deprecated (NOTICE).
+**`TaskOutput` — removed in 2.1.277.** [tools-reference] (read 2026-10-17): "Removed in v2.1.277 [...]
+Claude reads a background task's output file with `Read` instead"; [permissions] lists it among "the
+tools Claude Code has removed". **Measured** (2026-10-17, Claude Code 2.1.302, Haiku, one run each): an
+agent with `tools: TaskOutput` is refused - "would be spawned with zero tools — refusing [...]
+unrecognized [TaskOutput]"; with `tools: Read, TaskOutput` it runs with `Read` alone. `[23-agent-tools]`
+treats it like any entry that resolves to nothing: WARN, ERROR when no entry is left (it was a NOTICE,
+"deprecated", until 0.25.0). An allow rule `TaskOutput` approves nothing (`42-permissions-rule`, WARN).
 
 **Removed from every sub-agent**, even when listed ([sub-agents]): `AskUserQuestion`, `EndConversation`,
 `EnterPlanMode`, `ScheduleWakeup`, `WaitForMcpServers`, `Workflow`; `ExitPlanMode` **unless**

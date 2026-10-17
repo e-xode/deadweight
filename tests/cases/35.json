@@ -1,0 +1,641 @@
+{
+ "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
+ "cases": [
+  {
+   "id": "35-async-hook-in-frontmatter",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/agents/shop-reviewer.md": "---\nname: shop-reviewer\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nhooks:\n  PreToolUse:\n    - matcher: Bash\n      hooks:\n        - type: command\n          command: echo shop\n          async: true\n          onFailure: block\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-shape",
+     "NOTICE",
+     1
+    ],
+    [
+     "35-hooks-timeout",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "35-command-v-runs-nothing",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/hooks/shop-lint.sh": "#!/bin/sh\nexit 0\n",
+    ".claude/settings.json": "{\n  \"hooks\": {\n    \"Stop\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"command -v ./.claude/hooks/shop-lint.sh >/dev/null || echo missing\"\n          }\n        ]\n      },\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"command ./.claude/hooks/shop-lint.sh\"\n          }\n        ]\n      }\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-command",
+     "WARN",
+     1
+    ]
+   ],
+   "needs_exec_bit": true
+  },
+  {
+   "id": "35-dot-slash-in-skill",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-sec/scripts/security-check.sh": "exit 0\n",
+    ".claude/skills/shop-sec/SKILL.md": "---\nname: shop-sec\ndescription: Check shop checkout commands for unsafe payment calls before they run. Do not use for refunds.\nhooks:\n  PreToolUse:\n    - matcher: \"Bash\"\n      hooks:\n        - type: command\n          command: \"./scripts/security-check.sh\"\n          timeout: 5\n---\n\nRun the check.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-command",
+     "ERROR",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "35-hooks-command",
+     "does not exist\\. A dead anchor"
+    ]
+   ]
+  },
+  {
+   "id": "35-empty-hooks-list",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"hooks\": {\"PreToolUse\": [{\"matcher\": \"Bash\", \"hooks\": []}]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-shape",
+     "ERROR",
+     0
+    ],
+    [
+     "35-hooks-shape",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "35-empty-hooks-list-in-frontmatter",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\nhooks: []\n---\n\nBody.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-shape",
+     "NOTICE",
+     1
+    ],
+    [
+     "35-hooks-shape",
+     "ERROR",
+     0
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "35-hooks-shape",
+     "multi-line scalars|flow mappings"
+    ]
+   ]
+  },
+  {
+   "id": "35-frontmatter-hook-broken-matcher",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "scripts/check.sh": "#!/bin/sh\n",
+    ".claude/agents/shop-review.md": "---\nname: shop-review\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nhooks:\n  PreToolUse:\n    - matcher: \"bash\"\n      hooks:\n        - type: command\n          command: \"./scripts/check.sh\"\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-matcher",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "35-frontmatter-hook-valid",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "scripts/check.sh": "#!/bin/sh\n",
+    ".claude/agents/shop-review.md": "---\nname: shop-review\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\nhooks:\n  PreToolUse:\n    - matcher: \"Bash|Edit\"\n      hooks:\n        - type: command\n          command: \"sh ./scripts/check.sh\"\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-matcher",
+     "ERROR",
+     0
+    ],
+    [
+     "35-hooks-shape",
+     "ERROR",
+     0
+    ],
+    [
+     "35-hooks-event",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "35-hook-bare-mcp-matcher",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"hooks\": {\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"mcp__github\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"echo hi\",\n            \"timeout\": 5\n          }\n        ]\n      }\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-matcher",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "35-hook-if-on-non-tool-event",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"hooks\": {\n    \"SessionStart\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"echo hi\",\n            \"if\": \"Bash(git *)\",\n            \"timeout\": 5\n          }\n        ]\n      }\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-if",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "35-hook-injects-context",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"hooks\": {\n    \"UserPromptSubmit\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"echo shop\"\n          }\n        ]\n      }\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-context",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "35-hook-script-outside-missing",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"hooks\": {\"PreToolUse\": [{\"matcher\": \"Bash\", \"hooks\": [{\"type\": \"command\", \"command\": \"bash ~/.shop-absent/guard.sh\", \"timeout\": 5}, {\"type\": \"command\", \"command\": \"/opt/shop-absent/x.sh\", \"timeout\": 5}, {\"type\": \"command\", \"command\": \"scripts/absent.sh\", \"timeout\": 5}]}]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-command",
+     "ERROR",
+     3
+    ]
+   ]
+  },
+  {
+   "id": "35-hook-script-present-or-argument",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "scripts/present.sh": "echo ok\n",
+    ".claude/settings.json": "{\"hooks\": {\"PreToolUse\": [{\"matcher\": \"Bash\", \"hooks\": [{\"type\": \"command\", \"command\": \"bash scripts/present.sh\", \"timeout\": 5}, {\"type\": \"command\", \"command\": \"jq .a/b /dev/null\", \"timeout\": 5}]}]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-command",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "35-hook-without-context",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"hooks\": {\n    \"PostToolUse\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"echo shop\"\n          }\n        ]\n      }\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-context",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "35-matcher-all-alternatives-rules",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"hooks\": {\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"Bash(git push *)|Bash(git commit *)\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"echo shop\"\n          }\n        ]\n      }\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-matcher",
+     "ERROR",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "35-hooks-matcher",
+     "in the handler's `if` field"
+    ]
+   ]
+  },
+  {
+   "id": "35-matcher-alternative-that-fires",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"hooks\": {\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"Edit(.*)|Write\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"echo shop\"\n          }\n        ]\n      },\n      {\n        \"matcher\": \"Write|Edit\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"echo shop\"\n          }\n        ]\n      }\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-matcher",
+     "ERROR",
+     0
+    ],
+    [
+     "35-hooks-matcher",
+     "NOTICE",
+     0
+    ],
+    [
+     "35-hooks-timeout",
+     "NOTICE",
+     0
+    ],
+    [
+     "24-settings-keys",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "35-matcher-alternative-with-inner-bar",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"hooks\": {\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"Write|Bash(npm run lint|npm test)\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"echo shop\"\n          }\n        ]\n      }\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-matcher",
+     "NOTICE",
+     1
+    ],
+    [
+     "35-hooks-matcher",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "35-matcher-as-permission-rule",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"hooks\": {\"PreToolUse\": [{\"matcher\": \"Bash(git commit*)\", \"hooks\": [{\"type\": \"command\", \"command\": \"echo a\", \"timeout\": 5}]}]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-matcher",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "35-matcher-regex-that-matches",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"hooks\": {\"PreToolUse\": [{\"matcher\": \"Edit(.*)\", \"hooks\": [{\"type\": \"command\", \"command\": \"echo b\", \"timeout\": 5}]}, {\"matcher\": \"Bash\", \"hooks\": [{\"type\": \"command\", \"if\": \"Bash(git commit*)\", \"command\": \"echo c\", \"timeout\": 5}]}]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-matcher",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "35-matcher-rule-as-alternative",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"hooks\": {\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"Bash(git *)|Write\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"echo shop\"\n          }\n        ]\n      }\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-matcher",
+     "NOTICE",
+     1
+    ],
+    [
+     "35-hooks-matcher",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "35-matcher-rule-invalid-regex",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"hooks\": {\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"Write|Edit(*.ts)\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"echo shop\"\n          }\n        ]\n      }\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-matcher",
+     "ERROR",
+     1
+    ],
+    [
+     "35-hooks-matcher",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "35-matcher-two-rules-invalid-regex",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"hooks\": {\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"Bash(git *)|Edit(*.ts)\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"echo shop\"\n          }\n        ]\n      }\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-matcher",
+     "ERROR",
+     1
+    ],
+    [
+     "35-hooks-matcher",
+     "NOTICE",
+     0
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "35-hooks-matcher",
+     "Write the matcher 'Bash' and"
+    ]
+   ]
+  },
+  {
+   "id": "35-missing-script-after-semicolon",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"hooks\": {\"Stop\": [{\"hooks\": [{\"type\": \"command\", \"timeout\": 5, \"command\": \"python3 \\\"$CLAUDE_PROJECT_DIR/.claude/hooks/gone.py\\\";\"}]}]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-command",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "35-no-timeout",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\"hooks\": {\"PostToolUse\": [{\"matcher\": \"Edit\", \"hooks\": [{\"type\": \"command\", \"command\": \"true\"}]}]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-timeout",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "35-not-executable-via-wrapper",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/hooks/shop-lint.sh": "#!/bin/sh\nexit 0\n",
+    ".claude/settings.json": "{\n  \"hooks\": {\n    \"Stop\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"timeout 10 \\\"$CLAUDE_PROJECT_DIR\\\"/.claude/hooks/shop-lint.sh\"\n          }\n        ]\n      },\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"if [ -f package.json ]; then \\\"$CLAUDE_PROJECT_DIR\\\"/.claude/hooks/shop-lint.sh; fi\"\n          }\n        ]\n      },\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"exec \\\"$CLAUDE_PROJECT_DIR\\\"/.claude/hooks/shop-lint.sh\"\n          }\n        ]\n      },\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"{ \\\"$CLAUDE_PROJECT_DIR\\\"/.claude/hooks/shop-lint.sh; } 2>/dev/null\"\n          }\n        ]\n      },\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"echo start\\n\\\"$CLAUDE_PROJECT_DIR\\\"/.claude/hooks/shop-lint.sh\"\n          }\n        ]\n      }\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-command",
+     "WARN",
+     5
+    ]
+   ],
+   "needs_exec_bit": true
+  },
+  {
+   "id": "35-onfailure-block",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"hooks\": {\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"Bash\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"node\",\n            \"args\": [\n              \"${CLAUDE_PROJECT_DIR}/.claude/hooks/check.js\"\n            ],\n            \"timeout\": 5,\n            \"onFailure\": \"block\"\n          },\n          {\n            \"type\": \"http\",\n            \"url\": \"https://shop.example/hooks/check\",\n            \"timeout\": 5,\n            \"onFailure\": \"continue\"\n          }\n        ]\n      }\n    ]\n  }\n}",
+    ".claude/hooks/check.js": "process.exit(0);\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-shape",
+     "NOTICE",
+     0
+    ],
+    [
+     "35-hooks-shape",
+     "WARN",
+     0
+    ],
+    [
+     "35-hooks-shape",
+     "ERROR",
+     0
+    ],
+    [
+     "24-settings-keys",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "35-onfailure-without-effect",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"hooks\": {\n    \"Stop\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"echo shop\",\n            \"timeout\": 5,\n            \"onFailure\": \"block\"\n          }\n        ]\n      }\n    ],\n    \"PostToolUse\": [\n      {\n        \"matcher\": \"Write\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"echo shop\",\n            \"async\": true,\n            \"onFailure\": \"block\"\n          },\n          {\n            \"type\": \"command\",\n            \"command\": \"echo shop\",\n            \"timeout\": 5,\n            \"onFailure\": \"deny\"\n          }\n        ]\n      }\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-shape",
+     "NOTICE",
+     3
+    ],
+    [
+     "35-hooks-shape",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "35-redirect-against-script-name",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/hooks/shop-lint.sh": "#!/bin/sh\nexit 0\n",
+    ".claude/settings.json": "{\n  \"hooks\": {\n    \"Stop\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"./.claude/hooks/shop-lint.sh>/dev/null\"\n          }\n        ]\n      },\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"./.claude/hooks/shop-lint.sh</dev/null\"\n          }\n        ]\n      },\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"timeout\": 5,\n            \"command\": \"echo ok > ./.claude/hooks/shop-lint.sh\"\n          }\n        ]\n      }\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-command",
+     "WARN",
+     2
+    ]
+   ],
+   "needs_exec_bit": true
+  },
+  {
+   "id": "35-script-passed-to-interpreter",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/hooks/shop-check.rb": "exit 0\n",
+    ".claude/hooks/shop-guard.sh": "exit 0\n",
+    ".claude/settings.json": "{\"hooks\": {\"PreToolUse\": [{\"matcher\": \"Bash\", \"hooks\": [{\"type\": \"command\", \"command\": \"ruby \\\"$CLAUDE_PROJECT_DIR\\\"/.claude/hooks/shop-check.rb\", \"timeout\": 5}, {\"type\": \"command\", \"command\": \"\\\"$CLAUDE_PROJECT_DIR\\\"/.claude/hooks/shop-guard.sh\", \"timeout\": 5}]}]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-command",
+     "WARN",
+     1
+    ]
+   ],
+   "needs_exec_bit": true
+  },
+  {
+   "id": "35-shell-punctuation",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"hooks\": {\"PostCompact\": [{\"hooks\": [{\"type\": \"command\", \"timeout\": 5, \"command\": \"if command -v python3 >/dev/null; then python3 \\\"$CLAUDE_PROJECT_DIR/.claude/hooks/restock.py\\\"; else py \\\"$CLAUDE_PROJECT_DIR/.claude/hooks/restock.py\\\"; fi\"}]}], \"PostToolUse\": [{\"matcher\": \"Edit\", \"hooks\": [{\"type\": \"command\", \"timeout\": 5, \"command\": \"go vet ./... 2>&1 | head -20\"}]}]}}\n",
+    ".claude/hooks/restock.py": "print()\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-command",
+     "ERROR",
+     0
+    ],
+    [
+     "35-hooks-timeout",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "35-timeout-async-and-severity",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"hooks\": {\"PostToolUse\": [{\"matcher\": \"Edit\", \"hooks\": [{\"type\": \"command\", \"command\": \"echo a\", \"async\": true}]}], \"PreToolUse\": [{\"matcher\": \"Bash\", \"hooks\": [{\"type\": \"command\", \"command\": \"echo b\"}]}], \"Stop\": [{\"hooks\": [{\"type\": \"command\", \"command\": \"echo c\", \"asyncRewake\": true}]}]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-timeout",
+     "NOTICE",
+     2
+    ]
+   ]
+  },
+  {
+   "id": "35-unknown-event",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\"hooks\": {\"PreToolUs\": [{\"matcher\": \"Edit\", \"hooks\": [{\"type\": \"command\", \"timeout\": 5, \"command\": \"true\"}]}]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-event",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "35-unreadable-hooks-json",
+   "files": {
+    ".claude-plugin/plugin.json": "{\"name\": \"shop-tools\", \"version\": \"1.0.0\", \"description\": \"Shop tools.\"}\n",
+    "skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "hooks/hooks.json": "{\"hooks\": {\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-parse",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "35-unsupported-type",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"hooks\": {\n    \"SessionStart\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"prompt\",\n            \"prompt\": \"ok?\"\n          }\n        ]\n      }\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-shape",
+     "ERROR",
+     1
+    ]
+   ]
+  }
+ ]
+}
