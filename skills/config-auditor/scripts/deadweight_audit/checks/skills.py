@@ -19,7 +19,12 @@ from ..limits import (
     SKILL_NAME_RE,
 )
 from ..checks.security import _hook_commands
-from ..parsing.frontmatter import frontmatter_hooks, frontmatter_keys, parse_frontmatter
+from ..parsing.frontmatter import (
+    frontmatter_hooks,
+    frontmatter_keys,
+    frontmatter_raw_value,
+    parse_frontmatter,
+)
 from ..parsing.markdown import iter_relative_links
 from ..repo import readable_files, git_ignored, is_vendored_skill, exists_from_root
 from ..report import Report, house, house_note
@@ -289,11 +294,20 @@ def check_skills(ctx: AuditContext, report: Report) -> dict[str, dict]:
                 str(skill_md),
             )
 
-        if desc and desc[0] in (">", "|"):
+        raw_desc = frontmatter_raw_value(text, "description") or ""
+        if desc and desc[0] in (">", "|") and raw_desc[:1] in (">", "|"):
+            # Same reading as for agents (agents.py): a quoted "> ..." is a description that
+            # starts with '>', and `>2`/`|2-` are block headers the parser reads - neither
+            # reaches here. What is left is a header followed by text on the same line: not
+            # standard YAML, but the parser reads it as text. Until 0.28.0 this was an ERROR
+            # saying "parser failed" and fired on the quoted form too.
             report.add(
                 "02-frontmatter-block-scalar",
-                "ERROR",
-                f"Skill '{entry.name}' description parsed as a raw block-scalar indicator — frontmatter parser failed.",
+                "INFO",
+                f"Skill '{entry.name}' description opens with '{raw_desc[0]}' followed by text on "
+                "the same line: this auditor's parser reads it as text starting with "
+                f"'{raw_desc[0]}', which strict YAML parsers reject. Quote the value to be read "
+                "the same everywhere.",
                 str(skill_md),
             )
 

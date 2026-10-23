@@ -26,7 +26,7 @@
    "expected": [
     [
      "01-claude-md-exists",
-     "ERROR",
+     "INFO",
      0
     ]
    ]
@@ -42,7 +42,7 @@
    "expected": [
     [
      "23-agent-model",
-     "WARN",
+     "NOTICE",
      0
     ]
    ]
@@ -78,8 +78,13 @@
    "expected": [
     [
      "23-agent-skills-preload",
-     "ERROR",
+     "WARN",
      0
+    ],
+    [
+     "23-agent-skills-preload",
+     "INFO",
+     1
     ]
    ]
   },
@@ -110,8 +115,8 @@
    "expected": [
     [
      "24-settings-skill-overrides",
-     "ERROR",
-     0
+     "NOTICE",
+     1
     ]
    ]
   },
@@ -125,7 +130,7 @@
    "expected": [
     [
      "02-skills-dir",
-     "WARN",
+     "INFO",
      0
     ]
    ]
@@ -143,6 +148,11 @@
      "23-agent-tools",
      "ERROR",
      0
+    ],
+    [
+     "23-agent-tools",
+     "NOTICE",
+     1
     ]
    ]
   }

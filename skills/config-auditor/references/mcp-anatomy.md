@@ -155,7 +155,9 @@ Callable name: `mcp__<server>__<tool>` (permissions, MCP; hooks, Match MCP tools
 - `managed-mcp.json` (system path) is **exclusive**: only its servers, `managedMcpServers` and in-process app servers load; plugin servers and `--mcp-config` are dropped.
 - `allowedMcpServers` / `deniedMcpServers` filter, they do not deploy. Denylist merges from every scope and always wins. Without `allowManagedMcpServersOnly: true`, a user's own allowlist broadens the managed one. `allowedMcpServers: []` allows nothing; unset allows everything.
 - `serverName` entries are labels, not controls; use `serverUrl` / `serverCommand`.
-- A managed server that uses `${VAR}` is still checked against the allowlist.
+- A server in `managed-mcp.json` needs no `allowedMcpServers` entry, except one that uses `${VAR}` expansion outside `env`: that one is
+  still checked against the allowlist. Before v2.1.305 a server with `${VAR}` only in `env` was checked too, so on upgrade a server your
+  allowlist kept out starts loading; `deniedMcpServers` keeps it off (managed-mcp, read 2026-10-23).
 
 ## What audit.py checks, and what it does not
 

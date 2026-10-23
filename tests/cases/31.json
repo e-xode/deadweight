@@ -398,7 +398,7 @@
    "expected": [
     [
      "31-overlay-unused",
-     "INFO",
+     "NOTICE",
      0
     ],
     [

@@ -18,6 +18,22 @@
    ]
   },
   {
+   "id": "08-agent-not-for-opens-a-clause",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/agents/shop-donor.md": "---\nname: shop-donor\ndescription: Answers donors of the shop's not for profit partners about receipts and gift aid, with the donor history at hand.\n---\n\nReview.\n",
+    ".claude/agents/shop-payout.md": "---\nname: shop-payout\ndescription: Answers sellers about shop payouts, their schedule and the fees taken from each one. Not for refunds.\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "08b-agent-description",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
    "id": "08-agent-opening-not-on-line-1",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",

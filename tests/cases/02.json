@@ -15,11 +15,6 @@
      "02-frontmatter-block-scalar",
      "INFO",
      1
-    ],
-    [
-     "02-frontmatter-block-scalar",
-     "ERROR",
-     0
     ]
    ],
    "forbidden_messages": [
@@ -81,11 +76,6 @@
    "expected": [
     [
      "02-skill-frontmatter",
-     "ERROR",
-     0
-    ],
-    [
-     "02-skill-frontmatter",
      "WARN",
      1
     ]
@@ -101,17 +91,7 @@
    "expected": [
     [
      "02-skill-frontmatter",
-     "ERROR",
-     0
-    ],
-    [
-     "02-skill-frontmatter",
      "WARN",
-     0
-    ],
-    [
-     "02-skill-frontmatter",
-     "NOTICE",
      0
     ]
    ]
@@ -140,8 +120,30 @@
    "expected": [
     [
      "02-skills-dir",
-     "WARN",
-     0
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "02-skill-description-header-with-text",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: > Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-billing/SKILL.md": "---\nname: shop-billing\ndescription: \"> Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\"\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "02-frontmatter-block-scalar",
+     "INFO",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "02-frontmatter-block-scalar",
+     "parser failed"
     ]
    ]
   },
@@ -153,11 +155,6 @@
    },
    "git": true,
    "expected": [
-    [
-     "02-skill-frontmatter",
-     "ERROR",
-     0
-    ],
     [
      "02-skill-frontmatter",
      "WARN",

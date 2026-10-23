@@ -245,6 +245,27 @@
    ]
   },
   {
+   "id": "35-hook-without-type",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"hooks\": {\n    \"PostToolUse\": [\n      {\n        \"matcher\": \"Edit\",\n        \"hooks\": [\n          {\n            \"command\": \"echo shop\",\n            \"timeout\": 5\n          }\n        ]\n      }\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-shape",
+     "WARN",
+     1
+    ],
+    [
+     "35-hooks-shape",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
    "id": "35-matcher-all-alternatives-rules",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
@@ -569,7 +590,7 @@
     ],
     [
      "35-hooks-timeout",
-     "WARN",
+     "NOTICE",
      0
     ]
    ]

@@ -43,7 +43,7 @@
    "expected": [
     [
      "01-claude-md-exists",
-     "ERROR",
+     "INFO",
      0
     ],
     [
@@ -68,7 +68,7 @@
     ],
     [
      "01-claude-md-exists",
-     "ERROR",
+     "INFO",
      0
     ]
    ],
@@ -88,7 +88,7 @@
    "expected": [
     [
      "01-claude-md-exists",
-     "ERROR",
+     "INFO",
      0
     ],
     [
@@ -108,7 +108,7 @@
    "expected": [
     [
      "01-claude-md-exists",
-     "ERROR",
+     "INFO",
      0
     ],
     [

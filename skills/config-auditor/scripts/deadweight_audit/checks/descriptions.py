@@ -64,8 +64,17 @@ def check_agent_descriptions(ctx: AuditContext, report: Report, agents: dict[str
 # is not a translation table - it holds the openers actually observed on the fleet.
 # The apostrophe may be typographic (U+2019) or a backtick: `Don’t use` and `N’utilisez
 # pas` were read as no clause at all until 0.23.0 (external audit, 2026-10-08).
+# `Not for` needs no colon: until 0.28.0 only `Not for:` counted, so a description ending
+# "Not for backend-only or non-UI tasks." was told it never says when not to use it. The
+# colon was there from the first release with no reason recorded; the word boundaries keep
+# `cannot for` and `not format` out. It must open a clause - after punctuation, a line start
+# or "but" - and never follow a bare word: anywhere, "pages for not for profit
+# organisations" excluded nothing and lost its notice (external audit of 0.28.0, A-01). The
+# same pattern serves 08b and 33's exclusions, so the three checks move together.
 ANTI_TRIGGER_RE = re.compile(
-    r"Do ?n['’`]?o?t use|Never use|Not for:|Out of scope|Anti-?trigger"
+    r"Do ?n['’`]?o?t use|Never use"
+    r"|(?:(?<=\bbut )|(?<!\w[ \t])(?<!\w[ \t]{2}))\bNot for\b"
+    r"|Out of scope|Anti-?trigger"
     r"|Ne pas utiliser|N['’`]utilisez? pas|Hors périmètre",
     re.IGNORECASE,
 )

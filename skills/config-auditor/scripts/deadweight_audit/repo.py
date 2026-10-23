@@ -9,6 +9,13 @@ from pathlib import Path
 from .parsing.markdown import ImportToken, import_tokens
 
 
+# Prepended to every git call. `core.fsmonitor` names a program git runs to list changed
+# files, and a repository's own `.git/config` may set it: `git ls-files` on a cloned or
+# unpacked repository ran the script it named (measured on 0.27.0). The audit reads a
+# repository; it must not run what that repository's configuration says.
+GIT_SAFE = ("-c", "core.fsmonitor=false")
+
+
 WALK_PRUNE_DIRS = {
     ".git", "node_modules", "dist", "build", "coverage", ".venv", "venv",
     "__pycache__", ".cache", ".output", ".next", ".nuxt", "out",
@@ -76,7 +83,7 @@ def rule_scope_files(root: Path) -> list[str]:
     """
     files = set(repo_files(root))
     try:
-        r = subprocess.run(["git", "-C", str(root), "-c", "core.excludesFile=", "ls-files", "-z",
+        r = subprocess.run(["git", "-C", str(root), *GIT_SAFE, "-c", "core.excludesFile=", "ls-files", "-z",
                             "--cached", "--others", "--exclude-standard"],
                            capture_output=True, timeout=30)
     except (OSError, subprocess.SubprocessError):
@@ -219,7 +226,7 @@ def tracked_paths(root: Path) -> list[str]:
         # `-z`: without it git quotes and octal-escapes a non-ASCII name when core.quotePath
         # is true (its default) - `"apps/caf\303\251/package.json"` - and the file could not
         # be opened (external audit of 0.24.0, se-02).
-        r = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--cached", "--others",
+        r = subprocess.run(["git", "-C", str(root), *GIT_SAFE, "ls-files", "-z", "--cached", "--others",
                             "--exclude-standard"], capture_output=True, timeout=30)
     except (OSError, subprocess.SubprocessError):
         r = None
@@ -243,7 +250,7 @@ def git_tracked(root: Path, rel: str) -> str:
     (external audit 3, 2026-10-08). Each caller decides what "unknown" is worth.
     """
     try:
-        r = subprocess.run(["git", "-C", str(root), "ls-files", "--error-unmatch", "--", rel],
+        r = subprocess.run(["git", "-C", str(root), *GIT_SAFE, "ls-files", "--error-unmatch", "--", rel],
                            capture_output=True, text=True, timeout=10,
                            env={**os.environ, "LC_ALL": "C", "LANGUAGE": "C"})
     except (OSError, subprocess.SubprocessError):
@@ -264,7 +271,7 @@ def git_ignores(root: Path, rel: str) -> bool:
         # The REPOSITORY's rules only: a user's global excludes file made the
         # same commit read differently on two machines (measured 2026-09-23 -
         # `**/.claude/settings.local.json` sat in ~/.config/git/ignore).
-        r = subprocess.run(["git", "-C", str(root), "-c", "core.excludesFile=",
+        r = subprocess.run(["git", "-C", str(root), *GIT_SAFE, "-c", "core.excludesFile=",
                             "check-ignore", "-q", "--", rel],
                            capture_output=True, timeout=5)
     except (OSError, subprocess.SubprocessError):

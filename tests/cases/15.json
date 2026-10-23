@@ -22,6 +22,27 @@
    ]
   },
   {
+   "id": "15-index-listed-skill-house-profile",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\n## Skills index\n\n- `shop-refunds`\n",
+    ".claude/audit.local.json": "{\"profile\": \"house\"}\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "15-skill-index",
+     "WARN",
+     1
+    ],
+    [
+     "15-skill-index",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
    "id": "15-manual-skill",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",

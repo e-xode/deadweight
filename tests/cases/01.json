@@ -277,8 +277,8 @@
    "expected": [
     [
      "01-claude-md-exists",
-     "ERROR",
-     0
+     "INFO",
+     1
     ]
    ]
   },

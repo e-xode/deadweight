@@ -13,11 +13,6 @@
    "expected": [
     [
      "32-skill-name-shape",
-     "ERROR",
-     0
-    ],
-    [
-     "32-skill-name-shape",
      "WARN",
      1
     ]

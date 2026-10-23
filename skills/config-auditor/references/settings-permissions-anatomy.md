@@ -17,19 +17,17 @@ Contents: [Reading this page](#reading-this-page) · [Files and precedence](#fil
 A settings file fails by **meaning less than it says**: a key ignored at its scope, an allow rule
 that approves nothing, a deny that stops one spelling of a command. None raises an error at runtime.
 
-Tags as in [hooks-anatomy.md](./hooks-anatomy.md): **[doc]** cites the page under
-`code.claude.com/docs/en/` and its section, **[house]** is this plugin's convention, **[inference]**
-follows from the doc without being stated. Check ids name the audit.py control; audit.py reads
-`.claude/settings.json` and `.claude/settings.local.json` of the audited root, nothing else — not
-user, managed or `--settings` values.
+Tags as in [hooks-anatomy.md](./hooks-anatomy.md): **[doc]** cites the page under `code.claude.com/docs/en/`
+and its section, **[house]** is this plugin's convention, **[inference]** follows from the doc without being
+stated. Check ids name the audit.py control; audit.py reads `.claude/settings.json` and
+`.claude/settings.local.json` of the audited root, nothing else — not user, managed or `--settings` values.
 
 ## Files and precedence
 
 [doc] `settings § Settings precedence`, highest first:
 
-1. **Managed** (`managed-settings.json`, MDM, server-managed) — nothing overrides it, `--settings`
-   included, apart from a short list of security keys where a stricter lower value wins
-   (`settings § Exceptions to managed settings precedence`).
+1. **Managed** (`managed-settings.json`, MDM, server-managed) — nothing overrides it, `--settings` included,
+   apart from a few security keys where a stricter lower value wins (`settings § Exceptions to managed settings precedence`).
 2. **Command line** (`--settings`, `--model`, `--permission-mode`…) — one session.
 3. **Project local** `.claude/settings.local.json`.
 4. **Shared project** `.claude/settings.json`.
@@ -38,10 +36,9 @@ user, managed or `--settings` values.
 Environment variables are not a level; each variable/key pair has its own rule (`settings`). A
 fifth file, `~/.claude.json`, holds trust decisions, MCP configurations and the *Global config* keys.
 
-- [doc] **Lists merge** instead of overriding (`permissions.allow` from every file combine), except
-  `fallbackModel`, `modelPicker`, `availableModels` and `modelSettings`, which have their own rules
-  (`settings § Lists merge instead of overriding`). A project cannot remove a user's allow rule; it
-  can only add a deny.
+- [doc] **Lists merge** instead of overriding (`permissions.allow` from every file combine), except `fallbackModel`,
+  `modelPicker`, `availableModels` and `modelSettings`, which have their own rules
+  (`settings § Lists merge instead of overriding`). A project cannot remove a user's allow rule; it can only add a deny.
 - [doc] Shared `.claude/settings.json` is read from the session's primary working directory: a file
   committed at the repository root does not apply to a session started in `api-socket/`
   (`settings § Where Claude Code keeps the local file`).
@@ -58,11 +55,15 @@ fifth file, `~/.claude.json`, holds trust decisions, MCP configurations and the 
 A key outside its scope is ignored; the table is not reproduced here, audit.py carries it.
 
 - **`24-settings-unknown-key`** (NOTICE) — a key absent from the reference: a typo, or a key newer
-  than the auditor; or a key the reference lists as removed (`taskOutputMaxChars`, "Removed in
-  v2.1.277", no effect).
+  than the auditor; or a key the reference lists as removed (`taskOutputMaxChars`, "Removed in v2.1.277", no effect).
 - **`24-settings-unknown-subkey`** (NOTICE) — a field absent from a closed object (`attribution`,
   `permissions`, `autoMode`, `sandbox`, `statusLine`, `worktree`…), or from a `modelSettings.<model>`
   entry: ignored like a misspelt key, one level down. Freely keyed (`env`, `enabledPlugins`, `hooks`): not checked.
+  `sandbox.allowNestedUserNamespaces` (changelog 2.1.305) is listed by the reference from 2026-10-22, scope "User or
+  managed": "Claude Code ignores a `true` in a project's `.claude/settings.json` or `.claude/settings.local.json`"
+  (settings-reference), "which a repository can't turn on" (sandboxing). In a project file it is
+  `24-settings-scope`'s (ERROR), not check 50's. `axScreenReader` is the same: "Claude Code ignores the key in project
+  and local settings" (settings-reference; accessibility, "project settings can't turn it on").
 - **`24-settings-value`** (NOTICE) — `autoCompactWindow` not "a number of tokens from `100000` to
   `1000000`" (or `"auto"` per model) [doc]; the effect of another value is not documented.
 - [doc] Hiding all commit and PR attribution: `"attribution": false` since 2.1.281; earlier
@@ -77,11 +78,9 @@ A key outside its scope is ignored; the table is not reproduced here, audit.py c
   - `worktree.location` — *User*, "in `~/.claude/settings.json` on the remote machine": a
     project file cannot move Desktop SSH worktrees. The auditor bars it from `settings.local.json`
     too, as it does the *User or managed* keys (the Scope lists no Local; not probed).
-  - `skipDangerousModePermissionPrompt` — *User, local, or managed*: a repository cannot skip the
-    dialog for you.
+  - `skipDangerousModePermissionPrompt` — *User, local, or managed*: a repository cannot skip the dialog for you.
   - `allowManagedHooksOnly`, `claudeMd` — *Managed* only.
-  - `autoConnectIde`, `diffTool` — *Global config*: they live in `~/.claude.json`, never in a
-    settings file.
+  - `autoConnectIde`, `diffTool` — *Global config*: they live in `~/.claude.json`, never in a settings file.
   - `useAutoModeDuringPlan`, `syncClaudeAiSkills`, `syncClaudeAiPlugins`: a **`false` in the shared
     `settings.json` is ignored** — the opt-out is honoured from user, local, managed or
     `--settings` only (`settings § Exceptions to managed settings precedence`). One such line
@@ -286,10 +285,14 @@ For enforcement that does not depend on spelling, the doc points to **sandboxing
 filesystem and network, Bash and its children) and to a `PreToolUse` hook for custom inspection
 (`permissions § How permissions interact with sandboxing`). With the sandbox on and
 `autoAllowBashIfSandboxed` at its default, a bare `Bash` ask rule no longer prompts for sandboxed
-commands; content-scoped ask rules and explicit denies still apply.
+commands; content-scoped ask rules and explicit denies still apply. [house] A deny list guards the
+model's usual spelling; "secrets protected by `Read(./.env)`" is only true together with the sandbox.
 
-[house] A deny list is a guard against the model's usual spelling, reviewed as such; a finding that
-reads "secrets protected by `Read(./.env)`" is only true together with the sandbox.
+- **`50-security-sandbox-weakened`** (NOTICE) — `true`, in the project or local file, for a key that weakens the sandbox ("Each one weakens the sandbox", sandboxing; what each does, settings-reference):
+  `enableWeakerNestedSandbox` (in an unprivileged container the inner sandbox bind-mounts the container's /proc, which "exposes process information"), `enableWeakerNetworkIsolation` (macOS TLS trust service: "a potential data exfiltration path"),
+  `network.allowAllUnixSockets` (every Unix socket), `network.allowLocalBinding` (macOS: listen on ports, reach any localhost port; no effect on Linux).
+  `allowNestedUserNamespaces` is not here: it is "User or managed" and ignored in a repository's files (above).
+  Exempt the file (all its keys) with the reason, e.g. a CI container. Under an admin-required sandbox the four's `true` is ignored in a repository's files (sandboxing); audit.py cannot see managed settings.
 
 ## Not checked by audit.py
 

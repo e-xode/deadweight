@@ -62,6 +62,27 @@
    ]
   },
   {
+   "id": "39-judge-last-message",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "evals/shop-load/case.yaml": "schema_version: \"1.1\"\nname: shop-load\nexecution:\n  prompt: Refund order 1042.\n",
+    "evals/shop-load/graders/judge.md": "---\ntype: llm\n---\nThe run must load the `shop-refunds` skill.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "39-eval-judged-fact",
+     "WARN",
+     1
+    ],
+    [
+     "39-eval-judged-fact",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
    "id": "39-regex-in-case-yaml",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",

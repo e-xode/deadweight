@@ -159,6 +159,24 @@ class Transport(unittest.TestCase):
         self.assertEqual(len(calls), transport.RETRIES + 1)
         self.assertIn("FileNotFoundError", ans.error)
 
+    def test_no_session_file_is_kept(self) -> None:
+        # Without --no-session-persistence each request stayed in ~/.claude/projects, the
+        # configuration text sent included (measured on 0.27.0).
+        from deadweight_semantic import transport
+        seen = []
+        real_run = transport.subprocess.run
+
+        def record(cmd, *a, **k):
+            seen.append(cmd)
+            raise subprocess.TimeoutExpired(cmd, 1)
+        transport.subprocess.run = record
+        os.environ.pop("DEADWEIGHT_SEMANTIC_RESPONSE", None)
+        try:
+            transport.ask("s", "p", "claude-sonnet-5-5")
+        finally:
+            transport.subprocess.run = real_run
+        self.assertIn("--no-session-persistence", seen[0])
+
 
 
 class ReferencesOneHop(unittest.TestCase):

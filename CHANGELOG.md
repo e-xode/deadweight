@@ -1,5 +1,143 @@
 # Changelog
 
+## 0.28.0 — 2026-10-21
+
+**`audit.py` changed: floors set with 0.27.0 no longer compare** (`34-floor` refuses two auditors). Run `audit.py --set-floor` once and commit `floor.json`. What can **raise** a count: the new `50-security-sandbox-weakened` NOTICE; a `24-settings-scope` ERROR for `sandbox.allowNestedUserNamespaces` or `axScreenReader` written in a project's `settings.json` or `settings.local.json` (the documentation gives both the scope "User or managed" and says Claude Code ignores them there); a `31-overlay-unused` NOTICE for an exemption of `04-skill-description-antitrigger` or `08b-agent-description` on a description that now counts as excluding; a `33-description-overlap` NOTICE for a pair that now counts as separated by declaration. What can **lower** one: `sandbox.allowNestedUserNamespaces` is no longer a `24-settings-unknown-subkey` NOTICE (it becomes the ERROR above); a skill that says "There is no `path`" is no longer a `28-skill-anchors` WARN; a description in which "Not for ..." opens a clause without a colon is no longer an `04-skill-description-antitrigger` or `08b-agent-description` NOTICE, and a pair excluded that way is no longer a `33-description-overlap` WARN. A skill whose `description` is quoted and starts with `>` or `|`, or is written `description: > text`, is no longer a `02-frontmatter-block-scalar` ERROR (the second form is now an INFO, like an agent's). Measured on the 23 folders of one workspace with the 0.27.0 auditor and this one on the same files, 2026-10-21: errors 0 → 0, warnings 64 → 63, notices 140 → 141; four folders changed (one `28` WARN and three `04` findings gone, two NOTICE and one INFO; three `31-overlay-unused` NOTICE new); none sets a key the new sandbox check reads, and no `08b` or `33` finding moved.
+
+### Fixed
+
+- **`sandbox.allowNestedUserNamespaces` was called an ignored field, then given the wrong scope**
+  (`vocabulary/settings.py`, `checks/security.py`). Before: `{"sandbox": {"allowNestedUserNamespaces":
+  true}}` gave `24-settings-unknown-subkey` NOTICE, "it is ignored without a word". Claude Code 2.1.305
+  added the field. The first 0.28.0 candidate accepted it as valid in any file and reported a `true`
+  as weakening the sandbox "for everyone this file reaches". The settings reference lists it from
+  2026-10-22 with scope "User or managed" ("Claude Code ignores a `true` in a project's
+  `.claude/settings.json` or `.claude/settings.local.json`") and sandboxing says "which a repository
+  can't turn on": a repository's file cannot weaken anything with it. After: the key is in
+  `SETTINGS_KEYS_USER_MANAGED`, a project file gets `24-settings-scope` ERROR like any other key of
+  that scope, and `50-security-sandbox-weakened` no longer reads it. Found by the catch-up audit
+  (B-00) and by the release watch (issue 6, `SETTINGS_KEYS_USER_MANAGED` one key short). A misspelt
+  field (`allowNestedUserNamespace`) is still reported. The effect was not observed: on the test
+  machine the sandbox did not start at all.
+- **`axScreenReader` was accepted in any settings file** (`vocabulary/settings.py`). The settings
+  reference gives it scope "User or managed" and says Claude Code ignores it in project and local
+  settings; the accessibility page says "project settings can't turn it on", and the same for
+  `CLAUDE_AX_SCREEN_READER` under `env` there. Claude Code 2.1.307 changelog: applies only from user,
+  managed or `--settings` settings. A project file that sets it now gets `24-settings-scope` ERROR.
+  The `env` form is not checked yet.
+- **`deadweight --setup-statusline` deleted a dangling `settings.json` link when the launcher could not
+  be written** (`bin/deadweight`; catch-up audit, E-02). It now refuses a settings path that is a
+  link to a missing file (exit 2) and touches nothing. A link to an existing file is written through
+  and put back as before.
+- **The audit ran the program a repository's `.git/config` names in `core.fsmonitor`**
+  (`repo.py`). The four git calls (`ls-files` three times, `check-ignore`) now pass
+  `-c core.fsmonitor=false`. Before: measured with git 2.53.0 and a witness script, each call ran
+  it. A clone does not carry the setting; a `.git/` folder received as files can.
+  `tests/test_git_fsmonitor.py`.
+- **`deadweight --setup-statusline` replaced a file at the launcher's path even when it then left
+  the settings alone** (`bin/deadweight`). The launcher is now written only once the `statusLine`
+  key is set: a settings file with another status line, or one that is not plain JSON, leaves
+  `.claude/statusline.py` (or Copilot's `deadweight-statusline.py`) as it was. If the launcher then
+  cannot be written - its path is a folder, a symbolic link (never written through) or a read-only
+  file - the settings file is put back as it was, or removed if there was none, the command says so
+  and exits 3, and the other host is still set up; the first version of this change crashed there
+  with the `statusLine` already set (external review of this release). `tests/test_setup_launcher.py`,
+  the Copilot success path included.
+- **`deadweight --semantic` left a session file per request** in `~/.claude/projects/`, the
+  configuration text sent included (`deadweight_semantic/transport.py`). It now passes
+  `--no-session-persistence` (measured on Claude Code 2.1.306: no session folder for the run).
+  `--environment --measure` still keeps its four sessions; `PRIVACY.md` says so.
+
+- **`28-skill-anchors` reported a path the file says is not there** (`checks/reality.py`,
+  `anchor_verdict`). Before: a skill that says "There is **no `src/seo.config.js`** in this
+  project" got the WARN "names 'src/seo.config.js', which does not exist", the one sentence
+  that is true of a missing file. After: when every mention of the path reads "there is/are no
+  `path`" at the start of its sentence (after `.`, `!`, `?` or a line start, not `:` or `;`) and
+  the clause ends after the path (or goes on with "in", "here", "yet", "anymore"), it is not an
+  anchor. Deliberately narrow: a bare "no", "not", "never" or "without" before a path bans or
+  requires a file that must exist ("Never edit `src/x.ts`"), "If there is no `x`, stop" and
+  "Before you start: there is no `x`, stop" expect it, and "There is no `x` file in this project"
+  is not matched; all still count. A path that is also named plainly elsewhere stays reported.
+- **`04-skill-description-antitrigger`, `08b-agent-description` and `33-description-overlap` ignored
+  "Not for ..." without a colon** (`checks/descriptions.py`, one pattern for the three). Before: only
+  `Not for:` counted, so a skill description ending "Not for backend-only or non-UI tasks." got the
+  `04` NOTICE, an agent description ending "Not for refunds." the `08b` NOTICE, and a pair whose
+  second side ends "Not for shop-refunds." the `33` WARN "only one side draws the line". After: `Not
+  for` counts when it opens a clause - after punctuation, at a line start or after "but" - so those
+  three give nothing, a NOTICE "separated by declaration" for the pair. Inside a sentence it does not:
+  "pages for not for profit organisations", "cannot for now" and "parcels and not for pallets" still
+  get the NOTICE (each a labelled case). An exemption of `04` or `08b` written for such a description
+  is now reported by `31-overlay-unused`: remove it.
+- **`02-frontmatter-block-scalar` was an ERROR "parser failed" on a skill that no parser failed on**
+  (`checks/skills.py`). The check read the parsed value only, so `description: "> Review ..."`
+  (quoted: a description that starts with `>`) was reported as a raw block indicator. The agent
+  check already compared the raw value too (`checks/agents.py`) and reported only the unquoted
+  `description: > text` form, as an INFO. The skill check now does the same: quoted, nothing;
+  `description: > text`, INFO, the same message as for an agent. One labelled case pins both forms
+  and fails on 0.27.0.
+- **`25-orphan-reference` is unchanged, by decision.** A reference that only a script or program of
+  the skill names in its output is still reported: the documentation asks every reference to be
+  linked from `SKILL.md` (best practices: "All reference files should link directly from
+  SKILL.md"). `audit-checklist.md` says so and how to exempt it; a corpus case fixes the behaviour.
+
+### Added
+
+- **`50-security-sandbox-weakened`** (NOTICE, security family; `checks/security.py`). A `true`, in
+  `.claude/settings.json` or `.claude/settings.local.json`, for a sandbox key the documentation
+  says weakens the sandbox: `enableWeakerNestedSandbox`, `enableWeakerNetworkIsolation`,
+  `network.allowAllUnixSockets` and `network.allowLocalBinding` (sandboxing: "Each one weakens the
+  sandbox"). The message quotes the source and
+  says the key is documented to weaken the sandbox, nothing more. NOTICE, not WARN: the documented
+  uses (an unprivileged container, a MITM proxy on macOS, localhost servers on macOS, every Unix
+  socket) are reasons a settings file cannot show;
+  when one is the reason, exempt the check for that file in `.claude/audit.local.json` with the
+  reason - the message says the exemption covers every key of the check in the file. An untracked
+  `settings.local.json` keeps the grade, and the message says it reaches only your own sessions.
+  `false` (the documented default), an absent key and a misspelt one (still `24-settings-unknown-subkey`)
+  give nothing. `allowAppleEvents`, `filesystem.disabled` and `allowNestedUserNamespaces` are not read: their scope is user or
+  managed, so in a project file `24-settings-scope` already reports them. Not read either: managed
+  settings. Under an admin-required sandbox Claude Code ignores a repository's `true` for the four
+  keys of the sandboxing table, and their message says so. The effect of the keys was not observed: on
+  the test machine the sandbox did not start, with or without them (`evidence.json`).
+
+### Changed
+
+- The check 46 vocabulary is regenerated from the references (eight terms added); this is part
+  of the auditor's sha change.
+- `mcp-anatomy.md`: a server of `managed-mcp.json` needs no `allowedMcpServers` entry unless it uses
+  `${VAR}` expansion outside `env`; before v2.1.305 `${VAR}` only in `env` was checked too, and a
+  server an allowlist kept out starts loading on upgrade (managed-mcp, read 2026-10-23). The
+  previous sentence ("a managed server that uses `${VAR}` is still checked") was too broad.
+- `skill-anatomy.md`: under `allowManagedPermissionRulesOnly` Claude Code ignores `allowed-tools` in
+  project and personal skills (v2.1.282; skills, read 2026-10-23); the audit cannot see managed settings.
+- `PRIVACY.md` and `tests/test_git_fsmonitor.py`: the promise is what the test does. It sees a git call
+  written as a literal list, and now requires the override before the subcommand (git reads
+  `-c core.fsmonitor=false` after `ls-files` as arguments of `ls-files`); a call assembled another way
+  is not seen, and the page says so (catch-up audit, E-00).
+- The release watch no longer reports `setModel` (Agent SDK method) or `isReadOnly` (field of a mod's
+  event) (`.github/scripts/claude_code_watch_exclude.txt`).
+- `copilot-anatomy.md`: VS Code moved its custom agents page and its field descriptions to a new
+  file reference; four quotes no longer on the page are replaced by the current wording, with both
+  addresses (read 2026-10-21, and again 2026-10-22: the pages were rewritten within the day, so three
+  quotes were replaced a second time - `chat.useAgentsMdFile` is now documented as enabled by default).
+  No check changes.
+- `PRIVACY.md`: every git option the audit passes (`core.fsmonitor`, `core.excludesFile`, and the
+  locale it sets for one call), and what Claude Code itself runs when `--semantic` or `--measure`
+  starts it: its own git calls, with its own `-c core.fsmonitor=` (measured on Claude Code 2.1.306,
+  one run with each command's flags). `tests/test_git_fsmonitor.py` also fails now if any git call
+  in the code the plugin runs lacks `-c core.fsmonitor=false`.
+- `.github/scripts/claude_code_watch_exclude.txt`: `setMcpServers`, an Agent SDK method called from
+  code, never a key of a configuration file.
+- `CHANGELOG.md`: the icon's path in the 0.26.0 notes is no longer written as code; the directory
+  portal reported it as "Image or font file that the plugin's code could run".
+- `tests/test_cases.py`: a labelled case expecting `[check, severity, 0]` now needs another case that
+  sees that check fire at that same severity (`test_a_severity_held_silent_is_also_seen_firing`);
+  the per-id guard let 49 such expectations, on 31 check and severity pairs, pass whatever the check
+  did. 26 now expect the severity the check emits (16) or are dropped where the case already holds
+  the point (10); the other 20 now have a case that fires their severity (15 cases added, one
+  expectation added to an existing case); the 3 left are a retired check and the crash report,
+  exempt as before. 4 more cases fire computed severities no case reached. No check changes.
+
 ## 0.27.0 — 2026-10-17
 
 **`audit.py` changed: floors set with 0.26.0 no longer compare** (`34-floor` refuses two auditors). Run `audit.py --set-floor` once and commit `floor.json`. What can **raise** a count: a broken `@import` in a file that `CLAUDE.md` imports (`01-claude-md-import` WARN) and the new `01-claude-md-import-syntax` NOTICE. What can **lower** one: an `@path` written next to punctuation is no longer an import, so it no longer adds its file to the always-loaded budget (17), and a missing file named that way is no longer a broken-import WARN. Measured on the 23 folders of one workspace with the 0.26.0 auditor and this one on the same files, 2026-10-17: errors 0 → 0, warnings 63 → 63, notices 113 → 113.
@@ -203,7 +341,7 @@
 
 ### Added
 
-- `.claude-plugin/icon.png`: the icon of the plugin's listing in Anthropic's directory (a 1,024-pixel square PNG, 13 KB; the portal reads it from this path).
+- .claude-plugin/icon.png: the icon of the plugin's listing in Anthropic's directory (a 1,024-pixel square PNG, 13 KB; the portal reads it from this path).
 - A daily Claude Code release watch (`.github/workflows/claude-code-watch.yml`, `.github/scripts/claude_code_watch.py`): reads npm `latest` and the upstream `CHANGELOG.md`, and opens one `claude-code-drift` issue per range of new versions with the camelCase keys the plugin has never named, the removals and deprecations, and the lines touching frontmatter, settings, hooks, permissions or plugin manifests. Deterministic: no model, no API key, the issues are its state. Backtest on 2.1.270-2.1.302 against 0.25.0: it flags `idleCompaction` and `onFailure` by name and reaches `autoCompactWindow`, the `TaskOutput` removal and `"attribution": false` by line; it does not see the MCP description cap change.
 - `tests/test_claude_code_watch.py`, with invented fixtures under `tests/fixtures/watch/`.
 - A guard that every check id the auditor emits is fired by a labelled case or named, with the test that holds it, in `NOT_FIRED_BY_A_CASE`; 26 cases added to the corpus for the 14 ids that had none, and a test for `38-unreadable`.

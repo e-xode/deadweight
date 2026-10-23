@@ -21,6 +21,25 @@
      2
     ]
    ]
+  },
+  {
+   "id": "25-reference-named-by-a-script",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-ui/SKILL.md": "---\nname: shop-ui\ndescription: Polish the shop storefront pages and their layout. Do not use for refunds.\n---\n\nFor a review, read [reference/audit.md](reference/audit.md). For live iteration run `scripts/shop-ui live`.\n",
+    ".claude/skills/shop-ui/reference/audit.md": "# Audit\n",
+    ".claude/skills/shop-ui/reference/live-setup.md": "# Live setup\n",
+    ".claude/skills/shop-ui/reference/orphan.md": "# Never named\n",
+    ".claude/skills/shop-ui/scripts/shop-ui": "#!/bin/sh\necho \"No session yet: follow reference/live-setup.md, then rerun.\"\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "25-orphan-reference",
+     "WARN",
+     2
+    ]
+   ]
   }
  ]
 }

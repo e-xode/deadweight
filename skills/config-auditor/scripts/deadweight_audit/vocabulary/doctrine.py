@@ -1,6 +1,6 @@
 """The doctrine check 46 compares against: this plugin's reference names and code terms, frozen.
 
-GENERATED on 2026-10-17 from skills/config-auditor/references/ - do not edit by hand.
+GENERATED on 2026-10-23 from skills/config-auditor/references/ - do not edit by hand.
 Frozen rather than read at run time: a reference page added to the plugin changed findings in
 consuming projects while the auditor's sha stayed the same. Regenerating it is a deliberate change
 of the auditor, and moves its sha.
@@ -28,7 +28,7 @@ DOCTRINE_REFERENCE_NAMES = frozenset({
     'skill-runtime-mechanisms.md',
 })
 
-# 1356 code terms (text between backticks, 2 to 60 characters; generic repository folders,
+# 1366 code terms (text between backticks, 2 to 60 characters; generic repository folders,
 # extension globs, credential env names and fragments between two code spans left out).
 DOCTRINE_CODE_TERMS = frozenset({
     '!~/…',
@@ -349,6 +349,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     '50-security-broad-allow',
     '50-security-mcp-unpinned',
     '50-security-remote-exec',
+    '50-security-sandbox-weakened',
     '54-agents-md-variant',
     '55-cursor-reads-claude-md',
     '55-cursor-rule-glob',
@@ -733,6 +734,8 @@ DOCTRINE_CODE_TERMS = frozenset({
     'allowCrossMarketplaceDependenciesOn',
     'allowManagedHooksOnly',
     'allowManagedMcpServersOnly: true',
+    'allowManagedPermissionRulesOnly',
+    'allowNestedUserNamespaces',
     'allowed-tools',
     'allowedHttpHookUrls',
     'allowedMcpServers',
@@ -784,6 +787,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     'aws s3 ls',
     'awsAuthRefresh',
     'awsCredentialExport',
+    'axScreenReader',
     'background',
     'background: false',
     'background: true',
@@ -923,6 +927,8 @@ DOCTRINE_CODE_TERMS = frozenset({
     'echo:x hello',
     'effort',
     'enableAllProjectMcpServers',
+    'enableWeakerNestedSandbox',
+    'enableWeakerNetworkIsolation',
     'enabledMcpServers',
     'enabledMcpjsonServers',
     'enabledPlugins',
@@ -1088,6 +1094,8 @@ DOCTRINE_CODE_TERMS = frozenset({
     'must start with "./"',
     'name',
     'nested_traversal',
+    'network.allowAllUnixSockets',
+    'network.allowLocalBinding',
     'never expanded toward a remote server',
     'nice',
     'nl',
@@ -1196,6 +1204,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     'runtime-data.md',
     'sandbox',
     'sandbox.*',
+    'sandbox.allowNestedUserNamespaces',
     'sandbox.bwrapPath',
     'sandbox.network.strictAllowlist',
     'scaffold_script',
@@ -1275,6 +1284,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     'src/api/schema/',
     'src/billing/',
     'src/checkout/cart.js',
+    'src/seo.config.js',
     'sse',
     'statusLine',
     'statusline § Manually configure',

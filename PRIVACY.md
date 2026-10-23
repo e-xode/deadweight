@@ -12,11 +12,22 @@ The code that runs on your machine (`hooks/`, `bin/`, `skills/config-auditor/scr
 written in your files) and starts no program other than Python itself, `git` and `claude`. Only
 `claude`, under the two commands of "What it sends", reaches a network.
 
-`git` is run in the project (`ls-files`, `check-ignore`) without overriding `core.fsmonitor`: git then
-runs the program a repository's own `.git/config` names there, as it does for any git command, `git
-status` included (measured with git 2.53.0, a test repository and a harmless witness script; all four
-calls the audit makes ran it). A clone does not carry that setting; a `.git/` folder received as files
-can.
+`git` is run in the project (`ls-files`, `check-ignore`) four times, each with `-c core.fsmonitor=false`
+since 0.28.0, so the program a repository's own `.git/config` names there is not run. Until 0.27.0 it was:
+measured with git 2.53.0, a test repository and a harmless witness script, all four calls the audit makes
+ran it (`tests/test_git_fsmonitor.py` holds the fix, and fails if a git call written as a literal list in the shipped code lacks it before the subcommand; a call assembled another way, such as a string run through a shell, is not seen by that test).
+A clone does not carry that setting; a `.git/` folder received as files can. Two of the calls also pass
+`-c core.excludesFile=` (empty), so a global ignore file on your machine does not change what counts as
+ignored, and one sets `LC_ALL=C` and `LANGUAGE=C` for git, to read its error message. No other git setting
+is overridden.
+
+`--semantic` and `--environment --measure` start Claude Code, which runs git itself in the folder it runs in
+(`status`, `log`, `ls-files`, `remote`, `config`, in a run whose only reply was "OK"): that is Claude Code's
+behaviour, not this plugin's, and it is not under this plugin's control. Measured on Claude Code 2.1.306,
+with a logging `git` first in the `PATH` and the same witness, once with `--semantic`'s flags and once
+with those of `--measure`'s first run (plus `--no-session-persistence`): each git call carried Claude
+Code's own `-c core.fsmonitor=` and `-c core.hooksPath=/dev/null`, and the witness did not run. A later
+release may differ.
 
 ## What it reads
 
@@ -69,29 +80,33 @@ about an imported file outside the project gives its path, never its content.
   the counts, the auditor's sha, the plugin version, the layout, the time, and every finding with its
   message and location. `deadweight` and `deadweight --fresh` (which runs the hook again) show that file.
 - **`deadweight --setup-statusline`**, only when you run it, writes in each host it finds:
-  - Claude Code (`CLAUDE_CONFIG_DIR` or `~/.claude` exists): `.claude/statusline.py`, then the
-    `statusLine` key of `.claude/settings.json`, in your project.
-  - Copilot CLI (`$COPILOT_HOME` or `~/.copilot` exists): `deadweight-statusline.py`, then the
-    `statusLine` key of `settings.json`, in that folder - a user setting, for every project.
+  - Claude Code (`CLAUDE_CONFIG_DIR` or `~/.claude` exists): the `statusLine` key of
+    `.claude/settings.json`, then the launcher `.claude/statusline.py`, in your project.
+  - Copilot CLI (`$COPILOT_HOME` or `~/.copilot` exists): the `statusLine` key of `settings.json`, then
+    the launcher `deadweight-statusline.py`, in that folder - a user setting, for every project.
 
-  The launcher file is written first, every time: one already at that path is replaced, even when the
-  settings file is then left alone. A settings file that already has another `statusLine`, or is not plain
-  JSON, is left untouched; otherwise the whole file is written back as `json.dumps(indent=2)`, so its
-  formatting changes.
+  A settings file that already has another `statusLine`, or is not plain JSON, is left untouched, and so
+  is a file already at the launcher's path (until 0.27.0 the launcher was written first and replaced it).
+  Otherwise the whole settings file is written back as `json.dumps(indent=2)`, so its formatting changes,
+  and the launcher is written, replacing a regular file already there. If the launcher cannot be written
+  (its path is a folder, a symbolic link or a read-only file), the settings file is put back as it was
+  (removed if there was none) and the command exits 3; the other host is still set up.
 - **`semantic.py --method claims`** writes its cache (see "Retention").
 
 ## What it sends (only with `--semantic` or `--measure`)
 
 Both run `claude` with **your own login**. Neither reads a token nor sets an environment variable for it;
-what is sent to Anthropic goes through your account, under Anthropic's terms. Neither passes
-`--no-session-persistence`: Claude Code keeps each run as a session file, prompt included, under
+what is sent to Anthropic goes through your account, under Anthropic's terms. `--semantic` passes
+`--no-session-persistence` since 0.28.0: no session file is kept (measured on Claude Code 2.1.306: no
+folder appeared under `~/.claude/projects/` for the run). Until 0.27.0 it did not, and `--measure` still
+does not: Claude Code keeps each run as a session file, prompt included, under
 `~/.claude/projects/<the folder's path, / replaced by ->/<session id>.jsonl` (measured on Claude Code
-2.1.302, `CLAUDE_CONFIG_DIR` unset: the prompt was in that file; with `--no-session-persistence` no file was written). For
-`--semantic`, that file holds the configuration text sent.
+2.1.302, `CLAUDE_CONFIG_DIR` unset: the prompt was in that file; with `--no-session-persistence` no file
+was written).
 
 - **`deadweight --semantic`** (opt-in) runs `claude -p` (model `claude-sonnet-5-5`; `semantic.py --model`
-  picks another) with no tools, no MCP server and no settings source (`--tools "" --strict-mcp-config
-  --setting-sources ""`), in the folder you run the command from. With those flags, a `CLAUDE.md` in that
+  picks another) with no tools, no MCP server, no settings source and no session file (`--tools ""
+  --strict-mcp-config --setting-sources "" --no-session-persistence`), in the folder you run the command from. With those flags, a `CLAUDE.md` in that
   folder is not loaded by Claude Code itself (measured on 2.1.302: a marker phrase in it was not seen;
   with `--setting-sources project` it was). It sends the project `CLAUDE.md` (block-level HTML comments
   removed, as Claude Code does), the rules, every `SKILL.md` and agent file - taken by name, whatever a
@@ -143,4 +158,4 @@ The plugin has no account and no server. For the maintainer's website and the co
 
 A change to what the plugin reads, writes or sends is a change to this page, in the same commit.
 
-Last reviewed on version 0.27.0, 2026-10-17.
+Last reviewed on version 0.28.0, 2026-10-21.

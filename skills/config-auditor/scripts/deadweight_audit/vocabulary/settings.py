@@ -13,7 +13,7 @@ SETTINGS_KEYS_ANY = frozenset({
     "attribution.commit", "attribution.pr", "attribution.sessionUrl", "autoCompactEnabled",
     "autoCompactWindow", "autoMemoryDirectory", "autoMemoryEnabled", "autoScrollEnabled",
     "autoUpdatesChannel", "availableModels", "awaySummaryEnabled", "awsAuthRefresh",
-    "awsCredentialExport", "axScreenReader", "bashOutputMaxChars", "claudeMdExcludes",
+    "awsCredentialExport", "bashOutputMaxChars", "claudeMdExcludes",
     "cleanupPeriodDays", "companyAnnouncements", "crossSessionInbound", "defaultShell",
     "deniedMcpServers", "disableAgentView", "disableAllHooks", "disableArtifact",
     "disableAutoMode", "disableBundledSkills", "disableClaudeAiConnectors",
@@ -67,7 +67,7 @@ SETTINGS_KEYS_USER_MANAGED = frozenset({
     "autoMode.classifyAllShell", "bashEditDiffEnabled", "desktopSessionCleanupPeriodDays",
     "dialogExpiry", "feedbackDrafts", "footerLinksRegexes", "forceLoginGatewayUrl", "modelPicker",
     "pluginConfigs",
-    "processWrapper", "sandbox.allowAppleEvents", "sandbox.credentials.allowPlaintextInject",
+    "axScreenReader", "processWrapper", "sandbox.allowAppleEvents", "sandbox.allowNestedUserNamespaces", "sandbox.credentials.allowPlaintextInject",
     "sandbox.credentials.awsPairs", "sandbox.credentials.sigv4", "sandbox.filesystem.disabled",
     "sandbox.network.strictAllowlist", "sandbox.network.tlsTerminate", "sandbox.ripgrep",
     "skipAutoPermissionPrompt", "spellcheck", "sshConfigs", "vimInsertModeRemaps"
@@ -130,8 +130,11 @@ SETTINGS_OBJECT_FIELDS = {
                     "defaultMode", "deny", "disableAutoMode", "disableBypassPermissionsMode"},
     "policyHelper": {"path", "refreshIntervalMs", "timeoutMs"},
     "worktree": {"baseRef", "bgIsolation", "location", "sparsePaths", "symlinkDirectories"},
-    "sandbox": {"allowAppleEvents", "allowUnsandboxedCommands", "autoAllowBashIfSandboxed",
-                "bwrapPath", "credentials", "enableWeakerNestedSandbox",
+    # `allowNestedUserNamespaces`: "Added `sandbox.allowNestedUserNamespaces`" (Claude Code
+    # changelog, 2.1.305). The settings reference lists it from 2026-10-22, scope "User or
+    # managed" (SETTINGS_KEYS_USER_MANAGED): a `true` in a project file is ignored.
+    "sandbox": {"allowAppleEvents", "allowNestedUserNamespaces", "allowUnsandboxedCommands",
+                "autoAllowBashIfSandboxed", "bwrapPath", "credentials", "enableWeakerNestedSandbox",
                 "enableWeakerNetworkIsolation", "enabled", "excludedCommands",
                 "failIfUnavailable", "filesystem", "ignoreViolations", "network", "ripgrep",
                 "socatPath"},

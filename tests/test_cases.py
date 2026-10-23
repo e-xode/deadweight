@@ -132,6 +132,14 @@ class LabelledCases(unittest.TestCase):
         exempt = set(RETIRED_CHECK_IDS) | {"00-check-crashed"}
         self.assertEqual(sorted(silent - firing - exempt), [])
 
+    def test_a_severity_held_silent_is_also_seen_firing(self) -> None:
+        # The guard above is per id: `[check, "WARN", 0]` passed it when the check only ever
+        # emits NOTICE, and then passes whatever the check does - 49 such expectations on 31
+        # (check, severity) pairs in the corpus before this guard. Removing `fable` from the known model aliases
+        # made the check report the alias, and every test still passed. So the pair held at 0
+        # must be seen firing, at that severity, in a case that is replayed.
+        self.assertEqual(silent_without_firing(CASES), [])
+
     # Ids the auditor emits but that no labelled case fires, each with the test that holds it.
     # Empty means every emitted id has a case. An entry needs its reason; none is kept for lack of time.
     NOT_FIRED_BY_A_CASE: dict[str, str] = {
@@ -148,6 +156,67 @@ class LabelledCases(unittest.TestCase):
         # 0.25.0 - passed unseen: switched off, every test still passed. Read the ids from the code.
         firing = {c for case in CASES for c, _s, n in case["expected"] if n > 0}
         self.assertEqual(sorted(emitted_ids() - firing - set(self.NOT_FIRED_BY_A_CASE)), [])
+
+
+# (check, severity) pairs held at 0 with no case firing them, each with its reason. Empty: a pair
+# that cannot be fired by a case is not worth an expectation - drop it, or fire it.
+SILENT_WITHOUT_FIRING: dict[tuple[str, str], str] = {}
+
+
+def silent_without_firing(cases: list[dict]) -> list[str]:
+    """Each `[check, severity, 0]` no replayed case sees firing at that severity, as messages.
+
+    A known failure is reported as a skip, so it neither shows a severity firing nor holds one
+    silent. Retired ids and the crash report stay silent by design (as in the per-id guard).
+    """
+    from deadweight_audit.catalog import RETIRED_CHECK_IDS
+    replayed = [case for case in cases if case.get("known_failure") is not True]
+    firing = {(c, s) for case in replayed for c, s, n in case["expected"] if n > 0}
+    exempt = set(RETIRED_CHECK_IDS) | {"00-check-crashed"}
+    literal = emitted_severities()
+    found = {}
+    for case in replayed:
+        for c, s, n in case["expected"]:
+            if n == 0 and (c, s) not in firing and c not in exempt and (c, s) not in SILENT_WITHOUT_FIRING:
+                found.setdefault((c, s), case["id"])
+    return [f"{c} {s} held at 0 in {cid}, fired at {s} by no case"
+            + (f" (the auditor emits {c} literally as {', '.join(sorted(literal[c]))})" if literal.get(c) else "")
+            for (c, s), cid in sorted(found.items())]
+
+
+def emitted_severities() -> dict[str, set[str]]:
+    """Id -> the severities passed literally beside it to `report.add`: a hint for the message only."""
+    import ast
+    from deadweight_audit.identity import instrument_files
+    found: dict[str, set[str]] = {}
+    for f in instrument_files():
+        for n in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "add" \
+                    and len(n.args) > 1 and all(isinstance(a, ast.Constant) and isinstance(a.value, str)
+                                                for a in n.args[:2]):
+                found.setdefault(n.args[0].value, set()).add(n.args[1].value)
+    return found
+
+
+class SilentSeverityGuard(unittest.TestCase):
+    """Negative controls for silent_without_firing: a guard that refuses nothing passes every corpus."""
+
+    FIRES = {"id": "contrib-fires", "files": {}, "git": False, "expected": [["23-agent-model", "NOTICE", 1]]}
+
+    def test_a_zero_at_a_severity_no_case_fires_is_named(self) -> None:
+        held = {"id": "contrib-held", "files": {}, "git": False, "expected": [["23-agent-model", "WARN", 0]]}
+        found = silent_without_firing([self.FIRES, held])
+        self.assertEqual(len(found), 1, found)
+        self.assertIn("23-agent-model WARN held at 0 in contrib-held", found[0])
+        self.assertIn("literally as NOTICE", found[0])
+
+    def test_a_zero_at_a_fired_severity_passes(self) -> None:
+        held = {"id": "contrib-held", "files": {}, "git": False, "expected": [["23-agent-model", "NOTICE", 0]]}
+        self.assertEqual(silent_without_firing([self.FIRES, held]), [])
+
+    def test_a_known_failure_does_not_count_as_firing(self) -> None:
+        held = {"id": "contrib-held", "files": {}, "git": False, "expected": [["23-agent-model", "NOTICE", 0]]}
+        self.assertEqual(len(silent_without_firing([{**self.FIRES, "known_failure": True}, held])), 1)
 
 
 def emitted_ids() -> set[str]:

@@ -247,6 +247,12 @@ Why it fails: no trigger terms, no file surface, no anti-trigger, nothing that s
 it applies even in a `-p` run in a never-trusted folder, so read that field in any committed skill
 before running Claude Code there ([skills § Pre-approve tools](https://code.claude.com/docs/en/skills)).
 
+**Doc — `allowed-tools` can be ignored by policy.** When an organization sets `allowManagedPermissionRulesOnly`
+in managed settings, Claude Code ignores `allowed-tools` in project and personal skills and in the other sources that
+setting's entry lists (Claude Code v2.1.282 or later; [skills § When only managed permission rules apply](https://code.claude.com/docs/en/skills)).
+The tools then go through the managed rules and the normal prompt, and `/status` lists each skill affected. The audit
+cannot see managed settings, so it cannot say whether a skill's `allowed-tools` takes effect where it runs.
+
 **House conventions**, each with its reason:
 
 - **A script belongs to one skill** — the one whose body documents its method — so it travels and

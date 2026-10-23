@@ -119,6 +119,26 @@
    ]
   },
   {
+   "id": "12-real-comment-house",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\n// keep handlers thin\n",
+    ".claude/audit.local.json": "{\"profile\": \"house\"}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "12-no-code-comments",
+     "WARN",
+     1
+    ],
+    [
+     "12-no-code-comments",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
    "id": "12-root-glob-in-prose",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n\nNever commit /*.env files from the shop root.\n"

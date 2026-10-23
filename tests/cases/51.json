@@ -2,6 +2,27 @@
  "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
  "cases": [
   {
+   "id": "51-dead-command-in-agent",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "package.json": "{\"name\": \"shop-api\", \"scripts\": {\"test\": \"vitest\"}}\n",
+    ".claude/agents/shop-review.md": "---\nname: shop-review\ndescription: Review shop code changes for correctness before merge. Do not use for writing code.\n---\n\nRun `npm run complexity-check` first.\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "51-stale-command",
+     "NOTICE",
+     1
+    ],
+    [
+     "51-stale-command",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
    "id": "51-false-friends",
    "files": {
     "CLAUDE.md": "# shop-api\n\nMake the change small. Validation commands (e.g., `npm run ci`).\n\n```go\nm := make(map[string]int) // make when writing\n```\n\nBuild with `make -C src`.\n",

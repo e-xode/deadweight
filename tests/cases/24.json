@@ -91,6 +91,23 @@
    ]
   },
   {
+   "id": "24-ax-screen-reader-ignored-in-a-repository",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"axScreenReader\": true\n}",
+    ".claude/settings.local.json": "{\n  \"axScreenReader\": true\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-scope",
+     "ERROR",
+     2
+    ]
+   ]
+  },
+  {
    "id": "24-default-mode-accepted",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
@@ -390,6 +407,43 @@
     [
      "24-settings-scope",
      "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "24-sandbox-nested-user-namespaces-from-changelog",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"sandbox\": {\n    \"enabled\": true,\n    \"allowNestedUserNamespaces\": true\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-subkey",
+     "NOTICE",
+     0
+    ],
+    [
+     "24-settings-scope",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "24-sandbox-nested-user-namespaces-misspelt",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"sandbox\": {\n    \"enabled\": true,\n    \"allowNestedUserNamespace\": true\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-subkey",
+     "NOTICE",
      1
     ]
    ]

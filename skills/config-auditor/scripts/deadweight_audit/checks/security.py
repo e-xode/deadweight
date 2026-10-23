@@ -249,6 +249,41 @@ def check_security(ctx: AuditContext, report: Report) -> None:
                  f"a hook or the status line in '{rel}' downloads code and runs it (a `curl | sh` "
                  "shape): it executes with your full user permissions on every event, and what "
                  "it runs is whatever the server returns that day (hooks, security).", path)
+        # Sandbox keys the documentation says weaken it. Low: each has a documented use (an
+        # unprivileged container, a MITM proxy on macOS, localhost servers on macOS, every Unix
+        # socket) that a file cannot show.
+        # `allowAppleEvents`, `filesystem.disabled` and `allowNestedUserNamespaces` are "User or
+        # managed": in a project file they are ignored ("which a repository can't turn on",
+        # sandboxing, of allowNestedUserNamespaces), which 24-settings-scope already reports, so
+        # this check says nothing of them (catch-up audit of 0.28.0, B-00).
+        # The last item says whether sandboxing's table "Repository settings under an
+        # admin-required sandbox" names the key: there Claude Code ignores a repository's `true`
+        # (settings.json and settings.local.json alike), and the message must say so, since the
+        # audit cannot see managed settings (external audit of 0.28.0, A-03).
+        box = data.get("sandbox") if isinstance(data.get("sandbox"), dict) else {}
+        net = box.get("network") if isinstance(box.get("network"), dict) else {}
+        for key, value, source, admin_ignores in (
+                ("enableWeakerNestedSandbox", box.get("enableWeakerNestedSandbox"),
+                 "\"This reduces security; use it only when the outer container already provides "
+                 "the isolation you need\" (settings-reference)", True),
+                ("enableWeakerNetworkIsolation", box.get("enableWeakerNetworkIsolation"),
+                 "\"This reduces security by opening a potential data exfiltration path through "
+                 "the trust service\" (settings-reference)", True),
+                ("network.allowAllUnixSockets", net.get("allowAllUnixSockets"),
+                 "\"Each one weakens the sandbox\" (sandboxing, Keep developers from widening the policy)", True),
+                ("network.allowLocalBinding", net.get("allowLocalBinding"),
+                 "\"Each one weakens the sandbox\" (sandboxing, Keep developers from widening the policy)", True)):
+            if value is True:
+                _sec(report, "low", "50-security-sandbox-weakened",
+                     f"'sandbox.{key}: true' in '{rel}' is documented to weaken the sandbox, "
+                     + (reach if shared else "in your own sessions of this project") + f": {source}. "
+                     + ("Under an admin-required sandbox (managed settings or `--settings`) Claude "
+                        "Code ignores this `true` in a repository's files (sandboxing); the audit "
+                        "cannot see managed settings. " if admin_ignores else "")
+                     + "If a container or another boundary is why it is set, exempt "
+                     "50-security-sandbox-weakened for this file in .claude/audit.local.json with "
+                     "that reason: the exemption covers every key of this check in the file, "
+                     "including one added later.", path)
     # 1b. A plugin's hooks/hooks.json: "Claude Code merges whatever you declare with
     # hooks/hooks.json when that file exists" (plugins-reference). Hooks inline in
     # plugin.json stay unread here, as hooks-anatomy.md declares.

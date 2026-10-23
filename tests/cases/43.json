@@ -106,11 +106,6 @@
      "43-mcp-secret",
      "ERROR",
      1
-    ],
-    [
-     "43-mcp-secret",
-     "WARN",
-     0
     ]
    ]
   },
@@ -158,11 +153,6 @@
     [
      "43-mcp-secret",
      "ERROR",
-     0
-    ],
-    [
-     "43-mcp-secret",
-     "WARN",
      0
     ],
     [

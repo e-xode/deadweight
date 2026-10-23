@@ -26,13 +26,34 @@
    "expected": [
     [
      "14-rule-no-paths",
-     "WARN",
+     "INFO",
      0
     ],
     [
      "14-rule-unknown-field",
      "WARN",
      1
+    ]
+   ]
+  },
+  {
+   "id": "14-french-rule-house",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/audit.local.json": "{\"profile\": \"house\"}\n",
+    ".claude/rules/batches.md": "---\ndescription: batches\n---\nPour déployer, vous devez toujours lancer les tests dans le dossier du lot.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "14-rule-english-only",
+     "WARN",
+     1
+    ],
+    [
+     "14-rule-english-only",
+     "NOTICE",
+     0
     ]
    ]
   },
@@ -58,6 +79,28 @@
      "14-rule-no-paths",
      "INFO",
      1
+    ]
+   ]
+  },
+  {
+   "id": "14-rule-comment-house",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/audit.local.json": "{\"profile\": \"house\"}\n",
+    ".claude/rules/shop-api.md": "---\npaths:\n  - \"src/api/**\"\n---\n// keep handlers thin\n",
+    "src/api/refunds.ts": "export const handler = () => 1;\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "14-rule-code-comments",
+     "WARN",
+     1
+    ],
+    [
+     "14-rule-code-comments",
+     "NOTICE",
+     0
     ]
    ]
   },

@@ -17,3 +17,6 @@ cacheScope                   # MCP protocol field returned by a server, not conf
 listChanged                  # MCP capability a server declares, not configuration
 modelTimeoutException        # error type returned by a cloud provider, not configuration
 serviceUnavailableException  # error type returned by a cloud provider, not configuration
+setMcpServers                # Agent SDK method called from code (changelog 2.1.305), not a key of a file
+setModel                     # Agent SDK method called from code (changelog 2.1.307), not a key of a file
+isReadOnly                   # field of a mod's tool.check event, set by the harness (changelog 2.1.304), not configuration

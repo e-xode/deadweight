@@ -123,11 +123,50 @@ def wire(settings: Path, wanted: dict) -> int:
 
 
 def place_launcher(dest: Path) -> None:
+    # Called only once `wire` has set the line that runs it: written first, it replaced a
+    # launcher already at that path even when the settings file was then left alone.
     # The launcher, not the template: a copied template stays at the version of the
     # day it was copied, and 0.13.0's notices never reached the lines set up before it.
+    # A link is refused rather than written through: its target may be anyone's file.
+    if dest.is_symlink() or (dest.exists() and not dest.is_file()):
+        raise OSError(f"{dest} is a link or not a regular file")
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(LAUNCHER.read_text(encoding="utf-8"), encoding="utf-8")
     dest.chmod(0o755)
+
+
+def wire_then_place(settings: Path, wanted: dict, dest: Path) -> int:
+    """`wire`, then the launcher; if the launcher cannot be written, the settings file is put back.
+
+    0 both written, 1 or 2 as `wire` (2 also for a settings path that is a dangling link), 3 the
+    launcher failed and the settings are as they were.
+    Until 0.28.0's review a failed launcher (a folder, a dangling link or a read-only file at its
+    path) crashed after `wire`, leaving a `statusLine` that ran nothing, or someone else's file
+    (external audit of 0.28.0, C-00).
+    """
+    if settings.is_symlink() and not settings.exists():
+        # A dangling link: `wire` would create its target, and the undo below would then delete
+        # the link, which is the user's (catch-up audit of 0.28.0, E-02).
+        print(f"  {settings} is a link to a file that does not exist; not touching it.", file=sys.stderr)
+        return 2
+    before = settings.read_bytes() if settings.is_file() else None
+    code = wire(settings, wanted)
+    if code != 0:
+        return code
+    try:
+        place_launcher(dest)
+    except OSError as exc:
+        try:
+            if before is None:
+                settings.unlink()
+            else:
+                settings.write_bytes(before)
+            undone = "settings left as they were"
+        except OSError as undo:
+            undone = f"and {settings} could not be put back ({undo}): remove its statusLine"
+        print(f"  The launcher could not be written ({exc}); {undone}.", file=sys.stderr)
+        return 3
+    return 0
 
 
 def setup_claude(root: Path) -> int:
@@ -137,9 +176,9 @@ def setup_claude(root: Path) -> int:
               f"  Run the setup from the project's root.", file=sys.stderr)
         return 1
     dest = root / ".claude" / "statusline.py"
-    place_launcher(dest)
-    code = wire(root / ".claude" / "settings.json",
-                {"type": "command", "command": 'python3 "$CLAUDE_PROJECT_DIR"/.claude/statusline.py'})
+    code = wire_then_place(root / ".claude" / "settings.json",
+                           {"type": "command", "command": 'python3 "$CLAUDE_PROJECT_DIR"/.claude/statusline.py'},
+                           dest)
     if code == 0:
         print(f"Claude Code: installed for this project\n  {dest}\n  statusLine set in {root / '.claude' / 'settings.json'}")
     return code
@@ -154,9 +193,8 @@ def setup_copilot() -> int:
     """
     home = copilot_home()
     dest = home / "deadweight-statusline.py"
-    place_launcher(dest)
-    code = wire(home / "settings.json",
-                {"type": "command", "command": f'python3 "{dest}" copilot'})
+    code = wire_then_place(home / "settings.json",
+                           {"type": "command", "command": f'python3 "{dest}" copilot'}, dest)
     if code == 0:
         print(f"Copilot CLI: installed for every project\n  {dest}\n  statusLine set in {home / 'settings.json'}")
     return code

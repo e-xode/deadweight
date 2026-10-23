@@ -32,7 +32,10 @@ def ask(system: str, prompt: str, model: str, timeout: int = 600) -> Answer:
         with open(replay, encoding="utf-8") as f:
             return Answer(f.read(), 0.0, f"replay:{os.path.basename(replay)}")
     cmd = ["claude", "-p", "--model", model, "--system-prompt", system, "--tools", "",
-           "--strict-mcp-config", "--setting-sources", "", "--output-format", "json"]
+           "--strict-mcp-config", "--setting-sources", "", "--output-format", "json",
+           # Without it each request's session stays in ~/.claude/projects, prompt included:
+           # the files sent for judgement, kept on disk after the run (measured on 0.27.0).
+           "--no-session-persistence"]
     # The prompt goes on stdin: a command line is capped at 32,767 characters on Windows.
     # A Claude Code update replaces the `claude` executable in place: for a few seconds it is
     # missing, or half written ("Exec format error"). Measured twice on 2026-10-01: 98 and 173

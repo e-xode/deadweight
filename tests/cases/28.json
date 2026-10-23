@@ -2,6 +2,21 @@
  "_note": "Labelled cases for the auditor: a fictional repository, and the findings it must produce. Every case was checked by hand - the expected counts are what the configuration IS, not what the auditor happened to say; most come from a false positive found on real repositories, which the case keeps fixed. GENERATED from the maintainer's labelled source, which records where each verdict comes from - do not edit by hand. Fields: files {path: content}, links {path: target}, gitignore, git (init a repository), expected [[check, severity, exact count]], forbidden_messages [[check, regex]], runtime [{file, session_id, load_reason, ts}] (an InstructionsLoaded log given with --runtime), known_failure (a known defect: reported, not failed).",
  "cases": [
   {
+   "id": "28-absence-sentence-edges",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-seo/SKILL.md": "---\nname: shop-seo\ndescription: SEO wiring of the shop storefront pages and their routes. Do not use for refunds.\n---\n\n- Check the branch and there is no `src/flags.ts` to edit.\n- Il n'y a pas de `src/seo.ts` dans ce projet.\n- There is no `src/robots.config.js` file in this project.\n- There is no `src/old.ts`!\n\n2) There are no `src/legacy.ts` here.\n\nThere is no `src/gen/api.ts` in this branch, so check it out from main.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     3
+    ]
+   ]
+  },
+  {
    "id": "28-absolute-path",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
@@ -42,6 +57,21 @@
      "28-skill-anchors",
      "WARN",
      0
+    ]
+   ]
+  },
+  {
+   "id": "28-colon-does-not-open-a-sentence",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-env/SKILL.md": "---\nname: shop-env\ndescription: Set up the shop development environment and its services. Do not use for refunds.\n---\n\nBefore you start: there is no `src/env.ts`, stop and ask.\n\nSetup; there is no `src/db.ts`, create it first.\n\nThere is no `src/gen/client.ts`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     2
     ]
    ]
   },
@@ -192,6 +222,21 @@
    ]
   },
   {
+   "id": "28-negation-that-assumes-the-file",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\n1. If there is no `src/config/flags.ts`, stop: the setup is broken.\n2. Never edit `src/legacy/refunds.ts`.\n3. Do not deploy without `src/config/tax.ts`.\n4. There is no `src/api/refunds.ts` test yet: write one.\n5. There are no `src/api/coupons.ts` files to touch.\n\nThere is **no `src/seo.ts`** here. Edit `src/seo.ts` for canonicals.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     6
+    ]
+   ]
+  },
+  {
    "id": "28-path-cited-from-another-skill",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
@@ -255,6 +300,23 @@
      "28-skill-anchors",
      "WARN",
      0
+    ]
+   ]
+  },
+  {
+   "id": "28-there-is-no-path",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    "src/router.js": "export default {}\n",
+    ".claude/skills/shop-seo/SKILL.md": "---\nname: shop-seo\ndescription: SEO wiring of the shop storefront pages: route meta, hreflang and structured data. Do not use for refunds.\n---\n\nPer-page SEO lives on the route meta in `src/router.js`.\n\nThere is **no `src/seo.config.js`** in this project. Do not introduce one.\n\n- There's no `tests/e2e/seo.spec.ts` yet.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nRefund rules are in `src/legacy/refunds.ts`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     1
     ]
    ]
   },

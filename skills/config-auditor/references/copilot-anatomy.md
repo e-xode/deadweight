@@ -22,7 +22,8 @@ github.blog/changelog). Each fact below names its short label in parentheses:
 - **agents-configuration** — https://docs.github.com/en/copilot/reference/custom-agents-configuration
 - **code-review-tutorial** — https://docs.github.com/en/copilot/tutorials/customize-code-review
 - **vscode-instructions** — https://code.visualstudio.com/docs/agent-customization/custom-instructions
-- **vscode-custom-agents** — https://code.visualstudio.com/docs/copilot/customization/custom-chat-modes
+- **vscode-custom-agents** — https://code.visualstudio.com/docs/agent-customization/custom-agents (the former custom-chat-modes address redirects there)
+- **vscode-agent-file-reference** — https://code.visualstudio.com/docs/agents/reference/custom-agent-file-reference
 - **changelog-agents-md** — https://github.blog/changelog/2025-08-28-copilot-coding-agent-now-supports-agents-md-custom-instructions/
 - **changelog-exclude-agent** — https://github.blog/changelog/2025-11-12-copilot-code-review-and-coding-agent-now-support-agent-specific-instructions/
 - **changelog-4000-limit** — https://github.blog/changelog/2026-06-12-copilot-code-review-new-configurations-and-controls/
@@ -101,7 +102,8 @@ locations" (vscode-custom-agents). The supported workspace locations are `.githu
 Claude format, `.claude/agents`; `.github/chatmodes` is not among them (vscode-custom-agents), yet
 it is a deprecated location rather than an unread one: the [VS Code 1.106 release notes](https://code.visualstudio.com/updates/v1_106) say existing chat
 modes "continue to work and are automatically treated as custom agents" — the same host also recognizes a Claude-format
-location: "Workspace (Claude format): `.claude/agents` folder" (vscode-custom-agents).
+location: its location table lists `.claude/agents` under "Workspace (Claude format)", holding
+".md files in the Claude agent format" (vscode-custom-agents, read 2026-10-21).
 
 Naming and size limits for the cloud agent's `.agent.md` (create-custom-agents): "the filename may
 only contain the following characters: `.`, `-`, `_`, `a-z`, `A-Z`, `0-9`," and "The prompt can be
@@ -113,10 +115,9 @@ optionally `name`, `target`, `tools`, `model`, `disable-model-invocation`, `user
 properties are currently not supported for Copilot cloud agent on GitHub.com," and `mcp-servers`
 / `metadata` are "Not used in VS Code and other IDE custom agents" (agents-configuration).
 
-VS Code's own fields (vscode-custom-agents): `description` ("shown as placeholder text in the
-chat input field"), `tools` ("A list of tool or tool set names that are available for this custom
-agent"), `model` ("Specify a single model name (string) or a prioritized list of models
-(array)").
+VS Code's own fields (vscode-agent-file-reference, read 2026-10-22): `description` ("What the agent
+does and when to use it"), `tools` ("Tools available to the agent. Tool names and supported aliases depend on the
+harness"), `model` ("An array specifies models in preference order, using the first available model").
 
 ## Precedence
 
@@ -164,12 +165,14 @@ Code review: `AGENTS.md` is listed — "`AGENTS.md`: Repository-level agent-spec
 
 VS Code Local harness (this reference earlier quoted it as the Local agent; as read on
 2026-10-17 the page speaks of harnesses: "Each harness uses its own discovery rules and file
-formats"): "For the Local harness, configure the `chat.useAgentsMdFile` setting to enable or disable support
-for `AGENTS.md` files." For nested files: "The `chat.useNestedAgentsMdFiles` setting controls
-support for nested `AGENTS.md` files and is disabled by default." For `CLAUDE.md`: "configure the
-`chat.useClaudeMdFile` setting" (vscode-instructions). Whether `chat.useAgentsMdFile` and
-`chat.useClaudeMdFile` default to on or off is **not documented** on the page as read on
-2026-10-17. These settings are scoped to the Local harness; for the page's Anthropic Claude
+formats"): "The `chat.useAgentsMdFile` setting controls whether instructions from
+workspace-root AGENTS.md files are automatically attached to chat requests and is enabled by
+default." For nested files: "Set both `chat.useAgentsMdFile` and `chat.useNestedAgentsMdFiles` to
+true to discover nested AGENTS.md files. The nested-file setting is disabled by default." For
+`CLAUDE.md`: "configure the `chat.useClaudeMdFile` setting" (vscode-instructions). Whether
+`chat.useClaudeMdFile` defaults to on or off is **not documented** on the page as read on
+2026-10-22. (The same two quotes read differently on 2026-10-21: the page was rewritten within a
+day, and then did not say whether `chat.useAgentsMdFile` was on by default.) These settings are scoped to the Local harness; for the page's Anthropic Claude
 harness: "For Anthropic Claude sessions, use `CLAUDE.md` at the repository root for project-wide
 guidance." `GEMINI.md` is not mentioned on that page at all — silence, not a confirmed absence. The same page separately recognizes Claude Code's own rule
 files: "For `.claude/rules` instructions files, use a `paths` property instead of `applyTo` for

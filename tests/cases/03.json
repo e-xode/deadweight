@@ -33,6 +33,25 @@
    ]
   },
   {
+   "id": "03-library-folder-name",
+   "files": {
+    "shop-refunds/SKILL.md": "---\nname: shop-refunds-v2\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "03-skill-name-matches-folder",
+     "ERROR",
+     1
+    ],
+    [
+     "03-skill-name-matches-folder",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
    "id": "03-project-folder-name",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
@@ -78,7 +97,7 @@
    "expected": [
     [
      "23-agent-model",
-     "WARN",
+     "NOTICE",
      0
     ],
     [

@@ -164,6 +164,27 @@
    ]
   },
   {
+   "id": "26-evals-foreign-skill-name",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-refunds/evals/evals.json": "{\"skill_name\": \"shop-billing\", \"evals\": [{\"id\": 1, \"prompt\": \"Refund order 1042.\", \"expected_output\": \"A refund.\", \"expectations\": [\"refund issued\"]}, {\"id\": 2, \"prompt\": \"Refund half of order 1043.\", \"expected_output\": \"A partial refund.\", \"expectations\": [\"partial refund\"]}, {\"id\": 3, \"prompt\": \"Chargeback on order 1044.\", \"expected_output\": \"A chargeback note.\", \"expectations\": [\"chargeback logged\"]}]}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "26-evals-schema",
+     "ERROR",
+     1
+    ],
+    [
+     "26-evals-schema",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
    "id": "26-evals-without-assertions",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
@@ -201,6 +222,29 @@
     [
      "26-evals-schema",
      "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "26-low-coverage-house",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/audit.local.json": "{\"profile\": \"house\"}\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-checkout/SKILL.md": "---\nname: shop-checkout\ndescription: Build the shop checkout pages and their layout. Do not use for refunds.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-returns/SKILL.md": "---\nname: shop-returns\ndescription: Handle shop returns and restocking. Do not use for refunds.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "26-evals-coverage",
+     "WARN",
+     1
+    ],
+    [
+     "26-evals-coverage",
+     "NOTICE",
      0
     ]
    ]
@@ -247,6 +291,28 @@
     [
      "26-evals-coverage",
      "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "26-no-anti-trigger-house",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/audit.local.json": "{\"profile\": \"house\"}\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-refunds/evals/evals.json": "{\"skill_name\": \"shop-refunds\", \"evals\": [{\"id\": 1, \"prompt\": \"Refund order 1042.\", \"expected_output\": \"A refund.\", \"expectations\": [\"refund issued\"]}, {\"id\": 2, \"prompt\": \"Refund half of order 1043.\", \"expected_output\": \"A partial refund.\", \"expectations\": [\"partial refund\"]}, {\"id\": 3, \"prompt\": \"Chargeback on order 1044.\", \"expected_output\": \"A chargeback note.\", \"expectations\": [\"chargeback logged\"]}]}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "26-evals-anti-trigger",
+     "WARN",
+     1
+    ],
+    [
+     "26-evals-anti-trigger",
+     "NOTICE",
      0
     ]
    ]

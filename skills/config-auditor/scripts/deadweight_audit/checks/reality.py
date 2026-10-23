@@ -47,6 +47,42 @@ ANCHOR_TEMPLATE_RE = re.compile(
 )
 
 
+# A sentence that says the file is not there: "There is **no `src/seo.config.js`** in this
+# project." Read as an anchor until 0.28.0, so the one sentence that is true of a missing file
+# was reported dead. Deliberately narrow - 0.24.0 tried a wider reading and withdrew it after
+# two review rounds: a bare "no", "not", "never" or "without" before a path bans or requires a
+# file that should exist ("Never edit `src/x.ts`", "do not run without `src/x.ts`"), and
+# "If there is no `src/x.ts`, stop" expects it. So: "there is/are no" opening its sentence,
+# with nothing but emphasis between it and the path, and after the path the end of the clause
+# or "in"/"here"/"yet"/"anymore" - "There is no `src/x.ts` test yet" is about a test, and
+# `src/x.ts` must still exist. Every mention of the path must read that way.
+# A sentence opens after `.`, `!` or `?` only: with `:` and `;` too, "Before you start: there
+# is no `src/env.ts`, stop and ask" was read as a statement of absence, though it expects the
+# file (external audit of 0.28.0, A-00).
+_ABSENT_BEFORE_RE = re.compile(
+    r"(?:^|[.!?]\s+)[\s>*+\-\d.)]*there(?:\s+is|\s+are|['’]s)\s+[*_]{0,2}no[*_]{0,2}\s+[*_`]{0,3}$",
+    re.IGNORECASE,
+)
+_ABSENT_AFTER_RE = re.compile(
+    r"^[*_`]{0,4}(?:\s*(?:$|[.,;:!?)]|—|–|\s-\s)|\s+(?:in|here|yet|anymore|any\s+more|any\s+longer)\b)",
+    re.IGNORECASE,
+)
+
+
+def _stated_absent(ref: str, body: str) -> bool:
+    """True when every mention of `ref` reads "There is no `ref`" (see above)."""
+    found = False
+    for m in re.finditer(re.escape(ref), body):
+        line_start = body.rfind("\n", 0, m.start()) + 1
+        line_end = body.find("\n", m.end())
+        before = body[line_start:m.start()]
+        after = body[m.end():line_end if line_end >= 0 else len(body)]
+        if not (_ABSENT_BEFORE_RE.search(before) and _ABSENT_AFTER_RE.match(after)):
+            return False
+        found = True
+    return found
+
+
 def anchor_verdict(root: Path, ref: str, body: str, fences: list, bases: tuple, ignored, tracked_cache: list):
     """What one path named in a configuration file resolves to: alive, dead, unverifiable or skip.
 
@@ -63,6 +99,8 @@ def anchor_verdict(root: Path, ref: str, body: str, fences: list, bases: tuple, 
         return "alive", ""
     if ANCHOR_TEMPLATE_RE.search(ref):
         return "skip", ""             # template / illustrative path
+    if _stated_absent(ref, body):
+        return "skip", ""             # "There is no `x`": true of a missing file, not an anchor
     at = body.find(ref)
     if re.search(r"(?:e\.g\.|\bexample\b|such as|for instance)[^.\n]{0,30}$",
                  body[max(0, at - 48):at], re.I):

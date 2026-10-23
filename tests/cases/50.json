@@ -57,6 +57,25 @@
    ]
   },
   {
+   "id": "50-bom-mid-file",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test`.﻿\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "50-security-hidden-unicode",
+     "NOTICE",
+     1
+    ],
+    [
+     "50-security-hidden-unicode",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
    "id": "50-broad-allows-without-agent",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
@@ -458,6 +477,218 @@
    ]
   },
   {
+   "id": "50-sandbox-admin-required-the-four-keys",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"sandbox\": {\n    \"enabled\": true,\n    \"enableWeakerNetworkIsolation\": true,\n    \"network\": {\n      \"allowLocalBinding\": true\n    }\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "50-security-sandbox-weakened",
+     "NOTICE",
+     2
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "50-security-sandbox-weakened",
+     "^(?!.*Under an admin-required sandbox)"
+    ]
+   ]
+  },
+  {
+   "id": "50-sandbox-exempted-by-overlay",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"sandbox\": {\n    \"enabled\": true,\n    \"enableWeakerNestedSandbox\": true\n  }\n}",
+    ".claude/audit.local.json": "{\"exemptions\": [{\"check\": \"50-security-sandbox-weakened\", \"path\": \".claude/settings.json\", \"severity\": \"INFO\", \"reason\": \"runs only inside the unprivileged shop-ci container\", \"date\": \"2026-10-21\"}]}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "50-security-sandbox-weakened",
+     "NOTICE",
+     0
+    ],
+    [
+     "50-security-sandbox-weakened",
+     "INFO",
+     1
+    ],
+    [
+     "31-overlay-unknown-check",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "50-sandbox-exemption-covers-the-file",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"sandbox\": {\n    \"enabled\": true,\n    \"enableWeakerNestedSandbox\": true,\n    \"network\": {\n      \"allowLocalBinding\": true\n    }\n  }\n}",
+    ".claude/audit.local.json": "{\"exemptions\": [{\"check\": \"50-security-sandbox-weakened\", \"path\": \".claude/settings.json\", \"severity\": \"INFO\", \"reason\": \"runs only inside the unprivileged shop-ci container\", \"date\": \"2026-10-21\"}]}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "50-security-sandbox-weakened",
+     "INFO",
+     2
+    ],
+    [
+     "50-security-sandbox-weakened",
+     "NOTICE",
+     0
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "50-security-sandbox-weakened",
+     "^(?!.*the exemption covers every key of this check in the file)"
+    ]
+   ]
+  },
+  {
+   "id": "50-sandbox-false-or-absent",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"sandbox\": {\n    \"enabled\": true,\n    \"enableWeakerNestedSandbox\": false,\n    \"network\": {\n      \"allowLocalBinding\": false\n    }\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "50-security-sandbox-weakened",
+     "NOTICE",
+     0
+    ],
+    [
+     "24-settings-keys",
+     "INFO",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "50-sandbox-in-local-settings",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.local.json": "{\n  \"sandbox\": {\n    \"enableWeakerNestedSandbox\": true\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "50-security-sandbox-weakened",
+     "NOTICE",
+     1
+    ],
+    [
+     "24-settings-local",
+     "WARN",
+     0
+    ]
+   ],
+   "gitignore": ".claude/settings.local.json\n",
+   "forbidden_messages": [
+    [
+     "50-security-sandbox-weakened",
+     "for everyone"
+    ]
+   ]
+  },
+  {
+   "id": "50-sandbox-misspelt-key",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"sandbox\": {\n    \"enabled\": true,\n    \"allowNestedUserNamespace\": true\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-subkey",
+     "NOTICE",
+     1
+    ],
+    [
+     "50-security-sandbox-weakened",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "50-sandbox-nested-user-namespaces-ignored-in-a-repository",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"sandbox\": {\n    \"enabled\": true,\n    \"allowNestedUserNamespaces\": true\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "50-security-sandbox-weakened",
+     "NOTICE",
+     0
+    ],
+    [
+     "24-settings-scope",
+     "ERROR",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "24-settings-scope",
+     "^(?!'sandbox\\.allowNestedUserNamespaces' in)"
+    ]
+   ]
+  },
+  {
+   "id": "50-sandbox-weaker-nested-sandbox",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"sandbox\": {\n    \"enabled\": true,\n    \"enableWeakerNestedSandbox\": true\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "50-security-sandbox-weakened",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "50-security-sandbox-weakened",
+     "^(?!Security \\(low\\): 'sandbox\\.enableWeakerNestedSandbox: true' in '\\.claude/settings\\.json' is documented to weaken the sandbox, for everyone)"
+    ]
+   ]
+  },
+  {
+   "id": "50-sandbox-weaker-network-keys",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"sandbox\": {\n    \"enabled\": true,\n    \"enableWeakerNetworkIsolation\": true,\n    \"network\": {\n      \"allowAllUnixSockets\": true,\n      \"allowLocalBinding\": true\n    }\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "50-security-sandbox-weakened",
+     "NOTICE",
+     3
+    ]
+   ]
+  },
+  {
    "id": "50-secret-in-env",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
@@ -506,6 +737,25 @@
     [
      "50-security-hidden-unicode",
      "'CLAUDE\\.md'"
+    ]
+   ]
+  },
+  {
+   "id": "50-zero-width-space",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make​ test`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "50-security-hidden-unicode",
+     "NOTICE",
+     1
+    ],
+    [
+     "50-security-hidden-unicode",
+     "ERROR",
+     0
     ]
    ]
   }

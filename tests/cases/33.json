@@ -230,6 +230,27 @@
    ]
   },
   {
+   "id": "33-not-for-without-colon-separates",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for shop-returns.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-returns/SKILL.md": "---\nname: shop-returns\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for merchants. Not for shop-refunds.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "NOTICE",
+     1
+    ],
+    [
+     "33-description-overlap",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
    "id": "33-one-way-exclusion",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",

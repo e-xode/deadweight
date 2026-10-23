@@ -22,6 +22,21 @@
    ]
   },
   {
+   "id": "04-cannot-for-left-boundary",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-pay/SKILL.md": "---\nname: shop-pay\ndescription: Explain payment options to users who cannot for now pay by card, with bank transfer steps.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "04-skill-description-antitrigger",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
    "id": "04-configured-listing-cap",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
@@ -99,6 +114,113 @@
     ],
     [
      "04-skill-description-brackets",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "04-no-anti-trigger-house",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/audit.local.json": "{\"profile\": \"house\"}\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "04-skill-description-antitrigger",
+     "WARN",
+     1
+    ],
+    [
+     "04-skill-description-antitrigger",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "04-not-for-clause-openers",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-cart/SKILL.md": "---\nname: shop-cart\ndescription: Lay out the shop cart drawer and its line items. NOT FOR refunds.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-tax/SKILL.md": "---\nname: shop-tax\ndescription: Compute VAT lines on shop invoices for each country (not for refunds).\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-promo/SKILL.md": "---\nname: shop-promo\ndescription: Write coupon rules for seasonal shop promotions but not for loyalty points.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-ship/SKILL.md": "---\nname: shop-ship\ndescription: Pick carriers and print shipping labels for parcels and not for pallets.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-stock/SKILL.md": "---\nname: shop-stock\ndescription: Suivre les niveaux de stock des entrepots. Ne pas utiliser pour les remboursements.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-feed/SKILL.md": "---\nname: shop-feed\ndescription: Export the product feed for price comparison sites — not for marketplaces.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "04-skill-description-antitrigger",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "04-not-for-inside-a-sentence",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-donate/SKILL.md": "---\nname: shop-donate\ndescription: Builds donation pages for the shop for not for profit organisations. Use when a charity asks for a page.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "04-skill-description-antitrigger",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "04-not-for-without-colon",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-ui/SKILL.md": "---\nname: shop-ui\ndescription: Use when the user wants to design, critique or polish a shop storefront interface - pages, forms, empty states and checkout layout. Not for backend-only or non-UI tasks.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-invoices/SKILL.md": "---\nname: shop-invoices\ndescription: Issue and correct shop invoices and credit notes for the accounting team.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "04-skill-description-antitrigger",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "04-not-inside-a-word",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-receipts/SKILL.md": "---\nname: shop-receipts\ndescription: Format shop receipts that are not formatted yet, for customers who cannot format a PDF themselves.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "04-skill-description-antitrigger",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "04-short-description",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Shop refunds. Do not use for invoicing.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "04-skill-description-length",
+     "NOTICE",
+     1
+    ],
+    [
+     "04-skill-description-length",
      "WARN",
      0
     ]
