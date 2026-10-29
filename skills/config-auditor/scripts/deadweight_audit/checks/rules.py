@@ -64,7 +64,7 @@ def _ondemand_files(ctx: AuditContext) -> list[tuple[str, str]]:
     warns when it does not), so a list of tracked and unignored files never holds it (0.29.0 audit, A-01).
     A path is pruned by component, not by substring: `src/myvendor/` is not `vendor/` (A-03).
     """
-    root, found = ctx.root, []
+    root = ctx.root
     tracked = tracked_paths(root)
     dirs = set()
     for rel in tracked:
