@@ -27,7 +27,15 @@ behaviour, not this plugin's, and it is not under this plugin's control. Measure
 with a logging `git` first in the `PATH` and the same witness, once with `--semantic`'s flags and once
 with those of `--measure`'s first run (plus `--no-session-persistence`): each git call carried Claude
 Code's own `-c core.fsmonitor=` and `-c core.hooksPath=/dev/null`, and the witness did not run. A later
-release may differ.
+release may differ. To repeat the shorter form of this measurement (no wrapper, so it shows the witness did not
+run, not which options git received), in a throwaway repository: set `core.fsmonitor` to a script that
+creates a file; run a plain `git status` and check the file exists; delete it; then run `claude -p --model
+haiku --no-session-persistence --setting-sources project "Reply with the single word ok."` in that folder
+and check it does not exist again. Without the deletion the second check proves nothing. This gave
+"created", then "not created" on Claude Code 2.1.309, 2026-10-23. In a real repository
+`--setting-sources project` would load that project's own settings and hooks, which is why the repository
+must be a throwaway one. It is a billed model call, and it is not one of
+`probes/run_probes.py`'s probes, which replay what `evidence.json` records for a check.
 
 ## What it reads
 
@@ -88,9 +96,15 @@ about an imported file outside the project gives its path, never its content.
   A settings file that already has another `statusLine`, or is not plain JSON, is left untouched, and so
   is a file already at the launcher's path (until 0.27.0 the launcher was written first and replaced it).
   Otherwise the whole settings file is written back as `json.dumps(indent=2)`, so its formatting changes,
-  and the launcher is written, replacing a regular file already there. If the launcher cannot be written
-  (its path is a folder, a symbolic link or a read-only file), the settings file is put back as it was
-  (removed if there was none) and the command exits 3; the other host is still set up.
+  and the launcher is written, replacing a regular file already there. The launcher is first written to a
+  `.statusline-*` temporary file in the same folder (the project's `.claude/`, or the Copilot folder),
+  made executable, then moved over its destination; the temporary file is removed on any failure or
+  interruption, and only a kill or a power cut can leave it. In a folder that takes no new file the launcher
+  is written in place, and the launcher that was there is put back if that fails. If the launcher cannot be written (its path is a folder, a symbolic link or a
+  read-only file), the settings file is put back as it was (removed if there was none) and the command
+  exits 3; the other host is still set up. A settings file that cannot be written (read-only, or the
+  folder being a file) is left untouched and the command exits 2; if the write failed after the file was
+  opened, or was interrupted, its bytes are put back, and the message says whether that worked.
 - **`semantic.py --method claims`** writes its cache (see "Retention").
 
 ## What it sends (only with `--semantic` or `--measure`)

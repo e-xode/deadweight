@@ -31,11 +31,13 @@ declare and which fails silently where it is missing.
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -117,9 +119,39 @@ def wire(settings: Path, wanted: dict) -> int:
               f"\"Already have a status line?\").", file=sys.stderr)
         return 1
     data["statusLine"] = wanted
-    settings.parent.mkdir(parents=True, exist_ok=True)
-    settings.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    before = settings.read_bytes() if settings.is_file() else None
+    try:
+        settings.parent.mkdir(parents=True, exist_ok=True)
+        settings.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    except BaseException as exc:
+        # A read-only file, or `.claude` being a file: a message and 2, not a traceback that
+        # also skips the other host (catch-up audit of 0.28.0, E-01). A write that failed after
+        # opening the file (a full disk, an interruption) leaves it truncated: its bytes are put
+        # back, and the message says whether that worked (0.29.0 audit, E-00; re-audit, E-01).
+        undone = restore(settings, before)
+        if not isinstance(exc, OSError):
+            raise                        # an interruption: the file is back, the stop goes on
+        print(f"  {settings} could not be written ({exc}); {undone}.", file=sys.stderr)
+        return 2
     return 0
+
+
+def restore(settings: Path, before: bytes | None) -> str:
+    """Put a settings file back as it was; the words to say whether that worked."""
+    try:
+        now = settings.read_bytes() if settings.is_file() else None
+    except OSError:
+        now = b"unreadable"
+    if now == before:
+        return "settings left as they were"   # nothing was written: a read-only file stays itself
+    try:
+        if before is not None:
+            settings.write_bytes(before)
+        elif settings.is_file() and not settings.is_symlink():
+            settings.unlink()
+        return "settings left as they were"
+    except OSError as undo:
+        return f"and {settings} could not be put back ({undo}): check its content"
 
 
 def place_launcher(dest: Path) -> None:
@@ -130,9 +162,42 @@ def place_launcher(dest: Path) -> None:
     # A link is refused rather than written through: its target may be anyone's file.
     if dest.is_symlink() or (dest.exists() and not dest.is_file()):
         raise OSError(f"{dest} is a link or not a regular file")
+    if dest.exists() and not os.access(dest, os.W_OK):
+        # Moving a file over it would not ask: a read-only launcher stays as its owner left it.
+        raise OSError(f"{dest} is read-only")
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(LAUNCHER.read_text(encoding="utf-8"), encoding="utf-8")
-    dest.chmod(0o755)
+    if not os.access(dest.parent, os.W_OK):
+        # A folder that takes no new file may still hold a writable one: written in place, as
+        # before 0.29.0 (a read-only `.claude/` over writable files gave 0 there, 3 here: 0.29.0
+        # audit, E-01). No temporary file: the old bytes and mode are put back on a failure.
+        old = dest.read_bytes() if dest.exists() else None
+        mode = dest.stat().st_mode & 0o7777 if old is not None else None
+        try:
+            dest.write_text(LAUNCHER.read_text(encoding="utf-8"), encoding="utf-8")
+            dest.chmod(0o755)
+        except BaseException:
+            # The launcher that was there is put back (re-audit of 0.29.0, E-00).
+            with contextlib.suppress(OSError):
+                if old is None:
+                    dest.unlink()
+                else:
+                    dest.write_bytes(old)
+                    dest.chmod(mode)
+            raise
+        return
+    # Written beside the destination, made executable, then moved over it: a failure at any
+    # step leaves the launcher that was there untouched (catch-up audit of 0.28.0, B-01: a
+    # failing chmod came after the old file had already been replaced).
+    fd, tmp = tempfile.mkstemp(prefix=".statusline-", dir=dest.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as out:
+            out.write(LAUNCHER.read_text(encoding="utf-8"))
+        os.chmod(tmp, 0o755)
+        os.replace(tmp, dest)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
 
 
 def wire_then_place(settings: Path, wanted: dict, dest: Path) -> int:
@@ -155,15 +220,10 @@ def wire_then_place(settings: Path, wanted: dict, dest: Path) -> int:
         return code
     try:
         place_launcher(dest)
-    except OSError as exc:
-        try:
-            if before is None:
-                settings.unlink()
-            else:
-                settings.write_bytes(before)
-            undone = "settings left as they were"
-        except OSError as undo:
-            undone = f"and {settings} could not be put back ({undo}): remove its statusLine"
+    except BaseException as exc:
+        undone = restore(settings, before)
+        if not isinstance(exc, OSError):
+            raise                        # an interruption: the settings are back, the stop goes on
         print(f"  The launcher could not be written ({exc}); {undone}.", file=sys.stderr)
         return 3
     return 0

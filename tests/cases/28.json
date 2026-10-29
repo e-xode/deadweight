@@ -201,6 +201,36 @@
    "gitignore": "dist/\n"
   },
   {
+   "id": "28-instruction-label-stays-an-anchor",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-env/SKILL.md": "---\nname: shop-env\ndescription: Set up the shop development environment and its services. Do not use for refunds.\n---\n\nBefore you start: there is no `src/env1.ts`? Stop and ask.\n\nBefore you start: there is no `src/env2.ts`\n\nBefore you start: there is no `src/env3.ts`.\n\nSetup: there is no `src/env4.ts` yet\n\nNote: there is no `src/env5.ts`, create it first.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     5
+    ]
+   ]
+  },
+  {
+   "id": "28-label-then-absence-statement",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-legacy/SKILL.md": "---\nname: shop-legacy\ndescription: Migrate the shop legacy handlers to the new router. Do not use for refunds.\n---\n\nNote: there is no `src/legacy.ts` anymore.\n\nHeads-up; there is no `src/old.ts` here.\n\nNote: there is no `src/older.ts`.\n\nNOTE: there is no `src/eol.ts`\n\nWarning: there is no `src/yet.ts` yet\n\nFYI: there is no `src/in.ts` in this repository.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
    "id": "28-monorepo-subpackage",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
@@ -250,6 +280,21 @@
      "28-skill-anchors",
      "WARN",
      0
+    ]
+   ]
+  },
+  {
+   "id": "28-question-after-a-label",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nImportant: there is no `src/config/flags.ts`? Stop and ask.\n\nWarning: there is no `src/config/tax.ts` yet, create it first.\n\nUpdate: there is no `src/legacy/refunds.ts` anymore.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "28-skill-anchors",
+     "WARN",
+     2
     ]
    ]
   },

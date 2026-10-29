@@ -70,7 +70,7 @@ SETTINGS_KEYS_USER_MANAGED = frozenset({
     "axScreenReader", "processWrapper", "sandbox.allowAppleEvents", "sandbox.allowNestedUserNamespaces", "sandbox.credentials.allowPlaintextInject",
     "sandbox.credentials.awsPairs", "sandbox.credentials.sigv4", "sandbox.filesystem.disabled",
     "sandbox.network.strictAllowlist", "sandbox.network.tlsTerminate", "sandbox.ripgrep",
-    "skipAutoPermissionPrompt", "spellcheck", "sshConfigs", "vimInsertModeRemaps"
+    "skipAutoPermissionPrompt", "spellcheck", "sshConfigs", "sshHostCommands", "vimInsertModeRemaps"
 })
 
 

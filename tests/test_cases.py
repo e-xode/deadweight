@@ -138,6 +138,10 @@ class LabelledCases(unittest.TestCase):
         # (check, severity) pairs in the corpus before this guard. Removing `fable` from the known model aliases
         # made the check report the alias, and every test still passed. So the pair held at 0
         # must be seen firing, at that severity, in a case that is replayed.
+        # Its limit, found by the catch-up audit of 0.28.0 (C-00): the pair is judged over the whole
+        # corpus, not per case, so `["23-agent-model", "NOTICE", 0]` added to a case with no agent at
+        # all still passes - another case sees that pair firing. What the guard rules out is a pair
+        # nobody sees firing, not a zero that its own case cannot test.
         self.assertEqual(silent_without_firing(CASES), [])
 
     # Ids the auditor emits but that no labelled case fires, each with the test that holds it.

@@ -354,3 +354,51 @@ transcript now shows a `hook error` notice (hooks, "Other exit codes", read 2026
 graded on the current documentation, not on the issue.
 | `user-scope-agent-key` | #93109 | an agent in `~/.claude/agents/` with `observer: true`, a key the 2.1.266 bundle accepts and the docs do not list |
 | `task-alias-spawn-list` | #28277 | a subagent restricted with `Task(a), Task(b)`; `Task` still resolves to `Agent` (tested 2026-10-08, 2.1.293) |
+
+## `sandbox-weakened` (0.28.0, 2026-10-21)
+
+Written from the documentation for the `50-security-sandbox-weakened` check, by the session that
+wrote the check: an echo of the check, not a case from a user's report. It measures whether the skill
+is loaded and the doctrine applied, not whether the check is right; the corpus cases fix that. No
+result of running it is recorded in this repository, so none is claimed. The four oldest evals above
+have no entry either.
+
+## Four cases added on 2026-10-29 - a coverage audit, and what they do and do not prove
+
+A coverage audit of 0.20.0 to 0.29.0 and of the Claude Code notes 2.1.310 to 2.1.312 found four
+behaviours the references state and no eval asked about. Each case is a question about a fictional
+shop; the criterion is written from the reference text, which is the limit this whole file is about:
+a pass shows the skill **carries** the reference, not that the reference is right. Run 2026-10-29, three
+runs per arm, model of the session, judge of three votes.
+
+| Case | With the plugin | Without | Plugin 0.28.0 (references before the audit) | Source of the criterion |
+| --- | --- | --- | --- | --- |
+| `subagent-compact-window-vs-variable` | 3/3 | 0/3 | 0/3 | sub-agents page and 2.1.312 notes, which **disagree**; the criterion rewards saying so |
+| `hook-fails-windows-no-git-bash` | 3/3 | 0/3 | 0/3 | hooks page, "Failed hooks on Windows without Git Bash" (read 2026-10-29) |
+| `on-demand-file-over-limit` | 3/3 | 0/3 | 0/3 | memory page, quoted in the 0.29.0 entry of `CHANGELOG.md`; not re-read on 2026-10-29 |
+| `import-punctuation-not-loaded` | 3/3 | 0/3 | 1/3 | one probe on 2.1.302 (`evidence.json`); not documented by Anthropic; not re-run |
+
+- The first three fail on 0.28.0 for the reason intended: its references say nothing about the point,
+  or state one reading as settled (`autoCompactWindow`: "the variable wins", the page's reading, without its source or the 2.1.312 note).
+- `import-punctuation-not-loaded` is a **witness**, not a correction: the 0.28.0 references already
+  held the content, and the one judged failure there was a response that was right on substance
+  (neither line imports; punctuation breaks it; measured on 2.1.302) and missed a detail of the fix.
+  Three runs cannot tell 3/3 from 1/3 on that arm.
+- Without the plugin the base model scores 0/3 on all four. For `import-punctuation-not-loaded` that was
+  guaranteed by the first wording of the rubric, which required citing the plugin's own probe; the
+  wording was changed after an external review (below), so its without-arm figure says nothing about what
+  the model knows. For the other three, the likeliest reading is that the model has not seen the
+  behaviour; that reading is not tested.
+- **The run outputs are not recorded in this repository** (`evals/results/` is ignored: it holds
+  absolute machine paths), so the scores above are the maintainer's report, not a replayable record,
+  like every older entry of this file.
+- An external review of the rubrics on 2026-10-29 (re-audit of 0.29.0) corrected four of them: the probe
+  that settles `autoCompactWindow` must use a variable HIGHER than the field, and the 500,000 reading
+  holds only on a window of 500K or more; exit 2 is an accepted fix for the Windows hook; the
+  `on-demand-file-over-limit` prompt no longer cites `/memory` as proof of loading and its rubric says the
+  text past the limit is out of context unless the Read tool fetches it. The scores above are for the
+  earlier wording. Re-run the same day with the corrected rubrics, three runs per arm, with the plugin /
+  without: `subagent-compact-window-vs-variable` 3/3 / 0/3, `hook-fails-windows-no-git-bash` 3/3 / 0/3,
+  `on-demand-file-over-limit` 3/3 / 0/3, `import-punctuation-not-loaded` 2/3 / 0/3 (one with-plugin run
+  judged a fail by three votes of FAIL, not read; the case stays a witness). Cost 4.72 USD.
+- Cost of the runs: 4.16 USD with and without the plugin, 3.02 USD on 0.28.0.

@@ -259,6 +259,27 @@
    ]
   },
   {
+   "id": "31-overlay-unused-exemption-of-04",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-page/SKILL.md": "---\nname: shop-page\ndescription: Build the shop landing and category pages from the catalogue. This skill is not for checkout work.\n---\n\nSee `README.md`.\n",
+    ".claude/audit.local.json": "{\"exemptions\": [{\"check\": \"04-skill-description-antitrigger\", \"path\": \".claude/skills/shop-page/SKILL.md\", \"severity\": \"NOTICE\", \"reason\": \"no anti-trigger by design\", \"date\": \"2026-10-20\"}]}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "31-overlay-unused",
+     "NOTICE",
+     1
+    ],
+    [
+     "04-skill-description-antitrigger",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
    "id": "31-ratchet-id",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",

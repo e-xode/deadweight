@@ -120,6 +120,23 @@
    ]
   },
   {
+   "id": "04-it-is-not-for-without-a-clause-opener",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-note/SKILL.md": "---\nname: shop-note\ndescription: Write release notes for the shop, even when it is not for a release.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-credit/SKILL.md": "---\nname: shop-credit\ndescription: Draft credit notes for the shop, even if it is not for a refund already approved.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-region/SKILL.md": "---\nname: shop-region\ndescription: Check the shop catalogue per country, whether the plugin is not for sale in a region.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "04-skill-description-antitrigger",
+     "NOTICE",
+     3
+    ]
+   ]
+  },
+  {
    "id": "04-no-anti-trigger-house",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
@@ -137,6 +154,24 @@
      "04-skill-description-antitrigger",
      "NOTICE",
      0
+    ]
+   ]
+  },
+  {
+   "id": "04-not-for-after-a-word-whatever-the-spacing",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-one/SKILL.md": "---\nname: shop-one\ndescription: Build donation pages for the shop for not for profit charities. Use when a charity asks.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-two/SKILL.md": "---\nname: shop-two\ndescription: Build donation pages for the shop for  not for profit charities. Use when a charity asks.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-three/SKILL.md": "---\nname: shop-three\ndescription: Build donation pages for the shop for   not for profit charities. Use when a charity asks.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-nbsp/SKILL.md": "---\nname: shop-nbsp\ndescription: Build donation pages for the shop for not for profit charities. Use when a charity asks.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "04-skill-description-antitrigger",
+     "NOTICE",
+     4
     ]
    ]
   },
@@ -207,6 +242,22 @@
    ]
   },
   {
+   "id": "04-note-that-this-skill-is-not-for",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-page/SKILL.md": "---\nname: shop-page\ndescription: Build the shop landing pages from the catalogue. Note that this skill is not for checkout work.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-seo/SKILL.md": "---\nname: shop-seo\ndescription: Wire the SEO meta of the storefront routes, even when it is not for a release.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "04-skill-description-antitrigger",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
    "id": "04-short-description",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
@@ -223,6 +274,24 @@
      "04-skill-description-length",
      "WARN",
      0
+    ]
+   ]
+  },
+  {
+   "id": "04-this-skill-is-not-for",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-page/SKILL.md": "---\nname: shop-page\ndescription: Build the shop landing and category pages from the catalogue. This skill is not for checkout work.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-charity/SKILL.md": "---\nname: shop-charity\ndescription: Build donation pages for organisations that are not for profit. Use when a charity asks for a page.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-cart/SKILL.md": "---\nname: shop-cart\ndescription: Lay out the shop cart drawer and its line items, and this skill is not for refunds.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-ship/SKILL.md": "---\nname: shop-ship\ndescription: Print shipping labels for parcels, but it is not for pallets.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "04-skill-description-antitrigger",
+     "NOTICE",
+     1
     ]
    ]
   },

@@ -190,6 +190,12 @@ Silent failures by type [doc]:
   bucket. The doc's own words: "a mistyped path in `settings.json` means the hook never runs".
   **`35-hooks-command`** (ERROR) catches the missing file, and (WARN) a script invoked
   directly without `+x`.
+- **One documented exception, Windows without Git Bash.** A shell-form `PreToolUse` or
+  `PermissionRequest` command hook that fails with `onFailure` unset can instead **block** the
+  call, and only exit code 0 or 2 counts as its verdict (hooks § Failed hooks on Windows without
+  Git Bash, read 2026-10-29; 2.1.310 fixed a case where such a hook let the call through). The
+  auditor does not read a hook's `shell` field, so no check sees this: ask which platform the
+  hook runs on before calling its failure harmless.
 - **The remedy: `"onFailure": "block"`** (hooks § Block the action when a hook fails, 2.1.295+), on
   a `command` or `http` hook; `"continue"` is the default. Then any failure — cannot start, exit
   code other than 0 or 2 (even with a JSON `allow`), HTTP error or non-2xx, timeout, unparsable or

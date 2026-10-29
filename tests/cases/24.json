@@ -108,6 +108,23 @@
    ]
   },
   {
+   "id": "24-claude-ax-screen-reader-env-in-a-project",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"env\": {\n    \"CLAUDE_AX_SCREEN_READER\": \"1\"\n  }\n}",
+    ".claude/settings.local.json": "{\n  \"env\": {\n    \"claude_ax_screen_reader\": \"0\"\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-scope",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
    "id": "24-default-mode-accepted",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
@@ -282,6 +299,27 @@
      "24-settings-local",
      "WARN",
      1
+    ]
+   ]
+  },
+  {
+   "id": "24-managed-and-global-keys-in-a-project",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"copyFullResponse\": true,\n  \"defaultToAgentsView\": true,\n  \"allowClaudeInChromeWithManagedMcp\": true,\n  \"allowedProviders\": [\n    \"anthropic\"\n  ],\n  \"appendPlugins\": [\n    \"shop-kit@shop-market\"\n  ],\n  \"prependPlugins\": [\n    \"shop-core@shop-market\"\n  ]\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-scope",
+     "ERROR",
+     6
+    ],
+    [
+     "24-settings-unknown-key",
+     "NOTICE",
+     0
     ]
    ]
   },
@@ -532,6 +570,26 @@
     [
      "24-settings-parse",
      "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "24-ssh-host-commands-in-a-project",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"sshHostCommands\": [{\"id\": \"devbox\", \"name\": \"Dev box\", \"command\": \"shop-dev create\"}]}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-scope",
+     "ERROR",
+     1
+    ],
+    [
+     "24-settings-unknown-key",
+     "NOTICE",
      0
     ]
    ]

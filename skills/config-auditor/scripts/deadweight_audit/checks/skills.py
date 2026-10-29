@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 
 from ..checks.budget import listing_cap
-from ..checks.descriptions import ANTI_TRIGGER_RE
+from ..checks.descriptions import ANTI_TRIGGER_RE, squash_ws
 from ..context import AuditContext
 from ..layout import claude_signs, root_level_skills
 from ..limits import (
@@ -333,7 +333,7 @@ def check_skills(ctx: AuditContext, report: Report) -> dict[str, dict]:
                     "'description' + 'when_to_use' combined (skills).",
                     str(skill_md),
                 )
-            if not ANTI_TRIGGER_RE.search(desc):
+            if not ANTI_TRIGGER_RE.search(squash_ws(desc)):
                 report.add(
                     "04-skill-description-antitrigger",
                     # Family 1: the measurement behind this clause is about confusable

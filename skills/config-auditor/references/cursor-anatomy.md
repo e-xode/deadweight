@@ -74,8 +74,10 @@ Specific Files, ensure the file pattern matches referenced files."
 `55-cursor-rule-glob`.
 
 **Doc.** Rules also have a bounded surface: "Rules only apply to Agent (Chat). They do not apply
-to Tab completion, Inline Edit, or Bugbot PR reviews."
-([Rules, help center](https://cursor.com/help/customization/rules))
+to Tab completion or Bugbot PR reviews."
+([Rules, help center](https://cursor.com/help/customization/rules)) The wording this reference
+quoted before also named Inline Edit in that list; the page read on 2026-10-29 does not, so state
+nothing about Inline Edit.
 
 ## `globs` syntax
 

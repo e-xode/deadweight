@@ -111,13 +111,15 @@ a maximum of 30,000 characters."
 
 Recognized frontmatter for the cloud agent (agents-configuration): `description` (required), and
 optionally `name`, `target`, `tools`, `model`, `disable-model-invocation`, `user-invocable`,
-`infer`, `mcp-servers`, `metadata`. Two are out of scope there: "`argument-hint` and `handoffs`
-properties are currently not supported for Copilot cloud agent on GitHub.com," and `mcp-servers`
-/ `metadata` are "Not used in VS Code and other IDE custom agents" (agents-configuration).
+`infer`, `mcp-servers`, `metadata`. Two are out of scope there: `argument-hint` and `handoffs`,
+"properties from VS Code and other IDE custom agents are currently not supported for Copilot in the
+cloud on GitHub.com. They are ignored to ensure compatibility" (read 2026-10-29; this reference
+quoted an earlier wording that said "Copilot cloud agent"), and `mcp-servers` / `metadata` are "Not used in VS Code and other
+IDE custom agents" (agents-configuration).
 
 VS Code's own fields (vscode-agent-file-reference, read 2026-10-22): `description` ("What the agent
 does and when to use it"), `tools` ("Tools available to the agent. Tool names and supported aliases depend on the
-harness"), `model` ("An array specifies models in preference order, using the first available model").
+harness"), `model` ("The model to use in the Copilot harness. An array specifies models in preference order, using the first available model").
 
 ## Precedence
 
@@ -129,9 +131,12 @@ provided to Copilot" (repo-instructions). A repository-wide file and a path-spec
 (repo-instructions).
 
 Scope limits: personal instructions are "only supported for GitHub Copilot Chat in GitHub"
-(personal-instructions) — not VS Code, not the coding agent. Organisation instructions are
-"currently only supported for Copilot Chat on GitHub.com, Copilot code review on GitHub.com and
-Copilot cloud agent on GitHub.com" (org-instructions).
+(personal-instructions) — not VS Code, not the coding agent. Organisation instructions: "Organization
+custom instructions are currently supported for sessions running on the GitHub website (in cloud
+sandboxes or on GitHub Actions) and for Copilot code review. They are not supported in local client
+sessions" (org-instructions, read 2026-10-29). The wording this reference quoted before listed
+"Copilot Chat on GitHub.com" among the supported surfaces; the page no longer does, so do not promise
+organisation instructions in chat.
 
 Between several files of the same type in VS Code, no tie-break is documented: "Applicable
 instruction sources are additive. Do not depend on a file order or precedence rule to resolve
@@ -167,8 +172,8 @@ VS Code Local harness (this reference earlier quoted it as the Local agent; as r
 2026-10-17 the page speaks of harnesses: "Each harness uses its own discovery rules and file
 formats"): "The `chat.useAgentsMdFile` setting controls whether instructions from
 workspace-root AGENTS.md files are automatically attached to chat requests and is enabled by
-default." For nested files: "Set both `chat.useAgentsMdFile` and `chat.useNestedAgentsMdFiles` to
-true to discover nested AGENTS.md files. The nested-file setting is disabled by default." For
+default." For nested files, which the page marks "experimental and might change or be removed": "Set both
+`chat.useAgentsMdFile` and `chat.useNestedAgentsMdFiles` to true to discover nested AGENTS.md files. The nested-file setting is disabled by default." For
 `CLAUDE.md`: "configure the `chat.useClaudeMdFile` setting" (vscode-instructions). Whether
 `chat.useClaudeMdFile` defaults to on or off is **not documented** on the page as read on
 2026-10-22. (The same two quotes read differently on 2026-10-21: the page was rewritten within a

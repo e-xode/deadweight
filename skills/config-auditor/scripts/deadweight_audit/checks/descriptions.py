@@ -38,7 +38,7 @@ def check_agent_descriptions(ctx: AuditContext, report: Report, agents: dict[str
                 + house_note("at most 900 chars", "10-5,000 chars, best 200-1,000 (plugin-dev)"),
                 meta["path"],
             )
-        if not ANTI_TRIGGER_RE.search(desc):
+        if not ANTI_TRIGGER_RE.search(squash_ws(desc)):
             # Same concept as 04, same severity: a WARN here and a NOTICE there made the
             # grade depend on the object, not on the evidence (259 WARN on a public sample).
             report.add(
@@ -69,15 +69,37 @@ def check_agent_descriptions(ctx: AuditContext, report: Report, agents: dict[str
 # colon was there from the first release with no reason recorded; the word boundaries keep
 # `cannot for` and `not format` out. It must open a clause - after punctuation, a line start
 # or "but" - and never follow a bare word: anywhere, "pages for not for profit
-# organisations" excluded nothing and lost its notice (external audit of 0.28.0, A-01). The
-# same pattern serves 08b and 33's exclusions, so the three checks move together.
+# organisations" excluded nothing and lost its notice (external audit of 0.28.0, A-01). That
+# rule looked back over one or two spaces only, so three spaces or a no-break space let
+# "pages for   not for profit" through (catch-up audit, B-03): the text is searched through
+# `squash_ws`, which makes every run of blanks one space, and the pattern looks back over one.
+# "This skill is not for checkout work" says the same thing without opening a clause, and is
+# the form a description written in the third person takes (catch-up audit, A-01): it counts,
+# with the subject named, since "organisations that are not for profit" must not, and opening a
+# clause like `Not for` (or after "but" / "and"): "even when it is not for a release" is a condition,
+# not an exclusion, and lost its notice in 0.29.0's first candidate (0.29.0 audit, B-00, B-01). The same
+# pattern serves 08b and 33's exclusions, so the three checks move together.
+# The third-person form counts after any word but a condition: "Note that this skill is not for X"
+# is an exclusion, "even when it is not for a release" is not. A word that makes the clause
+# conditional is looked back over, a line break counting as a blank (re-audit of 0.29.0, B-00, B-04).
+_NOT_CONDITION = "".join(rf"(?<!\b{w}[ \n])" for w in
+                         ("when", "if", "whether", "unless", "even", "though", "although", "while"))
 ANTI_TRIGGER_RE = re.compile(
     r"Do ?n['’`]?o?t use|Never use"
-    r"|(?:(?<=\bbut )|(?<!\w[ \t])(?<!\w[ \t]{2}))\bNot for\b"
+    r"|(?:(?<=\bbut )|(?<!\w ))\bNot for\b"
+    r"|" + _NOT_CONDITION + r"\b(?:(?:this|the) (?:skill|agent|command|plugin)|it) (?:is|are) not for\b"
     r"|Out of scope|Anti-?trigger"
     r"|Ne pas utiliser|N['’`]utilisez? pas|Hors périmètre",
     re.IGNORECASE,
 )
+
+
+def squash_ws(text: str) -> str:
+    """Every run of blanks (spaces, tabs, no-break and other Unicode spaces) as one space.
+
+    Newlines are kept: a line start is a clause start for `Not for`.
+    """
+    return re.sub(r"[^\S\n]+", " ", text)
 
 
 def _listing_text(sk: dict) -> str:
@@ -210,7 +232,7 @@ def check_description_overlap(ctx: AuditContext, report: Report, skills: dict[st
     # separates nothing - so the name is searched in the anti-trigger's own sentence,
     # not anywhere after it.
     def excludes(a: str, b: str) -> bool:
-        text = listed[a]
+        text = squash_ws(listed[a])
         for m in ANTI_TRIGGER_RE.finditer(text):
             clause = _clause(text, m.start(), m.end())
             if re.search(rf"(?<![\w-]){re.escape(b)}(?![\w-])", clause):

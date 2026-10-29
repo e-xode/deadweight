@@ -28,7 +28,7 @@ DOCTRINE_REFERENCE_NAMES = frozenset({
     'skill-runtime-mechanisms.md',
 })
 
-# 1366 code terms (text between backticks, 2 to 60 characters; generic repository folders,
+# 1368 code terms (text between backticks, 2 to 60 characters; generic repository folders,
 # extension globs, credential env names and fragments between two code spans left out).
 DOCTRINE_CODE_TERMS = frozenset({
     '!~/…',
@@ -628,6 +628,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     '[AUTO 11-english-only]',
     '[AUTO 12-no-code-comments]',
     '[AUTO 13-no-global-scripts]',
+    '[AUTO 14-ondemand-file-size]',
     '[AUTO 14-rule-code-comments]',
     '[AUTO 14-rule-english-only]',
     '[AUTO 14-rule-no-paths]',
@@ -1351,6 +1352,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     'validate',
     'validateImportPath',
     'version',
+    'wc -m',
     'when_to_use',
     'window',
     'workflows',

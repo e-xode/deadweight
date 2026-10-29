@@ -230,6 +230,27 @@
    ]
   },
   {
+   "id": "33-not-for-after-a-word-three-blanks",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for shop-returns.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-returns/SKILL.md": "---\nname: shop-returns\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for merchants. Written for   not for shop-refunds cases.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "WARN",
+     1
+    ],
+    [
+     "33-description-overlap",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
    "id": "33-not-for-without-colon-separates",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
@@ -275,6 +296,27 @@
    },
    "git": true,
    "expected": [
+    [
+     "33-description-overlap",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "33-pair-excluded-on-both-sides",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. This skill is not for shop-returns.\n---\n\nSee `README.md`.\n",
+    ".claude/skills/shop-returns/SKILL.md": "---\nname: shop-returns\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for merchants. It is not for shop-refunds cases.\n---\n\nSee `README.md`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "33-description-overlap",
+     "WARN",
+     0
+    ],
     [
      "33-description-overlap",
      "NOTICE",

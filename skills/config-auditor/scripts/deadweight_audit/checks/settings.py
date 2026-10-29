@@ -199,6 +199,19 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                            f"'{dotted}' in '{name}' is ignored at this scope{loud}: it "
                            f"takes effect from {where} only (settings-reference, Scope).",
                            str(path))
+        # `axScreenReader` is "User or managed"; its environment twin is ignored the same way:
+        # "Claude Code ignores both the `axScreenReader` key and a `CLAUDE_AX_SCREEN_READER`
+        # value under `env` in the project's `.claude/settings.json` and
+        # `.claude/settings.local.json`, whatever their value" (accessibility).
+        env_ax = data.get("env")
+        # The name as written in the documentation: on POSIX an environment variable is case-sensitive,
+        # so `claude_ax_screen_reader` is another variable (0.29.0 audit, A-05).
+        if isinstance(env_ax, dict) and "CLAUDE_AX_SCREEN_READER" in env_ax:
+            report.add("24-settings-scope", "ERROR",
+                       f"'env.CLAUDE_AX_SCREEN_READER' in '{name}' is ignored at this scope: screen "
+                       "reader mode takes effect from the flag, your shell environment or user settings "
+                       "only; a project cannot turn it on or off (accessibility).",
+                       str(path))
         if shared:
             for key in ("enableAllProjectMcpServers", "enabledMcpjsonServers"):
                 if key in data:

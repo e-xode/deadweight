@@ -1,5 +1,110 @@
 # Changelog
 
+## 0.29.0 — 2026-10-23
+
+**`audit.py` changed: floors set with 0.28.0 no longer compare** (`34-floor` refuses two auditors). Run `audit.py --set-floor` once and commit `floor.json`. What can **raise** a count: the new `14-ondemand-file-size` NOTICE (a subdirectory `CLAUDE.md`, `CLAUDE.local.md` or rules file, or a path-scoped rule, over 40,000 characters, including the rules of a subdirectory whose `.claude/` git ignores); a `24-settings-scope` ERROR for `CLAUDE_AX_SCREEN_READER` under `env` in a project's settings; a `24-settings-scope` ERROR, in place of a `24-settings-unknown-key` NOTICE, for `sshHostCommands` in a project's settings (the key is "User or managed"); a `31-overlay-unused` NOTICE for an exemption of `04` or `08b` written for a description that now counts as excluding ("This skill is not for ..."), as in 0.28.0; a `04-skill-description-antitrigger`, `08b-agent-description` or `33-description-overlap` finding for a description in which "not for" follows a word after three or more blanks or a no-break space (it counted as an exclusion before); a `28-skill-anchors` WARN for "There is no `x`? Stop and ask." (a question mark after the path no longer reads as a statement of absence; 0.28.0 accepted it). What can **lower** one: a `28-skill-anchors` WARN for "Note: there is no `src/x.ts` anymore." (a label, then an absence that ends the clause); an `04`, `08b` or `33` finding for a description that says "This skill is not for ..." (or "The agent/command/plugin is not for ...", "It is not for ...") after any word except one that makes the clause conditional (when, if, whether, unless, even, though, although, while). Measured on the 21 folders of one workspace with the 0.28.0 auditor and this one on the same files, 2026-10-29 (after the `sshHostCommands` change and the corrections of the second external review): errors 0 → 0, warnings 55 → 55, notices 144 → 144; no finding appears or disappears in any folder.
+
+### Added
+
+- **Seven corpus cases and four evals from a coverage audit** (2026-10-29): `08b-this-agent-is-not-for`,
+  `31-overlay-unused-exemption-of-04` and `24-ssh-host-commands-in-a-project` fail on the 0.28.0
+  auditor; `33-pair-excluded-on-both-sides`, `24-managed-and-global-keys-in-a-project`,
+  `35-onfailure-other-handlers` and `44-monitors-without-dot-slash` are witnesses (same verdict on
+  both) and say so. Evals: `subagent-compact-window-vs-variable`, `hook-fails-windows-no-git-bash`,
+  `on-demand-file-over-limit`, `import-punctuation-not-loaded`; `evals/PROVENANCE.md` gives their
+  scores with the plugin, without it and on 0.28.0, and what a pass does not prove.
+- **`14-ondemand-file-size`** (NOTICE; `checks/rules.py`). The memory page says: "When a subdirectory
+  `CLAUDE.md` or a rules file that loads on demand is over a per-file size limit, Claude receives only
+  the start of it" - 40,000 characters on a 200K context window, 150,000 or 200,000 on a 1M window -
+  and that Claude Code did not apply the limit before v2.1.309. The page lists `CLAUDE.md` and
+  `CLAUDE.local.md` in a subdirectory (and the files they import), rules files in a subdirectory's
+  `.claude/rules/`, and path-scoped rules; the check reads those of the project. A `CLAUDE.local.md` is
+  looked for beside every tracked file, since git ignores it by design; the rules of a subdirectory are
+  read from the disk, so a project that ignores `api/.claude/` is still measured. A folder that holds no
+  tracked file at all is not visited, and `@path` imports are not followed. A rule of the project without
+  `paths:` loads at start and is not concerned. Characters are counted as `wc -m` counts them (a CRLF is
+  two), paths are pruned by component (`node_modules`, `vendor`, `.git`), and `~/.claude/rules/` and
+  `@path` imports are not added. The audit cannot see which window a session uses, so it reports the
+  smallest limit, as a NOTICE. Seen in the Claude Code changelog of 2.1.309 by the release watch. Cases
+  pin 40,001 characters (a NOTICE per file), 40,000 (nothing), an ignored `CLAUDE.local.md`, a
+  subdirectory rule, a CRLF file, accented characters (characters, not bytes) and the pruning.
+- **`env.CLAUDE_AX_SCREEN_READER` in a project's settings** is a `24-settings-scope` ERROR:
+  "Claude Code ignores both the `axScreenReader` key and a `CLAUDE_AX_SCREEN_READER` value under `env`
+  in the project's `.claude/settings.json` and `.claude/settings.local.json`" (accessibility). The name is
+  matched as written: an environment variable is case-sensitive on POSIX and the page names only the
+  upper-case one (0.29.0 audit, A-05). The key itself was handled in 0.28.0.
+
+### Fixed
+
+- **`sshHostCommands` was reported as an unknown settings key** (release watch ticket 9, 2026-10-25).
+  The settings reference lists it, scope "User or managed" (desktop app; an array of objects with
+  `id`, `name`, `command`). It is now in `SETTINGS_KNOWN_KEYS` and `SETTINGS_KEYS_USER_MANAGED`, so
+  a project's `settings.json` that holds it gets the `24-settings-scope` ERROR the other keys of that
+  scope get. One case pins it, and fails on the 0.28.0 auditor.
+- **Two reference sentences that the 2.1.310-2.1.312 notes and the hooks page contradict or
+  complete.** `agent-anatomy.md`: a sub-agent's `autoCompactWindow` against
+  `CLAUDE_CODE_AUTO_COMPACT_WINDOW` - the sub-agents page says the variable wins and the field has no
+  effect, the 2.1.312 changelog says the field now lowers the variable's window; the reference states
+  the disagreement and its sources instead of one of them. `hooks-anatomy.md`: on Windows without Git
+  Bash a shell-form `PreToolUse` / `PermissionRequest` command hook that fails with `onFailure` unset
+  can block the call (it read "exit 1 never blocks"). No auditor change.
+- **`04-skill-description-antitrigger`, `08b-agent-description`, `33-description-overlap`: "This skill is
+  not for checkout work."** was reported as saying nothing about when not to use the skill (catch-up
+  audit of 0.28.0, A-01). "This/the skill/agent/command/plugin is/are not for" and "It is not for" now
+  count, after any word except one that makes the clause conditional (when, if, whether, unless, even,
+  though, although, while): "Note that this skill is not for checkout work" excludes, "even when it is
+  not for a release" is a condition, and "organisations that are not for profit" is not an exclusion
+  either (0.29.0 audit, B-00, B-01; re-audit, B-00, B-04).
+- **"not for" after a bare word counted when the blanks before it were three or more, or a no-break
+  space** (B-03 / C-01): "pages for   not for profit" was an exclusion. Descriptions are searched with
+  every run of blanks as one space (`squash_ws`); one case per width (1, 2, 3, no-break) keeps it so for
+  04, and one case each for 08b and 33, whose calls were unguarded (0.29.0 audit, B-04).
+- **`28-skill-anchors`: "Note: there is no `src/legacy.ts` anymore." was an anchor again** (A-00).
+  0.28.0 stopped `:` and `;` from opening a sentence, to keep "Before you start: there is no `src/env.ts`,
+  stop and ask" an anchor, and lost the label case. The first 0.29.0 candidate let any label back in and
+  stopped reporting "Before you start: there is no `src/env1.ts`? Stop and ask." (0.29.0 audit, B-02). A
+  sentence is now opened by a label that introduces a fact - Note, NB, FYI, Heads-up, Warning, Caution,
+  Important, Reminder, Update, Deprecated, Removed, Changed, Remarque, Attention - and the path must be
+  followed by the end of the clause (`.`, `!`, `)`, the end of the line) or by "in", "here", "anymore",
+  or "yet" ending the clause; any other label, and a comma, semicolon, colon, dash or question mark
+  after the path, stay anchors ("Important: there is no `x`? Stop and ask." and "Warning: there is no `x`
+  yet, create it first." expect the file; re-audit, B-01, B-02, B-03). A question mark is also dropped
+  from the unlabelled form. Cases pin both the forms accepted and the forms refused.
+- **`deadweight --setup-statusline`**: a settings file it cannot write (read-only, or `.claude` being a
+  file) ends with a message and exit 2 instead of a traceback that also skipped the other host (E-01); a
+  write that fails after the file was opened (a full disk) puts the bytes back and says whether that
+  worked (0.29.0 audit, E-00), an interruption (Ctrl-C) during that write too, and a read-only file is
+  reported as left as it was, not as damaged (re-audit, E-01, C-01); an interruption (Ctrl-C) while the
+  launcher is written puts the settings back and stops (E-03); in a read-only folder the launcher is
+  written in place and the old one is put back if that fails (re-audit, E-00). The launcher is written beside its destination, made executable, then moved over
+  it, so a failing `chmod` no longer leaves the old launcher replaced (B-01); a read-only launcher is left
+  as it is, and a folder that takes no new file gets the launcher in place, as before (E-01 of the 0.29.0
+  audit: the temporary file had turned exit 0 into 3). Tests pin the mode `0o755`, an unchanged old
+  launcher when `chmod` or the move fails (E-02, E-03 of the catch-up audit; E-02 of the 0.29.0 audit),
+  the restored bytes, the interruption and the read-only folder.
+- **`axScreenReader` and `sandbox.allowNestedUserNamespaces`** were accepted in any settings file in the
+  0.28.0 candidate and corrected before its publication; this release adds the `env` form above.
+
+### Changed
+
+- `copilot-anatomy.md`: the quote on nested `AGENTS.md` files keeps the page's reserve ("experimental and
+  might change or be removed"), and the `model` field is attributed to the Copilot harness, as on the
+  page (D-01, D-02; the pages as read by the catch-up audit on 2026-10-22, and again by the 0.29.0 audit).
+- `tests/test_cases.py`: the comment of the severity guard says what it does not rule out - a zero its
+  own case cannot test, when another case sees the pair firing (C-00).
+- `PRIVACY.md`: how to repeat the measurement that Claude Code's own git calls do not run a repository's
+  `core.fsmonitor` program (a billed `claude -p` call in a throwaway repository, with the witness deleted
+  between the two runs; created, then not created on Claude Code 2.1.309); it is not one of the probes of
+  `run_probes.py`, which replay what `evidence.json` records for a check (B-04; 0.29.0 audit, C-04). The
+  `.statusline-*` temporary file of the launcher is declared (C-05).
+- `evals/sandbox-weakened`: the third criterion accepts dropping `network.allowLocalBinding` only where it has
+  no effect (Linux CI), and keeping the other keys to the environment that needs them (D-00; 0.29.0 audit,
+  C-07). `evals/PROVENANCE.md` says where the case comes from and that no result of running it is recorded
+  (D-03; 0.29.0 audit, C-02: the first candidate claimed "3/3 each").
+- `audit-checklist.md`, `evidence.json`: the new check and its scope, and the rule for a label before
+  "there is no `x`".
+- The check 46 vocabulary is regenerated from the references.
+
 ## 0.28.0 — 2026-10-21
 
 **`audit.py` changed: floors set with 0.27.0 no longer compare** (`34-floor` refuses two auditors). Run `audit.py --set-floor` once and commit `floor.json`. What can **raise** a count: the new `50-security-sandbox-weakened` NOTICE; a `24-settings-scope` ERROR for `sandbox.allowNestedUserNamespaces` or `axScreenReader` written in a project's `settings.json` or `settings.local.json` (the documentation gives both the scope "User or managed" and says Claude Code ignores them there); a `31-overlay-unused` NOTICE for an exemption of `04-skill-description-antitrigger` or `08b-agent-description` on a description that now counts as excluding; a `33-description-overlap` NOTICE for a pair that now counts as separated by declaration. What can **lower** one: `sandbox.allowNestedUserNamespaces` is no longer a `24-settings-unknown-subkey` NOTICE (it becomes the ERROR above); a skill that says "There is no `path`" is no longer a `28-skill-anchors` WARN; a description in which "Not for ..." opens a clause without a colon is no longer an `04-skill-description-antitrigger` or `08b-agent-description` NOTICE, and a pair excluded that way is no longer a `33-description-overlap` WARN. A skill whose `description` is quoted and starts with `>` or `|`, or is written `description: > text`, is no longer a `02-frontmatter-block-scalar` ERROR (the second form is now an INFO, like an agent's). Measured on the 23 folders of one workspace with the 0.27.0 auditor and this one on the same files, 2026-10-21: errors 0 → 0, warnings 64 → 63, notices 140 → 141; four folders changed (one `28` WARN and three `04` findings gone, two NOTICE and one INFO; three `31-overlay-unused` NOTICE new); none sets a key the new sandbox check reads, and no `08b` or `33` finding moved.

@@ -56,15 +56,32 @@ ANCHOR_TEMPLATE_RE = re.compile(
 # with nothing but emphasis between it and the path, and after the path the end of the clause
 # or "in"/"here"/"yet"/"anymore" - "There is no `src/x.ts` test yet" is about a test, and
 # `src/x.ts` must still exist. Every mention of the path must read that way.
-# A sentence opens after `.`, `!` or `?` only: with `:` and `;` too, "Before you start: there
-# is no `src/env.ts`, stop and ask" was read as a statement of absence, though it expects the
-# file (external audit of 0.28.0, A-00).
+# A sentence opens after `.`, `!` or `?`. With `:` and `;` too, "Before you start: there is no
+# `src/env.ts`, stop and ask" was read as a statement of absence, though it expects the file
+# (external audit of 0.28.0, A-00); dropping them made "Note: there is no `src/legacy.ts`
+# anymore." an anchor again (catch-up audit, A-00). Any label opening a sentence let too much
+# through: "Before you start: there is no `x`? Stop and ask." expects the file (0.29.0 audit, B-02).
+# So only a label that introduces a fact - Note, NB, FYI, Heads-up, Warning, Caution, Important,
+# Reminder, Update, Deprecated, Removed, Changed, Remarque, Attention - opens one, and then the path
+# must be followed by the end of the clause (`.`, `!`, `)`, the end of the line) or by "in", "here",
+# "anymore", or "yet" ending the clause; a `,`, `;`, `:`, dash or `?` is an instruction going on
+# ("Important: there is no `x`? Stop and ask." and "Warning: there is no `x` yet, create it first."
+# expect the file; 0.29.0 re-audit, B-01, B-02, B-03). A `?` is also dropped for a sentence with no label.
 _ABSENT_BEFORE_RE = re.compile(
     r"(?:^|[.!?]\s+)[\s>*+\-\d.)]*there(?:\s+is|\s+are|['’]s)\s+[*_]{0,2}no[*_]{0,2}\s+[*_`]{0,3}$",
     re.IGNORECASE,
 )
 _ABSENT_AFTER_RE = re.compile(
-    r"^[*_`]{0,4}(?:\s*(?:$|[.,;:!?)]|—|–|\s-\s)|\s+(?:in|here|yet|anymore|any\s+more|any\s+longer)\b)",
+    r"^[*_`]{0,4}(?:\s*(?:$|[.,;:!)]|—|–|\s-\s)|\s+(?:in|here|yet|anymore|any\s+more|any\s+longer)\b)",
+    re.IGNORECASE,
+)
+_ABSENT_LABEL_BEFORE_RE = re.compile(
+    r"(?:^|[.!?]\s+)[\s>*+\-\d.)]*[*_]{0,2}(?:note|nb|n\.b\.|fyi|heads[ -]up|warning|caution|important|reminder|update|deprecated|removed|changed|remarque|attention)"
+    r"[*_]{0,2}\s*[:;—–-]\s*[*_]{0,2}\s*there(?:\s+is|\s+are|['’]s)\s+[*_]{0,2}no[*_]{0,2}\s+[*_`]{0,3}$",
+    re.IGNORECASE,
+)
+_ABSENT_LABEL_AFTER_RE = re.compile(
+    r"^[*_`]{0,4}(?:\s*(?:$|[.!)])|\s+(?:in|here|anymore|any\s+more|any\s+longer)\b|\s+yet\s*(?:$|[.!)]))",
     re.IGNORECASE,
 )
 
@@ -77,7 +94,8 @@ def _stated_absent(ref: str, body: str) -> bool:
         line_end = body.find("\n", m.end())
         before = body[line_start:m.start()]
         after = body[m.end():line_end if line_end >= 0 else len(body)]
-        if not (_ABSENT_BEFORE_RE.search(before) and _ABSENT_AFTER_RE.match(after)):
+        if not ((_ABSENT_BEFORE_RE.search(before) and _ABSENT_AFTER_RE.match(after))
+                or (_ABSENT_LABEL_BEFORE_RE.search(before) and _ABSENT_LABEL_AFTER_RE.match(after))):
             return False
         found = True
     return found

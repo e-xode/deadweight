@@ -18,6 +18,21 @@
    ]
   },
   {
+   "id": "08-agent-not-for-after-a-word-three-blanks",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/agents/shop-donate.md": "---\nname: shop-donate\ndescription: Review donation pages for the shop for   not for profit charities. Use when a charity asks.\n---\n\nReview.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "08b-agent-description",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
    "id": "08-agent-not-for-opens-a-clause",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",

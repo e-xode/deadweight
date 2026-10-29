@@ -106,6 +106,22 @@
    ]
   },
   {
+   "id": "44-monitors-without-dot-slash",
+   "files": {
+    ".claude-plugin/plugin.json": "{\"name\": \"shop-tools\", \"version\": \"1.0.0\", \"experimental\": {\"monitors\": \"config/monitors.json\"}}\n",
+    "skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    "config/monitors.json": "[]\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "44-plugin-path",
+     "ERROR",
+     1
+    ]
+   ]
+  },
+  {
    "id": "44-path-without-dot",
    "files": {
     ".claude-plugin/plugin.json": "{\n  \"name\": \"shop-kit\",\n  \"agents\": \"agents/\"\n}",

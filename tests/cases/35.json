@@ -519,6 +519,27 @@
    ]
   },
   {
+   "id": "35-onfailure-other-handlers",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"hooks\": {\n    \"SubagentStop\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"echo shop\",\n            \"timeout\": 5,\n            \"onFailure\": \"block\"\n          }\n        ]\n      }\n    ],\n    \"PreToolUse\": [\n      {\n        \"matcher\": \"Bash\",\n        \"hooks\": [\n          {\n            \"type\": \"prompt\",\n            \"prompt\": \"Is this safe? $ARGUMENTS\",\n            \"onFailure\": \"block\"\n          },\n          {\n            \"type\": \"command\",\n            \"command\": \"echo shop\",\n            \"asyncRewake\": true,\n            \"onFailure\": \"block\"\n          }\n        ]\n      }\n    ]\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-shape",
+     "NOTICE",
+     3
+    ],
+    [
+     "35-hooks-shape",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
    "id": "35-onfailure-without-effect",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",

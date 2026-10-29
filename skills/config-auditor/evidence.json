@@ -185,6 +185,13 @@
    "reported": [],
    "tested": null,
    "tested_note": "Attempted 2026-10-21 on Claude Code 2.1.306, Linux: claude -p --model haiku --setting-sources project --no-session-persistence --strict-mcp-config --allowedTools=Bash, sandbox.enabled, failIfUnavailable true and allowUnsandboxedCommands false, enableWeakerNestedSandbox false then true, command `echo SBXOK; head -c 60 /proc/1/cmdline`. Not evidence either way: both runs failed before the command ran with the same apply-seccomp error (write /proc/self/setgroups, nested userns is capability-restricted), so no key's effect was observed. The check reads only what the documentation says."
+  },
+  "14-ondemand-file-size": {
+   "documented": "https://code.claude.com/docs/en/memory (Claude ignores the end of my subdirectory CLAUDE.md)",
+   "documented_note": "Read 2026-10-23. \"When a subdirectory `CLAUDE.md` or a rules file that loads on demand is over a per-file size limit, Claude receives only the start of it\"; the limit applies to `CLAUDE.md` and `CLAUDE.local.md` in a subdirectory (and the files they import), to rules files in a subdirectory's `.claude/rules/`, and to path-scoped rules in the project's `.claude/rules/` or in `~/.claude/rules/` (the last is outside the project and not read); 40,000 characters on a 200K context window, 200,000 on a 1M window for Claude Opus 4.6 and Claude Sonnet 4.6 and 150,000 on later models; \"Before v2.1.309, Claude Code didn't apply this limit\". The audit cannot see the window, so it reports the smallest limit as a NOTICE and does not count `@path` imports.",
+   "reported": [],
+   "tested": null,
+   "tested_note": "Not tested: the documented limit is not replayed against a model."
   }
  }
 }
