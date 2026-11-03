@@ -71,6 +71,30 @@ def check_settings_scope(ctx: AuditContext, report: Report) -> None:
         if isinstance(overrides, dict):
             for skill_name in sorted(overrides):
                 if not (root / ctx.skills_dir / skill_name / "SKILL.md").is_file():
+                    # `folder:name` also names a command in a project subfolder (`commands/frontend/
+                    # component.md` is `frontend:component`) and a nested skill: those stay a NOTICE.
+                    # Only a key no project file can answer to reads as a plugin skill (external audit
+                    # 0.31.0, A-00).
+                    prefix, _, leaf = skill_name.partition(":")
+                    project_answer = ("/" in skill_name or (
+                        root / ctx.claude_dir / "commands" / prefix / f"{leaf}.md").is_file() or (
+                        root / ctx.skills_dir / prefix / leaf / "SKILL.md").is_file())
+                    if ":" in skill_name and not project_answer:
+                        # `plugin:skill` is the namespaced name of a plugin skill. The docs: "Plugin
+                        # skills are not affected by `skillOverrides`. Manage those through `/plugin`
+                        # instead." Measured on 2.1.317: the skill stays listed with its description,
+                        # and Claude Code reports nothing (anthropics/claude-code#105570). A bare name
+                        # cannot be told from a user skill: only the namespaced form is flagged.
+                        report.add(
+                            "24-settings-skill-overrides",
+                            "WARN",
+                            f"skillOverrides in '{name}' names '{skill_name}', which reads as a plugin skill: "
+                            "if it is one, plugin skills are not affected by skillOverrides (skills, 'Override skill "
+                            "visibility from settings'), so this entry changes nothing and Claude Code "
+                            "does not say so. Manage plugin skills through /plugin.",
+                            str(path),
+                        )
+                        continue
                     # The docs' own example is `"doctor": "off"` - a bundled skill. A key
                     # outside the project may be bundled, personal or synced: legitimate,
                     # and not verifiable from here.

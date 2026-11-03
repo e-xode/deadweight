@@ -28,7 +28,7 @@ DOCTRINE_REFERENCE_NAMES = frozenset({
     'skill-runtime-mechanisms.md',
 })
 
-# 1390 code terms (text between backticks, 2 to 60 characters; generic repository folders,
+# 1392 code terms (text between backticks, 2 to 60 characters; generic repository folders,
 # extension globs, credential env names and fragments between two code spans left out).
 DOCTRINE_CODE_TERMS = frozenset({
     '!~/…',
@@ -62,6 +62,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     '"off"',
     '"on"',
     '"onFailure": "block"',
+    '"probe:alpha": "off"',
     '"type": "sdk"',
     '"user-invocable-only"',
     '"worktree"',
@@ -779,6 +780,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     'applyTo: "api/**"',
     'args',
     'argument-hint',
+    'argument-hint: [--dry-run] [path]',
     'arguments',
     'array',
     'ask',

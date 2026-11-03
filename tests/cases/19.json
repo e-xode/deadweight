@@ -18,6 +18,40 @@
    ]
   },
   {
+   "id": "19-commands-unquoted-frontmatter",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/commands/shop-modernize.md": "---\ndescription: Modernize a shop module\nargument-hint: [--dry-run] [path]\n---\n\nCorps.\n",
+    ".claude/commands/shop-notes.md": "---\ndescription: Write shop notes. Do not use for: refunds\n---\n\nCorps.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "19-frontmatter-quoting",
+     "WARN",
+     2
+    ]
+   ]
+  },
+  {
+   "id": "19-commands-witnesses",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/commands/shop-quoted.md": "---\ndescription: Quoted hint\nargument-hint: \"[--dry-run] [path]\"\n---\n\nCorps.\n",
+    ".claude/commands/shop-plain.md": "---\ndescription: Plain hint\nargument-hint: path\n---\n\nCorps.\n",
+    ".claude/commands/shop-closed.md": "---\ndescription: Closed hint\nargument-hint: [path]\n---\n\nCorps.\n",
+    ".claude/commands/shop-tools.md": "---\ndescription: Two-line collection\nallowed-tools: [Read,\n  Grep]\n---\n\nCorps.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "19-frontmatter-quoting",
+     "WARN",
+     0
+    ]
+   ]
+  },
+  {
    "id": "19-open-flow-collection",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
@@ -29,6 +63,22 @@
      "19-frontmatter-quoting",
      "WARN",
      1
+    ]
+   ]
+  },
+  {
+   "id": "19-plugin-commands-in-a-subfolder",
+   "files": {
+    ".claude-plugin/plugin.json": "{\"name\": \"shop-kit\", \"version\": \"1.0.0\", \"description\": \"Shop kit.\"}",
+    "commands/shop-modernize.md": "---\ndescription: Modernize a shop module\nargument-hint: [--dry-run] [path]\n---\n\nCorps.\n",
+    "commands/review/shop-audit.md": "---\ndescription: Audit a shop module\nargument-hint: [beta] <path>\n---\n\nCorps.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "19-frontmatter-quoting",
+     "WARN",
+     2
     ]
    ]
   }

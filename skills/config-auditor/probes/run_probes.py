@@ -603,6 +603,10 @@ NOT_IMPLEMENTED: dict[tuple[str, str], str] = {
                                              "pass or a fail would not say the harness changed",
     ("24-settings-unknown-subkey", "tested_permissions_subkey"): "recorded by hand on 2.1.309 and "
                                                                   "2.1.317; the runner has no probe for it yet",
+    ("19-frontmatter-quoting", "tested"): "recorded by hand on 2.1.317; the runner has no probe for it "
+                                          "yet (the method is in `how`)",
+    ("24-settings-skill-overrides", "tested"): "recorded by a second session on 2.1.317, not re-run "
+                                               "here; the runner has no probe for it yet",
 }
 
 

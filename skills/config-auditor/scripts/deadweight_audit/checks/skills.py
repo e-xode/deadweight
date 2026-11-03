@@ -589,6 +589,12 @@ def check_frontmatter_quoting(ctx: AuditContext, report: Report) -> None:
         targets.extend(readable_files(skills_dir.glob("*/SKILL.md")))
     if agents_dir.is_dir():
         targets.extend(readable_files(agents_dir.rglob("*.md")))
+    # A command shares the frontmatter of a skill and is loaded as tolerantly (measured on 2.1.317:
+    # an unquoted `argument-hint: [--dry-run] [path]` loads and runs), so the same strict-YAML
+    # reader sees the same defect there (anthropics/claude-plugins-official#6885).
+    commands_dir = root / ctx.claude_dir / "commands"
+    if commands_dir.is_dir():
+        targets.extend(readable_files(commands_dir.rglob("*.md")))
 
     for path in targets:
         try:

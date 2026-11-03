@@ -621,6 +621,76 @@
    ]
   },
   {
+   "id": "24-skill-overrides-command-folder",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/commands/frontend/component.md": "---\ndescription: Scaffold a shop component.\n---\n\nCorps.\n",
+    ".claude/settings.json": "{\n  \"skillOverrides\": {\n    \"frontend:component\": \"off\",\n    \"shop-kit:deploy\": \"off\"\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-skill-overrides",
+     "WARN",
+     1
+    ],
+    [
+     "24-settings-skill-overrides",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "24-skill-overrides-plugin-key",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"skillOverrides\": {\n    \"shop-kit:deploy\": \"off\",\n    \"shop-kit:audit\": \"on\",\n    \"doctor\": \"off\"\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-skill-overrides",
+     "WARN",
+     2
+    ],
+    [
+     "24-settings-skill-overrides",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "24-settings-skill-overrides",
+     "shop-kit:\\w+'.*fine for a bundled"
+    ]
+   ]
+  },
+  {
+   "id": "24-skill-overrides-witnesses",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"skillOverrides\": {\n    \"shop-refunds\": \"off\"\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-skill-overrides",
+     "WARN",
+     0
+    ],
+    [
+     "24-settings-skill-overrides",
+     "NOTICE",
+     0
+    ]
+   ]
+  },
+  {
    "id": "24-ssh-host-commands-in-a-project",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",

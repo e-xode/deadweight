@@ -106,6 +106,11 @@ A key outside its scope is ignored; the table is not reproduced here, audit.py c
   [antipatterns.md](./antipatterns.md) § G1.
 - **`24-settings-skill-overrides`** (NOTICE) — a `skillOverrides` key naming no project skill: fine
   for a bundled, user or synced skill, dead if the skill was renamed [house].
+  (WARN) — a key of the form `plugin:skill`: **Doc** (skills, "Override skill visibility from
+  settings"): "Plugin skills are not affected by `skillOverrides`. Manage those through `/plugin`
+  instead." **Measured** on 2.1.317: `"probe:alpha": "off"` on a skill loaded with `--plugin-dir`
+  leaves it listed with its full description, while an entry with another key on a project skill hides it, and
+  Claude Code reports nothing. A bare name is not flagged: it cannot be told from a user skill.
 
 ## Rule order: deny, ask, allow
 
