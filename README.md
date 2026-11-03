@@ -9,7 +9,7 @@ Your coding agent ignores part of its configuration, and it doesn't tell you.
 
 A deny rule that is never checked. A sub-agent that never loads. A Cursor rule that Cursor skips. A
 `CLAUDE.md` that grows on every turn while half of it points at files that are gone. Claude Code,
-Copilot and Cursor accept all of these without an error. Deadweight reads the configuration of a
+Copilot and Cursor accept all of these without an error. Codex is read where it differs: an `AGENTS.override.md`, and the `@path` imports of an `AGENTS.md` it passes through unexpanded. Deadweight reads the configuration of a
 repository and lists what the agents ignore, with the reason and the fix.
 
 ## What it finds

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.32.0 — 2026-11-03
+
+**`audit.py` changed: floors set with 0.31.0 no longer compare** (`34-floor` refuses two auditors). Run `audit.py --set-floor` once and commit `floor.json`. What can **raise** a count: the new `54-agents-md-import` NOTICE, only in a repository that has an `AGENTS.override.md` not ignored by git (the signal that Codex reads it), for each `AGENTS.md` or `AGENTS.override.md` that holds an `@path` import outside code and comments. Not counted: an `AGENTS.md` whose folder also holds a non-ignored `AGENTS.override.md` (Codex reads one file per folder, the override), and an `AGENTS.override.md` that no `CLAUDE.md` imports (Claude Code does not read it, so nothing diverges; `54-agents-md-variant` already reports it). Nothing lowers a count. Measured on the 21 repositories of one workspace (the 0.31.0 and 0.32.0 auditors run on each, read-only, 2026-11-03): no finding changes anywhere.
+
+### Added
+
+- **`54-agents-md-import`** (NOTICE; `checks/other_agents.py`). Claude Code expands an `@path` import in `AGENTS.md`; Codex does not. Read in the Codex source (`codex-rs/core/src/agents_md.rs`, `read_agents_md`, commit 30587d78 of 2026-10-23): each file found from the root to the working directory is read, cut to `project_doc_max_bytes` and passed as it is, with no step that resolves `@`. This is a reading of the source, not a run (Codex is not installed where it was written), and only of that file; a resolution elsewhere in the chain is not excluded. Fires only where an `AGENTS.override.md` shows that Codex reads the repository, since an `AGENTS.md` with imports is the recommended form for Claude Code and flagging every one would be noise. A `.codex/` folder is not used as a signal: not verified. Imports in code spans, fenced blocks and block-level HTML comments (stripped before injection, memory), and the forms Claude Code does not import either (`@path.` with a period, etc.), are not counted.
+- **Three corpus cases** (`54-import-read-by-codex-only`, `54-import-without-codex-signal`, `54-import-ignored-override`); the first fails on the 0.31.0 auditor.
+
+### Changed
+
+- `README.md` names Codex as a reader the plugin knows (`AGENTS.override.md`, unexpanded imports); it is still not one of the agents whose whole configuration is audited. `references/agents-md-anatomy.md`, the checklist and `evidence.json` list the new check; vocabulary of check 46 regenerated.
+
 ## 0.31.0 — 2026-11-03
 
 **`audit.py` changed: floors set with 0.30.0 no longer compare** (`34-floor` refuses two auditors). Run `audit.py --set-floor` once and commit `floor.json`. What can **raise** a count: `19-frontmatter-quoting` now reads the files of `commands/` as it reads skills and agents (an unquoted `argument-hint: [--dry-run] [path]`, or an unquoted `: `, in a command is a WARN), and a `skillOverrides` key of the form `plugin:skill` is now a WARN instead of a NOTICE (the NOTICE count of `24-settings-skill-overrides` falls by as many). The regenerated vocabulary of check 46 gains 2 terms, both literal examples from the new references (`"probe:alpha": "off"`, `argument-hint: [--dry-run] [path]`). Nothing lowers an error or warning count; only the NOTICE count of `24-settings-skill-overrides` falls, by one per `plugin:skill` key. Measured on the 21 repositories of one workspace (the 0.30.0 and 0.31.0 auditors run on each, read-only, 2026-11-03; the summary line and the lines of checks 19 and 24 compared): no finding changes anywhere.

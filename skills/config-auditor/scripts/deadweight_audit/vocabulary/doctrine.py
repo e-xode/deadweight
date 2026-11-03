@@ -28,7 +28,7 @@ DOCTRINE_REFERENCE_NAMES = frozenset({
     'skill-runtime-mechanisms.md',
 })
 
-# 1392 code terms (text between backticks, 2 to 60 characters; generic repository folders,
+# 1396 code terms (text between backticks, 2 to 60 characters; generic repository folders,
 # extension globs, credential env names and fragments between two code spans left out).
 DOCTRINE_CODE_TERMS = frozenset({
     '!~/…',
@@ -355,6 +355,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     '50-security-mcp-unpinned',
     '50-security-remote-exec',
     '50-security-sandbox-weakened',
+    '54-agents-md-import',
     '54-agents-md-variant',
     '55-cursor-reads-claude-md',
     '55-cursor-rule-glob',
@@ -711,6 +712,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     '[AUTO 51-stale-command]',
     '[AUTO 52-claude-md-tree]',
     '[AUTO 53-no-verification-command]',
+    '[AUTO 54-agents-md-import]',
     '[AUTO 54-agents-md-variant]',
     '[AUTO 55-cursor-*]',
     '[AUTO 55-cursor-reads-claude-md, 56-copilot-reads-claude-md]',
@@ -865,6 +867,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     'code.claude.com',
     'code.claude.com/docs/en/',
     'code.claude.com/docs/en/<page>',
+    'codex-rs/core/src/agents_md.rs',
     'color',
     'command',
     'commands',
@@ -1209,6 +1212,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     'quick_validate.py',
     'range-conflict',
     'react-patterns.mdc',
+    'read_agents_md',
     'reason',
     'reference/',
     'references/',

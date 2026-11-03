@@ -191,6 +191,46 @@ def check_other_tools(ctx: AuditContext, report: Report) -> None:
                                      if name == "AGENTS.override.md" else
                                      ". Import it from CLAUDE.md with `@` if Claude Code should read it."),
                        str(root / rel))
+    # `@path` in a file Codex reads: Claude Code expands it, Codex passes the line as text. Read in
+    # the Codex source (`codex-rs/core/src/agents_md.rs`, `read_agents_md`, commit 30587d78 of
+    # 2026-10-23): each file found is read, cut to the byte budget and pushed as it is, with no
+    # resolution of `@`. Source reading, not a run (Codex is not installed where this was written),
+    # and only that file. Fires only when a signal shows Codex reads this repository - an
+    # `AGENTS.override.md` that git tracks or does not ignore: a Claude Code user who imports from
+    # AGENTS.md is following the memory page, and flagging every such file would be noise.
+    overrides = {rel for rel in files if rel.rsplit("/", 1)[-1] == "AGENTS.override.md" and not ignored(rel)}
+    if overrides:
+        for rel in files:
+            name = rel.rsplit("/", 1)[-1]
+            if name not in ("AGENTS.md", "AGENTS.override.md") or ignored(rel):
+                continue
+            if name == "AGENTS.md" and rel[:-len(name)] + "AGENTS.override.md" in overrides:
+                # "Codex includes at most one file per directory": the override replaces this
+                # AGENTS.md, so Codex never reads its imports (audit externe 032, A-00).
+                continue
+            if name == "AGENTS.override.md":
+                # Claude Code does not read an override unless a CLAUDE.md imports it: without
+                # that, its imports expand for no one and nothing diverges (54-agents-md-variant
+                # already reports the file; audit externe 032, A-01).
+                if imported is None:
+                    imported = _imported_by_memory(root, all_files)
+                if os.path.realpath(root / rel) not in imported:
+                    continue
+            try:
+                text = (root / rel).read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            # Block-level HTML comments are stripped before injection (memory): an import in
+            # one is not expanded (audit externe 032, A-02).
+            refs = memory_imports(injected_memory(text))
+            if refs:
+                shown = ", ".join(f"@{r}" for r in refs[:3]) + ("..." if len(refs) > 3 else "")
+                report.add("54-agents-md-import", "NOTICE",
+                           f"'{rel}' imports {shown}: Claude Code expands an `@path` import, while "
+                           "Codex, which this repository's AGENTS.override.md shows reading it, passes "
+                           "the line to the model as text (Codex source, agents_md.rs, read; not run). "
+                           "Inline what Codex must see, or accept that it does not.",
+                           str(root / rel))
     # Cursor applies CLAUDE.md to every conversation "regardless of any alwaysApply" (Cursor
     # rules help), and Copilot's agent, CLI and code review read it too (Copilot custom
     # instructions): what CLAUDE.md tells Claude Code alone, they read as theirs. Only

@@ -266,6 +266,15 @@
     "how": "Measured by a second session: `\"probe:alpha\": \"off\"` on a skill loaded with --plugin-dir, and `\"gamma\": \"off\"` on a project skill, in the same run. Not re-run in this session: here only the auditor's output for the `plugin:skill` key was checked.",
     "result": "The plugin skill stays listed with its full description and Claude Code reports nothing; the project skill is hidden."
    }
+  },
+  "54-agents-md-import": {
+   "documented": "https://code.claude.com/docs/en/memory (`@path` imports in memory files, AGENTS.md included); nothing on the Codex side: the Codex AGENTS.md guide says nothing about `@` imports",
+   "documented_note": "Only the Claude Code side is documented. That Codex does not resolve `@path` is a reading of its source, not a documented rule.",
+   "reported": [
+    "https://github.com/openai/codex/issues/54662"
+   ],
+   "tested": null,
+   "tested_note": "Not run: Codex is not installed where this was written. Read, 2026-10-23: codex-rs/core/src/agents_md.rs, function read_agents_md, commit 30587d78 (main that day): each file found from the root to the working directory is read, cut to project_doc_max_bytes and pushed as it is; no step resolves `@`. Only that file was read; a resolution elsewhere in the chain is not excluded. Signal used to say Codex reads the repository: an AGENTS.override.md not ignored by git (Codex AGENTS.md guide). A `.codex/` folder is not used: not verified."
   }
  }
 }

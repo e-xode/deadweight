@@ -54,6 +54,81 @@
    ]
   },
   {
+   "id": "54-import-ignored-override",
+   "files": {
+    "CLAUDE.md": "@AGENTS.md\n",
+    ".gitignore": "sub/AGENTS.override.md\n",
+    "AGENTS.md": "# shop-api\n\nSee @docs/rtk.md for the commands\n",
+    "sub/AGENTS.override.md": "Mine.\n",
+    "AGENTS.local.md": "Mine too.\n",
+    "docs/rtk.md": "Commands.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "54-agents-md-import",
+     "NOTICE",
+     0
+    ],
+    [
+     "54-agents-md-variant",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
+   "id": "54-import-read-by-codex-only",
+   "files": {
+    "CLAUDE.md": "@AGENTS.md\n@sub/AGENTS.override.md\n",
+    ".gitignore": "gen/AGENTS.md\n",
+    "AGENTS.md": "# shop-api\n\nSee @docs/rtk.md for the commands\n",
+    "sub/AGENTS.override.md": "Local override, also see @docs/a.md @docs/b.md @docs/c.md @docs/d.md\n",
+    "lib/AGENTS.md": "Shadowed, see @docs/y.md\n",
+    "lib/AGENTS.override.md": "Plain override.\n",
+    "tools/AGENTS.override.md": "Nobody imports me, see @docs/y.md\n",
+    "gen/AGENTS.md": "Ignored, see @docs/y.md\n",
+    "api/AGENTS.md": "Never `@docs/y.md` in code.\n\n<!-- note @docs/y.md -->\n\n```\n@docs/z.md\n```\n",
+    "docs/rtk.md": "Commands.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "54-agents-md-import",
+     "NOTICE",
+     2
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "54-agents-md-import",
+     "@docs/d\\.md"
+    ]
+   ]
+  },
+  {
+   "id": "54-import-without-codex-signal",
+   "files": {
+    "CLAUDE.md": "@AGENTS.md\n",
+    "AGENTS.md": "# shop-api\n\nSee @docs/rtk.md for the commands.\n",
+    "AGENTS.local.md": "Mine.\n",
+    "docs/rtk.md": "Commands.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "54-agents-md-import",
+     "NOTICE",
+     0
+    ],
+    [
+     "54-agents-md-variant",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
    "id": "54-override-and-agents-md-both-imported",
    "files": {
     "CLAUDE.md": "# shop-api\n\n@AGENTS.md\n@AGENTS.override.md\n",
