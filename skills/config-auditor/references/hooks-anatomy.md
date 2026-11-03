@@ -69,6 +69,14 @@ Facts that change what a declaration means:
   entry has no `hooks` list, a handler is not an object or has an unknown `type`. In a skill's or
   an agent's frontmatter, `hooks: []` is a NOTICE: an empty list declares no hook, and the skill
   still loads (2.1.302, one run, a skill only; `evidence.json` `35-hooks-shape`) [measured].
+- **`35-hooks-skill-event`** (WARN) — in a **skill's** frontmatter, one of `PreCompact`, `PostCompact`,
+  `SessionEnd`, `InstructionsLoaded`, `CwdChanged`, `SubagentStop`. The skill loads and the hook is
+  accepted, but it never fires: the same hook in `settings.json` fired in the same session, and the
+  skill's `PreToolUse` kept firing after a compaction. [measured, 2.1.309 and 2.1.317, Linux, a
+  project skill, also flagged in a plugin skill, which was not measured; the docs ("Hooks in skills and agents") list no restriction, so this can change
+  without notice.] Not covered: sixteen events the probe could not produce, agents
+  (the subagents page says all events are supported). Move the hook to `settings.json` or the
+  plugin's `hooks/hooks.json`.
 - **`35-hooks-event`** — an event name outside the 33. [doc] It is dropped as a *Settings Warning*
   at interactive start-up, the rest of the file staying in effect (`settings § Fix a broken settings
   file`); in `-p` nothing is shown. The hook never fires. Casing counts: `preToolUse` is a typo.

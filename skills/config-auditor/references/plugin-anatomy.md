@@ -183,6 +183,7 @@ Blind spots it documents itself: a root `SKILL.md` of a plugin not sitting in a 
 | --- | --- |
 | `44-plugin-layout` | component directories inside `.claude-plugin/` |
 | `44-plugin-path` | path without `./`; path escaping the root; files in a default folder (`agents/`, `commands/`, `output-styles/`, `workflows/`, `themes/`, `monitors/`) not loaded because the field replaces it |
+| `44-plugin-agent-bare-name` | `subagent_type: <name>` in a command, skill or agent of the plugin, where `<name>` is an agent it ships: Claude Code registers `<plugin>:<name>` and answers the bare name "not found" [measured, 2.1.309 and 2.1.317; in 9 of 9 command runs the model used the scoped name from its first call, so NOTICE] |
 | `44-plugin-version` | `version` differing between `plugin.json` and `marketplace.json` |
 | `23-agent-frontmatter-keys` | `hooks`, `mcpServers`, `permissionMode` on a plugin agent |
 | `45-command-shadowed` | command/skill name clash; `name`/`paths` in a command file |

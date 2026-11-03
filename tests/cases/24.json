@@ -435,6 +435,52 @@
    ]
   },
   {
+   "id": "24-permissions-subkey-ask-and-deny",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"permissions\": {\"files\": {\"ask\": [\"Read(./.env)\"]}, \"bash\": {\"ask\": [\"Bash(git push *)\"], \"deny\": [\"Bash(rm *)\"]}}}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-subkey",
+     "WARN",
+     2
+    ],
+    [
+     "24-settings-unknown-subkey",
+     "NOTICE",
+     0
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "24-settings-unknown-subkey",
+     "Move them to .permissions\\.ask. as .Bash"
+    ]
+   ]
+  },
+  {
+   "id": "24-permissions-subkey-holds-deny",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/settings.json": "{\"permissions\": {\"bash\": {\"deny\": [\"Bash(rm *)\"]}, \"shell\": {\"allow\": [\"Bash(ls)\"]}}}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-subkey",
+     "WARN",
+     1
+    ],
+    [
+     "24-settings-unknown-subkey",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
    "id": "24-pluginconfigs-agents-md-project",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",

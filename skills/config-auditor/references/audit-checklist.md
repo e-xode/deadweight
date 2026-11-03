@@ -43,6 +43,7 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 ## Skills
 
 - `[AUTO 02-skill-frontmatter]` Frontmatter parses; `name` and `description` present.
+- `[AUTO 02-frontmatter-early-close]` No `---` before the closing line of a frontmatter, in a skill, agent, rule or command: Claude Code closes the frontmatter at the first `---` it meets, inside a value, quotes or a comment (2.1.309 for skills, agents, rules and commands; 2.1.317 for skills, an agent, a hook command and a comment line).
 - `[AUTO 02-skill-unknown-field]` No field outside the twenty documented ones — an unknown field is ignored without an error.
 - `[AUTO 02-skill-md-exists]` Every skill folder has a `SKILL.md`; no folder named `synced`, and no folder or `name` `anthropic-skills` / `anthropic-skills:*`, outside a plugin (reserved: ERROR); no `SKILL.md` in a category folder `.claude/skills/<category>/<skill>/` in a project (not loaded: WARN).
 - `[AUTO 03-skill-name-matches-folder]` `name` equals the folder name.
@@ -113,6 +114,7 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 
 ## Hooks
 
+- `[AUTO 35-hooks-skill-event]` A skill's frontmatter declares none of `PreCompact`, `PostCompact`, `SessionEnd`, `InstructionsLoaded`, `CwdChanged`, `SubagentStop`: accepted, never fired (measured 2.1.309 and 2.1.317; the docs list no such restriction).
 - `[AUTO 35-hooks-parse]` / `[AUTO 35-hooks-shape]` Valid JSON; known handler type with its required field; `onFailure` is `continue` or `block`, and `block` sits where it acts - a command or http hook, not on `Stop`/`SubagentStop`/`TaskCompleted`/`TeammateIdle`, not on an `async` one (NOTICE).
 - `[AUTO 35-hooks-event]` One of the thirty-three events.
 - `[AUTO 35-hooks-matcher]` No matcher on a matcherless event; no bare `mcp__<server>` (use `mcp__<server>__.*`); no permission rule (`Bash(git *)`) as a matcher or as one of its `|` alternatives (it goes in `if`).
@@ -133,7 +135,7 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 - `[AUTO 24-settings-statusline]` / `[AUTO 24-settings-output-style]` The script exists, `refreshInterval` ≥ 1; the style name matches exactly.
 - `[AUTO 42-permissions-conflict]` No rule both allowed and denied or asked.
 - `[AUTO 42-permissions-rule]` Allow rules name known tools, no unanchored glob, no `mcp__…(…)`, `:*` only at the end of a `Bash` or `PowerShell` pattern; a whole-tool `Agent` allow rule has no effect (NOTICE); a path rule never starts with `$HOME/`, which is not expanded (write `~/`); a removed tool (`TaskOutput`) approves nothing (WARN); `mcp__<server>` for a `.mcp.json` server whose name contains `__` or ends in `_` approves none of its tools - write `mcp__<server>__*` (WARN).
-- `[AUTO 24-settings-unknown-subkey]` Every field of a closed object (`attribution`, `permissions`…) is documented, and every field of a `modelSettings.<model>` entry. `"attribution": false` is valid since 2.1.281.
+- `[AUTO 24-settings-unknown-subkey]` Every field of a closed object (`attribution`, `permissions`…) is documented (WARN when the unknown subkey of `permissions` holds `deny` or `ask`: those rules never apply; measured for `deny` on 2.1.309 and 2.1.317, `ask` is the same mechanism, not measured), and every field of a `modelSettings.<model>` entry. `"attribution": false` is valid since 2.1.281.
 - `[AUTO 24-settings-value]` `autoCompactWindow`, at the top level or under `modelSettings.<model>`, is a number from `100000` to `1000000` (or `"auto"` under a model); otherwise a NOTICE - the page does not say what Claude Code does with another value.
 - `[AUTO 24-settings-unknown-key]` A key the reference lists as removed (`taskOutputMaxChars`, 2.1.277) has no effect (NOTICE).
 - `[MANUAL]` A rule the prose states and a setting can enforce is in the setting too — commit attribution first: a
@@ -149,6 +151,7 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 
 ## Plugins
 
+- `[AUTO 44-plugin-agent-bare-name]` A plugin's command, skill or agent asks for `subagent_type` by the bare name of an agent the plugin ships: Claude Code registers it as `<plugin>:<name>` (NOTICE; `claude --agent <bare name>` is the documented exception).
 - `[AUTO 44-plugin-layout]` No component directory inside `.claude-plugin/`.
 - `[AUTO 44-plugin-path]` Component paths start with `./` and stay inside the plugin (`workflows`, `themes`, `monitors` and their `experimental.` forms included since 0.26.0); a field that replaces a default directory (`agents`, `commands`, `outputStyles`, `workflows`, `experimental.themes`, `experimental.monitors`) lists every file in it.
 - `[AUTO 44-plugin-version]` `plugin.json` and the marketplace entry agree.

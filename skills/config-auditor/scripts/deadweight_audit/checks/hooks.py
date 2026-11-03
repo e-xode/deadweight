@@ -24,6 +24,7 @@ from ..vocabulary.hooks import (
     HOOK_TYPE_FIELDS,
     KNOWN_HOOK_EVENTS,
     MATCHERLESS_HOOK_EVENTS,
+    SKILL_FRONTMATTER_IGNORED_EVENTS,
 )
 from ..vocabulary.tools import KNOWN_TOOLS, TOOL_ALIASES
 
@@ -243,6 +244,13 @@ def check_hooks(ctx: AuditContext, report: Report) -> None:
         _audit_hooks(ctx, report, data.get("hooks") if isinstance(data, dict) else None, rel, path)
 
 
+_SKILL_EVENT_TEXT = (
+    "'{ev}' in the frontmatter hooks of '{rel}' is accepted and never fires: measured on a project "
+    "skill, Claude Code 2.1.309 and 2.1.317, where the same hook in settings.json fired in the same "
+    "session (the docs list no skill events; a plugin skill was not measured). Move it to "
+    ".claude/settings.json or to the plugin's hooks/hooks.json.")
+
+
 def check_frontmatter_hooks(ctx: AuditContext, report: Report) -> None:
     """Hooks declared in a skill's or an agent's frontmatter: the same checks as settings hooks."""
     root = ctx.root
@@ -280,6 +288,9 @@ def check_frontmatter_hooks(ctx: AuditContext, report: Report) -> None:
                     if not l.startswith(" "):
                         break
                     mm = re.match(r"^ {%d}([A-Za-z]+):" % ind, l)
+                    if mm and kind_ == "skill" and mm.group(1) in SKILL_FRONTMATTER_IGNORED_EVENTS:
+                        report.add("35-hooks-skill-event", "WARN", _SKILL_EVENT_TEXT.format(
+                            ev=mm.group(1), rel=p.relative_to(root)), str(p))
                     if mm and mm.group(1) not in KNOWN_HOOK_EVENTS:
                         report.add("35-hooks-event", "ERROR",
                                    f"'{mm.group(1)}' in the frontmatter hooks of '{p.relative_to(root)}' "
@@ -297,6 +308,10 @@ def check_frontmatter_hooks(ctx: AuditContext, report: Report) -> None:
         if kind_ == "agent" and isinstance(hooks, dict) and "Stop" in hooks:
             # "Claude Code converts a Stop hook here to SubagentStop" (hooks).
             hooks = {("SubagentStop" if e == "Stop" else e): v for e, v in hooks.items()}
+        if kind_ == "skill" and isinstance(hooks, dict):
+            for ev in sorted(set(hooks) & SKILL_FRONTMATTER_IGNORED_EVENTS):
+                report.add("35-hooks-skill-event", "WARN",
+                           _SKILL_EVENT_TEXT.format(ev=ev, rel=p.relative_to(root)), str(p))
         _audit_hooks(ctx, report, _frontmatter_flags(hooks), str(p.relative_to(root)), p)
     if foreign:
         shown = ", ".join(str(x.relative_to(root)) for x in foreign[:3])

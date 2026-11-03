@@ -595,6 +595,14 @@ NOT_IMPLEMENTED: dict[tuple[str, str], str] = {
     ("42-permissions-rule", "tested_home_variable"): "moves HOME, which hides the login the "
                                                      "binary needs",
     ("manual-rule-guards-creation", "tested"): "part of the result is the model's own account",
+    ("02-frontmatter-early-close", "tested"): "recorded by hand on 2.1.309 and 2.1.317; the runner has "
+                                              "no probe for it yet (the method is in `how`)",
+    ("35-hooks-skill-event", "tested"): "recorded by hand on 2.1.309 and 2.1.317; needs a stream-json "
+                                        "dialogue the runner cannot hold yet (one prompt at a time)",
+    ("44-plugin-agent-bare-name", "tested"): "recorded by hand; the call depends on the model, so a "
+                                             "pass or a fail would not say the harness changed",
+    ("24-settings-unknown-subkey", "tested_permissions_subkey"): "recorded by hand on 2.1.309 and "
+                                                                  "2.1.317; the runner has no probe for it yet",
 }
 
 

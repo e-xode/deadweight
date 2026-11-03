@@ -28,7 +28,8 @@ SETTINGS_KEYS_ANY = frozenset({
     "isolatePeerMachines", "keybindingFlavor", "language", "maxEffortLevel", "maxProseWidth", "minimumVersion",
     "model", "modelOverrides", "modelSettings", "otelHeadersHelper", "outputStyle",
     "permissions", "permissions.additionalDirectories", "permissions.allow", "permissions.ask",
-    "permissions.blockReadsOutsideWorkingDirectories", "permissions.defaultMode",
+    "permissions.blockReadsOutsideWorkingDirectories",
+    "permissions.blockWritesOutsideWorkingDirectories", "permissions.defaultMode",
     "permissions.deny", "permissions.disableBypassPermissionsMode", "plansDirectory",
     "prUrlTemplate", "preferredNotifChannel", "prefersReducedMotion", "promptCacheTtl",
     "promptSuggestionEnabled", "remote.defaultEnvironmentId", "remoteControlAtStartup",
@@ -127,7 +128,7 @@ SETTINGS_OBJECT_FIELDS = {
     "attribution": {"commit", "pr", "sessionUrl"},
     "autoMode": {"allow", "classifyAllShell", "environment", "hard_deny", "soft_deny"},
     "permissions": {"additionalDirectories", "allow", "ask", "blockReadsOutsideWorkingDirectories",
-                    "defaultMode", "deny", "disableAutoMode", "disableBypassPermissionsMode"},
+                    "blockWritesOutsideWorkingDirectories", "defaultMode", "deny", "disableAutoMode", "disableBypassPermissionsMode"},
     "policyHelper": {"path", "refreshIntervalMs", "timeoutMs"},
     "worktree": {"baseRef", "bgIsolation", "location", "sparsePaths", "symlinkDirectories"},
     # `allowNestedUserNamespaces`: "Added `sandbox.allowNestedUserNamespaces`" (Claude Code

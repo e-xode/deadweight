@@ -109,6 +109,11 @@ name also invokes it, and a plugin skill is `/<plugin>:<name>`
 `32-skill-name-shape` is a WARN: the spec's rejection applies when a skill is uploaded or packaged,
 and in a plugin the plugin's own `<name>:` prefix is removed before the test.
 
+**A `---` inside the frontmatter ends it.** **Measured, not documented** (Linux; 2.1.309 for skills, agents, rules and commands, 2.1.317 for skills, an agent, a hook command and a comment line): Claude Code closes the frontmatter at the
+first `---` after the opening line, wherever it stands — in a plain value (`description: Alpha---Beta` is read `Alpha`; `Beta…` becomes the first line of the body),
+in a quoted value (an unclosed quote: `claude plugin validate` says the YAML failed to parse and the skill loads with empty metadata), on a `----` line of a `|` block, or in a `# a---b` comment line.
+The same cut applies to agents (a cut that breaks the YAML left the agent unlisted, 2 runs), rules (`paths: src/a---b/**` is read `src/a`) and commands, and it cuts a hook command in two. `02-frontmatter-early-close` (WARN) reports it; the other checks still read to the first line that is exactly `---`.
+
 **Silent failures** — **doc**: a frontmatter block is read only when the opening `---` is the file's
 first line; if the YAML does not parse, the skill still loads "with no fields set", so `/name` works
 but Claude cannot match its description ([skills § Skill not triggering](https://code.claude.com/docs/en/skills)).

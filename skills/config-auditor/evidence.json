@@ -38,7 +38,7 @@
     "claude_code": "2.1.302",
     "system": "Linux",
     "how": "claude -p --model haiku --setting-sources project in an empty git repository holding .claude/agents/shop-reader.md, asked to call the Agent tool with that subagent; three agents: tools: TaskOutput / tools: Read, TaskOutput / tools: Read, Grep. One run each.",
-    "result": "tools: TaskOutput: \"Agent 'shop-reader' would be spawned with zero tools — refusing. Its tools list resolved to nothing: unrecognized [TaskOutput].\" tools: Read, TaskOutput: the agent listed Read alone. tools: Read, Grep: Read and Grep."
+    "result": "tools: TaskOutput: \"Agent 'shop-reader' would be spawned with zero tools \u2014 refusing. Its tools list resolved to nothing: unrecognized [TaskOutput].\" tools: Read, TaskOutput: the agent listed Read alone. tools: Read, Grep: Read and Grep."
    }
   },
   "43-mcp-credential-var": {
@@ -118,7 +118,7 @@
     "claude_code": "2.1.302",
     "system": "Linux",
     "how": "`claude mcp list` in an empty git repository whose .mcp.json holds a type sdk server and a stdio server; output filtered to those two names.",
-    "result": "\"[Warning] [shop-sdk] mcpServers.shop-sdk: Skipped — MCP server \\\"shop-sdk\\\" declares type \\\"sdk\\\", which only an SDK host application can register\"; the stdio server listed, pending approval."
+    "result": "\"[Warning] [shop-sdk] mcpServers.shop-sdk: Skipped \u2014 MCP server \\\"shop-sdk\\\" declares type \\\"sdk\\\", which only an SDK host application can register\"; the stdio server listed, pending approval."
    }
   },
   "44-plugin-path": {
@@ -177,7 +177,15 @@
    "documented_note": "Scope of this entry: the `sandbox` field allowNestedUserNamespaces, accepted since 0.28.0. The settings reference lists it from 2026-10-22 (read that day): scope \"User or managed\", \"Claude Code ignores a `true` in a project's `.claude/settings.json` or `.claude/settings.local.json`\"; sandboxing: \"which a repository can't turn on\", \"set ... in `~/.claude/settings.json`, not the project's `.claude/settings.json`. Requires Claude Code v2.1.305 or later\". A project file is therefore reported by 24-settings-scope, not as an unknown field.",
    "reported": [],
    "tested": null,
-   "tested_note": "Attempted 2026-10-21 on Claude Code 2.1.306, Linux: claude -p --model haiku --setting-sources project --no-session-persistence --strict-mcp-config --allowedTools Bash, sandbox.enabled and failIfUnavailable true, `unshare -U true` with and without the field. Not evidence either way: on that machine the sandbox does not start at all (apply-seccomp refused to write /proc/self/setgroups, for a plain `echo ok` too), so the field's effect was not observed."
+   "tested_note": "Attempted 2026-10-21 on Claude Code 2.1.306, Linux: claude -p --model haiku --setting-sources project --no-session-persistence --strict-mcp-config --allowedTools Bash, sandbox.enabled and failIfUnavailable true, `unshare -U true` with and without the field. Not evidence either way: on that machine the sandbox does not start at all (apply-seccomp refused to write /proc/self/setgroups, for a plain `echo ok` too), so the field's effect was not observed.",
+   "tested_permissions_subkey": {
+    "date": "2026-11-03",
+    "claude_code": "2.1.317",
+    "system": "Linux",
+    "how": "claude -p --model haiku --setting-sources project --strict-mcp-config --no-session-persistence --allowedTools Bash, a command `touch <file>` asked once per settings file: (a) permissions.deny [\"Bash(touch *)\"]; (b) permissions.bash.deny only; (c) permissions.bash{allow,requireApproval,deny} beside a valid permissions.deny; (d) an unknown top-level key beside a valid permissions.deny. First measured on 2.1.309 (2026-10-23).",
+    "result": "(a) refused. (b) the command ran, nothing on stderr. (c) refused: the unknown subkey voids its own rules, not the file or the block. (d) refused. `ask` under an unknown subkey: same mechanism, not measured. Interactive session (/doctor, startup screen): not measured."
+   },
+   "tested_permissions_subkey_note": "WARN for an unknown subkey of `permissions` holding `deny` or `ask`; NOTICE for any other unknown subkey. Measured for `deny` only."
   },
   "50-security-sandbox-weakened": {
    "documented": "https://code.claude.com/docs/en/sandboxing (Keep developers from widening the policy: \"Each one weakens the sandbox\"); https://code.claude.com/docs/en/settings-reference (sandbox.enableWeakerNestedSandbox, sandbox.enableWeakerNetworkIsolation)",
@@ -192,6 +200,46 @@
    "reported": [],
    "tested": null,
    "tested_note": "Not tested: the documented limit is not replayed against a model."
+  },
+  "02-frontmatter-early-close": {
+   "documented": "https://code.claude.com/docs/en/skills (frontmatter that does not parse loads the skill with no fields set); no page says where the frontmatter ends",
+   "documented_note": "Nothing documents the closing rule: the claim stands on the measurement. Documented only: a frontmatter that fails to parse leaves the skill loaded with empty metadata.",
+   "reported": [
+    "https://github.com/anthropics/claude-code/issues/103059"
+   ],
+   "tested": {
+    "date": "2026-11-03",
+    "claude_code": "2.1.317",
+    "system": "Linux",
+    "how": "claude -p --model haiku --setting-sources project --strict-mcp-config --no-session-persistence; skills, agent, rule and command with `---` in a plain value, in a quoted value, on a `----` line of a `|` block and in a YAML comment line; a hook command read from the injected message and from witness files; `claude plugin validate` on the quoted case. Measured on 2.1.309 (2026-10-23) for all of these; replayed on 2.1.317 (2026-11-03) for the skills, the hook command, the validator, the comment line and the agent only (rules and commands: 2.1.309 only).",
+    "result": "The frontmatter closes at the first `---` met, anywhere. A plain value is cut (`Alpha---Beta` is read `Alpha`), a hook command is cut (`touch w e---src` runs `touch w e`), a quoted value leaves an unclosed quote: `plugin validate` says the YAML failed to parse and the skill loads with empty metadata; an agent in that state was not listed (2 runs, 2.1.317). A rule losing `paths` and a hook never registered were seen on 2.1.309 only. Not measured: Windows, macOS, skills of a plugin, an agent whose YAML parses after the cut."
+   }
+  },
+  "35-hooks-skill-event": {
+   "documented": "https://code.claude.com/docs/en/hooks (Hooks in skills and agents); https://code.claude.com/docs/en/sub-agents (\"All hook events are supported\", for subagents only)",
+   "documented_note": "No page restricts the events of a skill's frontmatter hooks; the list of six stands on the measurement alone and can change without notice. Agents and the sixteen events the probe did not produce are not covered.",
+   "reported": [
+    "https://github.com/anthropics/claude-code/issues/103350"
+   ],
+   "tested": {
+    "date": "2026-11-03",
+    "claude_code": "2.1.317",
+    "system": "Linux",
+    "how": "claude -p --model haiku --setting-sources project --strict-mcp-config --no-session-persistence --input-format stream-json, a project skill and settings.json declaring each event once, one prompt at a time, `/compact` as a turn, a tool call after it. First measured on 2.1.309 (2026-10-23). Project skill only.",
+    "result": "Fired from the skill and from settings.json: PreToolUse, PostToolUse, PostToolUseFailure, PostToolBatch, UserPromptSubmit, UserPromptExpansion, Stop, MessageDisplay, SubagentStart, PreModelSwitch, PostModelSwitch. Fired from settings.json only, in the same session: PreCompact (manual, with and without matcher), PostCompact, SessionEnd, InstructionsLoaded, CwdChanged, SubagentStop. The skill's PreToolUse still fired after the compaction."
+   }
+  },
+  "44-plugin-agent-bare-name": {
+   "documented": "https://code.claude.com/docs/en/plugins-reference (an agent `reviewer` of plugin `deploy-tools` appears as `deploy-tools:reviewer`); https://code.claude.com/docs/en/sub-agents (`:` reserved for plugin-scoped names; `claude --agent <name>` accepts the bare name of a plugin agent)",
+   "documented_note": "The documented exception, `claude --agent <bare name>`, is not read by the check.",
+   "reported": [],
+   "tested": {
+    "date": "2026-11-03",
+    "claude_code": "2.1.317",
+    "system": "Linux",
+    "how": "claude -p --model haiku --setting-sources project --strict-mcp-config --no-session-persistence --plugin-dir and a plugin named <plugin>; (a) the Agent tool asked for `security-auditor` directly; (b) a plugin command whose text says `subagent_type: \"security-auditor\"`, run 1 time on 2.1.309 and 4 times each with Haiku and Sonnet on 2.1.317. First measured on 2.1.309 (2026-10-23).",
+    "result": "(a) \"Agent type 'security-auditor' not found. Available agents: ... <plugin>:security-auditor\"; the model then used the scoped name. (b) 9 of 9 runs used the scoped name from the first call, with no difference between Haiku and Sonnet; no failed call was seen. The instruction as written cannot succeed when the tool is called as written (a). A project agent of the same name would be reached instead: deduced, not measured."
+   }
   }
  }
 }

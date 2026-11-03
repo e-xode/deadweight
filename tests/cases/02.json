@@ -82,6 +82,69 @@
    ]
   },
   {
+   "id": "02-frontmatter-closed-early",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-plain/SKILL.md": "---\nname: shop-plain\ndescription: Alpha---Beta handle refunds in the shop checkout for customers.\nargument-hint: x---y\n---\n\nCorps.\n",
+    ".claude/skills/shop-quoted/SKILL.md": "---\nname: shop-quoted\ndescription: \"Alpha---Beta handle refunds in the shop checkout for customers.\"\n---\n\nCorps.\n",
+    ".claude/skills/shop-block/SKILL.md": "---\nname: shop-block\ndescription: |\n  Alpha\n  ----\n  Beta handle refunds in the shop checkout.\n---\n\nCorps.\n",
+    ".claude/agents/shop-reviewer.md": "---\nname: shop-reviewer\ndescription: Gamma---Delta review shop code changes for correctness.\n---\n\nCorps.\n",
+    ".claude/rules/shop-paths.md": "---\npaths: src/c---d/**\n---\n\nCorps.\n",
+    ".claude/commands/shop-run.md": "---\ndescription: Alpha---Beta run the shop checks.\n---\n\nCorps.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "02-frontmatter-early-close",
+     "WARN",
+     6
+    ]
+   ]
+  },
+  {
+   "id": "02-frontmatter-closed-early-comment-crlf-bom",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-comment/SKILL.md": "---\nname: shop-comment\n# note a---b\ndescription: Handle refunds in the shop checkout for customers.\n---\n\nCorps.\n",
+    ".claude/skills/shop-crlf/SKILL.md": "---\r\nname: shop-crlf\r\ndescription: Alpha---Beta handle refunds in the shop checkout.\r\n---\r\n\r\nCorps.\r\n",
+    ".claude/skills/shop-bom/SKILL.md": "﻿---\nname: shop-bom\ndescription: Alpha---Beta handle refunds in the shop checkout.\n---\n\nCorps.\n",
+    ".claude/skills/shop-closing/SKILL.md": "---\nname: shop-closing\ndescription: Handle refunds in the shop checkout for customers.\n----\n\nCorps.\n\n---\n\nSuite.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "02-frontmatter-early-close",
+     "WARN",
+     3
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "02-frontmatter-early-close",
+     "'name' in the frontmatter of '[^']*shop-comment"
+    ]
+   ]
+  },
+  {
+   "id": "02-frontmatter-closed-early-witnesses",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-dashes/SKILL.md": "---\nname: shop-dashes\ndescription: Alpha--Beta handle refunds in the shop checkout for customers.\n---\n\nCorps.\n",
+    ".claude/skills/shop-hr/SKILL.md": "---\nname: shop-hr\ndescription: Handle refunds in the shop checkout for customers.\n---\n\nUn.\n\n---\n\nDeux.\n",
+    ".claude/skills/shop-hr/references/notes.md": "---\ntitle: a---b\n---\n\nNotes.\n",
+    ".claude/rules/shop-plain.md": "Pas de frontmatter ici --- vraiment.\n",
+    ".claude/commands/shop-cut.md": "---\ndescription: Alpha---Beta run the shop checks.\n---\n\nCorps.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "02-frontmatter-early-close",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
    "id": "02-name-optional-in-project",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",

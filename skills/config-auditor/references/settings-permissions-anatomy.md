@@ -56,7 +56,11 @@ A key outside its scope is ignored; the table is not reproduced here, audit.py c
 
 - **`24-settings-unknown-key`** (NOTICE) — a key absent from the reference: a typo, or a key newer
   than the auditor; or a key the reference lists as removed (`taskOutputMaxChars`, "Removed in v2.1.277", no effect).
-- **`24-settings-unknown-subkey`** (NOTICE) — a field absent from a closed object (`attribution`,
+- **`24-settings-unknown-subkey`** (NOTICE; **WARN** when the unknown subkey is under `permissions` and holds
+  `deny` or `ask`) — [measured, 2.1.309 and 2.1.317, `claude -p`] `permissions.bash.deny: ["Bash(touch *)"]`
+  let `touch` run with nothing on stderr, while a valid `permissions.deny` beside an unknown subkey still
+  refused: the unknown subkey voids its own rules, not the block or the file. An unknown `allow` only gives fewer rights,
+  hence the NOTICE. Interactive start-up warning: not measured. — a field absent from a closed object (`attribution`,
   `permissions`, `autoMode`, `sandbox`, `statusLine`, `worktree`…), or from a `modelSettings.<model>`
   entry: ignored like a misspelt key, one level down. Freely keyed (`env`, `enabledPlugins`, `hooks`): not checked.
   `sandbox.allowNestedUserNamespaces` (changelog 2.1.305) is listed by the reference from 2026-10-22, scope "User or

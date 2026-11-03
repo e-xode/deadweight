@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 
+from .checks.agent_names import check_plugin_agent_bare_name
+from .checks.frontmatter_cut import check_frontmatter_early_close
 from .checks.agents import check_agent_frontmatter_validity, check_agents, check_agents_dir_skills
 from .checks.budget import (
     check_always_loaded_budget,
@@ -71,7 +73,7 @@ PROJECT_ONLY = (
 )
 
 
-PLUGIN_ONLY = ("check_plugin_cost", "check_plugin_manifest")
+PLUGIN_ONLY = ("check_plugin_cost", "check_plugin_manifest", "check_plugin_agent_bare_name")
 
 
 # The only things worth saying about a marketplace repository: what it is, and
@@ -176,6 +178,7 @@ def run_checks(ctx: AuditContext, report: Report) -> None:
     run(check_foreign_skill_mentions, ctx, report, skills)
     run(check_documented_flags, ctx, report)
     run(check_frontmatter_quoting, ctx, report)
+    run(check_frontmatter_early_close, ctx, report)
     run(check_all_relative_links, ctx, report)
     run(check_rule_globs, ctx, report)
     run(check_agent_frontmatter_validity, ctx, report, skills)
@@ -202,5 +205,6 @@ def run_checks(ctx: AuditContext, report: Report) -> None:
     run(check_settings_semantics, ctx, report)
     run(check_mcp, ctx, report)
     run(check_plugin_manifest, ctx, report)
+    run(check_plugin_agent_bare_name, ctx, report)
     run(check_companions, ctx, report, skills)
     run(check_runtime_loads, ctx, report)

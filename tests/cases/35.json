@@ -617,6 +617,56 @@
    ]
   },
   {
+   "id": "35-skill-event-all-six",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-six/SKILL.md": "---\nname: shop-six\ndescription: Register every measured silent hook of the shop checkout.\nhooks:\n  PreCompact:\n    -         - type: command\n          command: \"echo PreCompact\"\n  PostCompact:\n    -         - type: command\n          command: \"echo PostCompact\"\n  SessionEnd:\n    -         - type: command\n          command: \"echo SessionEnd\"\n  InstructionsLoaded:\n    -         - type: command\n          command: \"echo InstructionsLoaded\"\n  CwdChanged:\n    -         - type: command\n          command: \"echo CwdChanged\"\n  SubagentStop:\n    -         - type: command\n          command: \"echo SubagentStop\"\n---\n\nCorps.\n",
+    ".claude/skills/shop-flow/SKILL.md": "---\nname: shop-flow\ndescription: Register a silent hook in flow style for the shop checkout.\nhooks:\n  PreCompact: [{hooks: [{type: command, command: \"echo x\"}]}]\n---\n\nCorps.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-skill-event",
+     "WARN",
+     7
+    ]
+   ]
+  },
+  {
+   "id": "35-skill-event-never-fires",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-compact/SKILL.md": "---\nname: shop-compact\ndescription: Save shop checkout notes before the context is compacted.\nhooks:\n  PreCompact:\n    - hooks:\n        - type: command\n          command: \"echo PreCompact\"\n  SessionEnd:\n    - hooks:\n        - type: command\n          command: \"echo end\"\n---\n\nCorps.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-skill-event",
+     "WARN",
+     2
+    ]
+   ]
+  },
+  {
+   "id": "35-skill-event-witnesses",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-tool/SKILL.md": "---\nname: shop-tool\ndescription: Log shop checkout tool calls while the skill is active.\nhooks:\n  PreToolUse:\n    - hooks:\n        - type: command\n          command: \"echo PreToolUse\"\n---\n\nCorps.\n",
+    ".claude/skills/shop-notify/SKILL.md": "---\nname: shop-notify\ndescription: Notify the shop team while the skill is active.\nhooks:\n  Notification:\n    - hooks:\n        - type: command\n          command: \"echo Notification\"\n---\n\nCorps.\n",
+    ".claude/skills/shop-cwd/SKILL.md": "---\nname: shop-cwd\ndescription: Track the shop working directory while the skill is active.\nhooks:\n  CwdChanged:\n    - hooks:\n        - type: command\n          command: \"echo CwdChanged\"\n---\n\nCorps.\n",
+    ".claude/agents/shop-agent.md": "---\nname: shop-agent\ndescription: Review shop code changes for correctness before merge.\nhooks:\n  PreCompact:\n    - hooks:\n        - type: command\n          command: \"echo PreCompact\"\n---\n\nCorps.\n",
+    ".claude/settings.json": "{\"hooks\": {\"PreCompact\": [{\"hooks\": [{\"type\": \"command\", \"command\": \"echo x\"}]}]}}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-skill-event",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
    "id": "35-timeout-async-and-severity",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",

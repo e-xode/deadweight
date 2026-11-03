@@ -284,6 +284,49 @@ def frontmatter_yaml_error(text: str) -> str | None:
     return None
 
 
+def frontmatter_cut(text: str) -> dict | None:
+    """Where Claude Code closes the frontmatter early, or None.
+
+    Measured, Claude Code 2.1.309 (2026-10-23; skills, agents, rules, commands) and 2.1.317
+    (2026-11-03; skills, an agent, a comment line, a hook command): the frontmatter ends at the
+    FIRST `---` met after the opening line, wherever it stands - inside a plain value, inside
+    quotes, on an indented `----` line of a `|` block, in a `# a---b` comment. Every reader in
+    this package closes on the first LINE that is exactly `---`, so none of them sees the cut.
+    A line that STARTS with `---` (the closing line itself, or `----`) closes the frontmatter
+    where the readers expect it: not a cut. Returns the line (1-based) and column of the first
+    `---` inside, the top-level key it cuts (None for a comment line), what Claude Code reads of
+    that key, the keys it never reads, and the reason the rest no longer parses (or None).
+    """
+    text = text.removeprefix(BOM)
+    if not text.startswith("---"):
+        return None
+    lines = text.splitlines()
+    cut = next((i for i in range(1, len(lines)) if "---" in lines[i]), None)
+    if cut is None or lines[cut].startswith("---"):
+        return None
+    end = next((i for i in range(cut + 1, len(lines)) if lines[i].strip() == "---"), None)
+    if end is None:
+        end = len(lines)
+    col = lines[cut].index("---")
+    comment = lines[cut].lstrip().startswith("#")
+    kept = lines[1:cut] + [lines[cut][:col]]
+    key = None
+    if not comment:
+        for j in range(cut, 0, -1):
+            m = re.match(r"^([A-Za-z_][A-Za-z0-9_-]*)\s*:", lines[j])
+            if m:
+                key = m.group(1)
+                break
+    lost = [m.group(1) for raw in lines[cut + 1:end]
+            if (m := re.match(r"^([A-Za-z_][A-Za-z0-9_-]*)\s*:", raw))]
+    synthetic = "---\n" + "\n".join(kept) + "\n---\n"
+    data, _ = parse_frontmatter(synthetic)
+    return {"line": cut + 1, "col": col, "key": key, "comment": comment,
+            "read": (data or {}).get(key, "") if key else "",
+            "kept_line": lines[cut][:col].strip(),
+            "lost": lost, "error": frontmatter_yaml_error(synthetic)}
+
+
 def frontmatter_keys(text: str) -> list[str]:
     """Top-level frontmatter keys, in file order."""
     text = text.removeprefix(BOM)

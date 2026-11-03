@@ -137,11 +137,24 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
             fields = SETTINGS_OBJECT_FIELDS.get(key)
             if fields and isinstance(data[key], dict):
                 for sub in sorted(set(data[key]) - fields):
-                    report.add("24-settings-unknown-subkey", "NOTICE",
+                    # Measured, Claude Code 2.1.309 (`claude -p`, 2026-10-23): a
+                    # `permissions.bash.deny` let the command run, with nothing on stderr; a valid
+                    # `permissions.deny` beside it still refused. The unknown subkey voids its own
+                    # rules only. Refusals that do nothing are not the same as an `allow` that does
+                    # nothing (fewer rights): WARN for `deny`/`ask`, NOTICE otherwise.
+                    inner = data[key][sub]
+                    held = sorted({"deny", "ask"} & set(inner)) if isinstance(inner, dict) else []
+                    extra = (f" It holds {' and '.join('`' + h + '`' for h in held)}: those rules "
+                             "are never checked (measured on 2.1.309 and 2.1.317 for `deny`: a "
+                             "`permissions.bash.deny` let the command run; `ask` is the same mechanism, "
+                             "not measured). Move each list to the field of the same name "
+                             f"(`{key}.deny`, `{key}.ask`) as rules of the form `Tool(specifier)`, "
+                             "for example `Bash(rm *)`.") if key == "permissions" and held else ""
+                    report.add("24-settings-unknown-subkey", "WARN" if extra else "NOTICE",
                                f"'{key}.{sub}' in '{name}' is not a field of `{key}` in the "
                                f"settings reference ({', '.join(sorted(fields))}): it is ignored "
-                               "without a word, so whatever it was meant to turn off stays on.",
-                               str(path))
+                               "without a word, so whatever it was meant to turn off stays on."
+                               + extra, str(path))
             inner_fields = SETTINGS_MAP_FIELDS.get(key)
             if inner_fields and isinstance(data[key], dict):
                 for entry_name, entry in sorted(data[key].items()):

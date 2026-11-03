@@ -88,3 +88,15 @@ HOOK_PLUGIN_ROOT_VARS = ("${CLAUDE_PLUGIN_ROOT}", "$CLAUDE_PLUGIN_ROOT")
 
 
 HOOK_PROJECT_DIR_VARS = ("${CLAUDE_PROJECT_DIR}", "$CLAUDE_PROJECT_DIR")
+
+
+# Events a hook declared in a SKILL's frontmatter accepts and never fires. Measured, Claude
+# Code 2.1.309 and again 2.1.317 (Linux, `claude -p`, 2026-10-23 and 2026-11-03, a project skill, matcher or none): the same
+# event declared in settings.json fired in the same session, the skill's did not, while the
+# skill's PreToolUse kept firing after a compaction. The docs ("Hooks in skills and agents")
+# list no restriction, so this is a measurement on one version, not a rule: the list holds
+# only the six measured silent; the sixteen events not produced in the probe are absent.
+SKILL_FRONTMATTER_IGNORED_EVENTS = frozenset({
+    "PreCompact", "PostCompact", "SessionEnd", "InstructionsLoaded", "CwdChanged",
+    "SubagentStop",
+})

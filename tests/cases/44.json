@@ -137,6 +137,65 @@
    ]
   },
   {
+   "id": "44-plugin-agent-by-bare-name",
+   "files": {
+    ".claude-plugin/plugin.json": "{\"name\": \"shop-kit\", \"version\": \"1.0.0\", \"description\": \"Shop review kit.\"}",
+    "agents/reviewer.md": "---\nname: reviewer\ndescription: Review shop code changes for correctness before merge.\n---\n\nCorps.\n",
+    "agents/review/security.md": "---\nname: security\ndescription: Review shop code changes for security before merge.\n---\n\nCorps.\n",
+    "commands/run.md": "---\ndescription: Run the shop review.\n---\n\nUse the Agent tool with `subagent_type: \"reviewer\"`, then `subagent_type: security`.\n",
+    "README.md": "Call `subagent_type: reviewer` from your own code.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "44-plugin-agent-bare-name",
+     "NOTICE",
+     2
+    ]
+   ]
+  },
+  {
+   "id": "44-plugin-agent-skills-agents-duplicate",
+   "files": {
+    ".claude-plugin/plugin.json": "{\"name\": \"shop-kit\", \"version\": \"1.0.0\", \"description\": \"Shop review kit.\"}",
+    "agents/review/security.md": "---\nname: security\ndescription: Review shop code changes for security before merge.\n---\n\nCorps.\n",
+    "agents/general-purpose.md": "---\nname: general-purpose\ndescription: Review shop code changes in general before merge.\n---\n\nCorps.\n",
+    "skills/shop-run/SKILL.md": "---\nname: shop-run\ndescription: Run the shop review through the Agent tool with subagent_type: security, then again with subagent_type: security.\n---\n\nCorps.\n",
+    "agents/lead.md": "---\nname: lead\ndescription: Lead the shop review.\n---\n\nDelegate with `subagent_type: security` and `subagent_type: general-purpose`.\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "44-plugin-agent-bare-name",
+     "NOTICE",
+     2
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "44-plugin-agent-bare-name",
+     "shop-kit:security'"
+    ]
+   ]
+  },
+  {
+   "id": "44-plugin-agent-witnesses",
+   "files": {
+    ".claude-plugin/plugin.json": "{\"name\": \"shop-kit\", \"version\": \"1.0.0\", \"description\": \"Shop review kit.\"}",
+    "agents/reviewer.md": "---\nname: reviewer\ndescription: Review shop code changes for correctness before merge.\n---\n\nCorps.\n",
+    "commands/run.md": "---\ndescription: Run the shop review.\n---\n\n`subagent_type: \"shop-kit:reviewer\"`, `subagent_type: general-purpose`, `subagent_type: host-auditor`.\n",
+    "commands/bare.md": "---\ndescription: Run the bare review.\n---\n\n`subagent_type: reviewer`\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "44-plugin-agent-bare-name",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
    "id": "44-skills-dot",
    "files": {
     ".claude-plugin/plugin.json": "{\"name\": \"shop-kit\", \"version\": \"1.0.0\", \"skills\": \".\"}\n",
