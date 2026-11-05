@@ -128,7 +128,7 @@ Then, in a fresh session, confirm what the harness actually loaded — `audit.py
 ## Settings and permissions
 
 - `[AUTO 24-settings-parse]` Valid JSON object.
-- `[AUTO 24-settings-scope]` No key outside its documented scope, nested keys (`sandbox.*`) included; no opt-out `false` the shared file cannot set.
+- `[AUTO 24-settings-scope]` No key outside its documented scope, nested keys (`sandbox.*`) included; no opt-out `false` the shared file cannot set. No `env` entry a project's settings cannot set (`XDG_*`, `CLAUDE_CODE_TMPDIR`, the OpenTelemetry exporter variables...): Claude Code drops it, with a warning under `--debug` (an interactive session also notes the telemetry group; `-p` shows none).
 - `[AUTO 24-settings-default-mode]` No `bypassPermissions` / `auto` default mode in a project file.
 - `[AUTO 24-settings-env]` No credential or request-routing variable in the shared file.
 - `[AUTO 24-settings-local]` `settings.local.json` ignored by the repository's git rules.

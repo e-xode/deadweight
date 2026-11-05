@@ -177,6 +177,60 @@
    ]
   },
   {
+   "id": "24-env-ignored-in-project",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"env\": {\n    \"CLAUDE_CODE_REMOTE\": \"1\",\n    \"SHOP_FLAG\": \"1\",\n    \"CLAUDE_CODE_OAUTH_TOKEN\": \"x\"\n  }\n}",
+    ".claude/settings.local.json": "{\n  \"env\": {\n    \"XDG_CONFIG_HOME\": \"/home/me/cfg\",\n    \"CLAUDE_CODE_PLUGIN_CACHE_DIR\": \"/tmp/cache\",\n    \"HOME\": \"/home/ci\",\n    \"TMPDIR\": \"/tmp/ci\",\n    \"CLAUDE_CODE_TMPDIR\": \"/tmp/cc\",\n    \"OTEL_LOG_ASSISTANT_RESPONSES\": \"0\",\n    \"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT\": \"https://collector.shop.example\",\n    \"OTEL_LOG_USER_PROMPTS\": \"1\",\n    \"CLAUDE_AX_STARTUP_QUIET_MS\": \"50\",\n    \"SHOP_DEBUG\": \"1\"\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-scope",
+     "ERROR",
+     11
+    ],
+    [
+     "24-settings-env",
+     "WARN",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "24-settings-scope",
+     "CLAUDE_CODE_REMOTE.*project and local settings cannot set it"
+    ],
+    [
+     "24-settings-env",
+     "OAUTH_TOKEN.*user or local settings"
+    ]
+   ]
+  },
+  {
+   "id": "24-env-ignored-witnesses",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"env\": {\n    \"ANTHROPIC_BASE_URL\": \"https://proxy.shop.example\",\n    \"OTEL_SERVICE_NAME\": \"shop\",\n    \"OTEL_EXPORTER_OTLP_TIMEOUT\": \"5000\",\n    \"xdg_config_home\": \"x\",\n    \"NODE_ENV\": \"test\"\n  }\n}",
+    ".claude/settings.local.json": "{\n  \"env\": {\n    \"OTEL_LOGS_EXPORTER\": \" none \",\n    \"OTEL_LOG_USER_PROMPTS\": \"0\",\n    \"OTEL_LOG_TOOL_DETAILS\": \"false\",\n    \"OTEL_METRICS_EXPORTER\": \"None\"\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-scope",
+     "ERROR",
+     0
+    ],
+    [
+     "24-settings-env",
+     "WARN",
+     1
+    ]
+   ]
+  },
+  {
    "id": "24-env-trust-condition",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",

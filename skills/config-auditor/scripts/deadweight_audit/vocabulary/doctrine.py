@@ -1,6 +1,6 @@
 """The doctrine check 46 compares against: this plugin's reference names and code terms, frozen.
 
-GENERATED on 2026-11-03 from skills/config-auditor/references/ - do not edit by hand.
+GENERATED on 2026-11-05 from skills/config-auditor/references/ - do not edit by hand.
 Frozen rather than read at run time: a reference page added to the plugin changed findings in
 consuming projects while the auditor's sha stayed the same. Regenerating it is a deliberate change
 of the auditor, and moves its sha.
@@ -28,7 +28,7 @@ DOCTRINE_REFERENCE_NAMES = frozenset({
     'skill-runtime-mechanisms.md',
 })
 
-# 1396 code terms (text between backticks, 2 to 60 characters; generic repository folders,
+# 1408 code terms (text between backticks, 2 to 60 characters; generic repository folders,
 # extension globs, credential env names and fragments between two code spans left out).
 DOCTRINE_CODE_TERMS = frozenset({
     '!~/…',
@@ -101,6 +101,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     '(@docs/x.md)',
     '**',
     '**/',
+    '**/*.ts, **/*.tsx',
     '**/*.{css,scss}',
     '**/.claude/settings.local.json',
     '**/src/**',
@@ -285,6 +286,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     '1000000',
     '12-no-code-comments',
     '13-no-global-scripts',
+    '14-ondemand-file-size',
     '14-rule-code-comments',
     '14-rule-english-only',
     '14-rule-no-paths',
@@ -473,6 +475,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     'Beta…',
     'CLAUDE.local.md',
     'CLAUDE.md',
+    'CLAUDE_AX_*',
     'CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1',
     'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
     'CLAUDE_CODE_DISABLE_AUTO_MEMORY=1',
@@ -483,8 +486,13 @@ DOCTRINE_CODE_TERMS = frozenset({
     'CLAUDE_CODE_MAX_MCP_DESCRIPTION_LENGTH',
     'CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH',
     'CLAUDE_CODE_OAUTH_TOKEN',
+    'CLAUDE_CODE_PLUGIN_CACHE_DIR',
+    'CLAUDE_CODE_PROCESS_WRAPPER',
+    'CLAUDE_CODE_REMOTE',
+    'CLAUDE_CODE_RESTRICTED',
     'CLAUDE_CODE_SUBAGENT_MODEL',
     'CLAUDE_CODE_SUBAGENT_MODEL_FORCE',
+    'CLAUDE_CODE_TMPDIR',
     'CLAUDE_CONFIG_DIR',
     'CLAUDE_PLUGIN_OPTION_<KEY>',
     'CLAUDE_PLUGIN_ROOT',
@@ -602,6 +610,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     'Write',
     'Write|Edit(*.ts)',
     'XDG_*',
+    'XDG_CONFIG_HOME',
     '[".git"]',
     '["src/api"]',
     '[...]',
@@ -824,6 +833,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     'cat',
     'cat src/api/existing.ts',
     'cc-plugin-agents-md@builtin',
+    'chat.includeApplyingInstructions',
     'chat.useAgentsMdFile',
     'chat.useClaudeMdFile',
     'chat.useNestedAgentsMdFiles',
@@ -1123,6 +1133,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     'no-matching-tag',
     'node <missing>.js',
     'nohup',
+    'none',
     'not configured',
     'npm',
     'npm run shop:seed',
@@ -1309,6 +1320,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     'src/api/refunds.ts',
     'src/api/schema/',
     'src/billing/',
+    'src/billing/CLAUDE.md',
     'src/checkout/cart.js',
     'src/seo.config.js',
     'sse',

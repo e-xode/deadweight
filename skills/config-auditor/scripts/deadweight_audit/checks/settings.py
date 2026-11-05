@@ -14,6 +14,13 @@ from ..report import Report
 from ..vocabulary.frontmatter import AUTO_COMPACT_WINDOW_MAX, AUTO_COMPACT_WINDOW_MIN
 from ..vocabulary.hooks import HOOK_PROJECT_DIR_VARS
 from ..vocabulary.settings import (
+    ENV_IGNORED_EVERYWHERE,
+    ENV_IGNORED_PROJECT_NAMES,
+    ENV_IGNORED_PROJECT_OTLP_SUFFIXES,
+    ENV_IGNORED_PROJECT_PREFIXES,
+    ENV_OFF_VALUE_CONTENT,
+    ENV_OFF_VALUE_SELECTORS,
+    ENV_OFF_WORDS,
     BUILTIN_OUTPUT_STYLES,
     PROJECT_SCOPE_IGNORED_MODES,
     SETTINGS_KEYS_GLOBAL,
@@ -32,6 +39,29 @@ from ..vocabulary.settings import (
 )
 from ..vocabulary.tools import KNOWN_TOOLS, TOOL_ALIASES, TOOL_REMOVED
 
+
+
+def _env_ignored(var: str, value) -> str | None:
+    """Why a settings file's `env` entry is dropped, or None.
+
+    "project and local settings can't set variables that a checked-out repository shouldn't control"
+    (settings-reference, "Variables Claude Code ignores in env"); a few are ignored from every file.
+    The telemetry OFF values still apply from a project: `none` for the three exporter selectors and
+    an off value for three content variables. Names are exact: on POSIX they are case-sensitive.
+    """
+    if var == "CLAUDE_AX_SCREEN_READER":
+        return None                      # reported by its own, older message
+    if var in ENV_IGNORED_EVERYWHERE:
+        return "everywhere"
+    text = str(value).strip().lower() if value is not None else ""
+    if var in ENV_OFF_VALUE_SELECTORS and text == "none":
+        return None
+    if var in ENV_OFF_VALUE_CONTENT and text in ENV_OFF_WORDS:
+        return None
+    if (var in ENV_IGNORED_PROJECT_NAMES or var.startswith(ENV_IGNORED_PROJECT_PREFIXES)
+            or (var.startswith("OTEL_EXPORTER_OTLP_") and var.endswith(ENV_IGNORED_PROJECT_OTLP_SUFFIXES))):
+        return "project"
+    return None
 
 def check_settings_scope(ctx: AuditContext, report: Report) -> None:
     """Settings keys that are silently ignored at project scope, and dangling overrides."""
@@ -249,6 +279,22 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                        "reader mode takes effect from the flag, your shell environment or user settings "
                        "only; a project cannot turn it on or off (accessibility).",
                        str(path))
+        env_all = data.get("env")
+        if isinstance(env_all, dict):
+            for var in sorted(env_all):
+                why = _env_ignored(var, env_all[var])
+                if why:
+                    where = ("any settings file: Claude Code reads it from the launch environment only, or sets it itself"
+                             if why == "everywhere" else
+                             "your shell, user settings, a `--settings` file or managed settings")
+                    report.add("24-settings-scope", "ERROR",
+                               f"'env.{var}' in '{name}' is dropped: " +
+                               ("no settings file can set it" if why == "everywhere" else
+                                "project and local settings cannot set it (a repository should not control it)") +
+                               f". It takes effect from {where} only. The warning is in `claude --debug` (an interactive session also notes the telemetry "
+                               "group); a `-p` run shows none (settings-reference, \"Variables Claude Code ignores in env\"; "
+                               "measured 2026-11-05 on 2.1.318).",
+                               str(path))
         if shared:
             for key in ("enableAllProjectMcpServers", "enabledMcpjsonServers"):
                 if key in data:
@@ -267,7 +313,9 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                                    "workspace is trusted - or at once in a `-p` run, which shows "
                                    "no trust dialog - its requests or credentials go where this "
                                    "file says (settings-reference, env; Check Point Research, "
-                                   "CVE-2026-21852). Keep it in user or local settings.", str(path))
+                                   "CVE-2026-21852). Keep it in " + ("user settings: project and local settings drop it"
+                                                              if _env_ignored(var, env[var]) else
+                                                              "user or local settings") + ".", str(path))
         else:
             # Asked of git, not of `root / ".git"`: audited from a subfolder of a repository,
             # a committed file read as "not ignored", and a machine without git crashed the
@@ -386,7 +434,9 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                                    f"{kind} rule '{rule}' in '{name}': a single leading `/` is "
                                    "\"relative to the settings source\", not the filesystem root - "
                                    f"'{m_rw.group(2)}' is looked up under {_settings_source(name)}. "
-                                   f"For an absolute path write {m_rw.group(1)}({fixed}) (permissions).",
+                                   f"For an absolute path write {m_rw.group(1)}({fixed}). A rule in a file passed with "
+                                   "`claude --settings <file>` anchors at that file's folder instead, which this "
+                                   "audit does not see (permissions, \"Where a pattern anchors\").",
                                    str(path))
                     if rule.startswith("mcp__") and "(" in rule:
                         report.add("42-permissions-rule", "ERROR",

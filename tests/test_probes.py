@@ -181,6 +181,8 @@ class FakeClaude:
                     if blocks else "README.md")
             return done(stream(init(), tool_use("Bash", command="ls"),
                                tool_result(text, error=blocks), result()))
+        if "DW_PROBE_CONTROL" in prompt:
+            return self.env_ignored(settings)
         if "git status" in prompt:
             rule = settings["permissions"]["deny"][0]
             denied = (rule == "Bash(git status)") if self.recorded else True
@@ -188,6 +190,13 @@ class FakeClaude:
             events += [tool_result("denied", error=True)] if denied else [tool_result("clean")]
             return done(stream(*events, result(denials=[{"tool_name": "Bash"}] if denied else [])))
         return done(stream(init(), result("I do not know this probe")))
+
+    def env_ignored(self, settings: dict) -> subprocess.CompletedProcess:
+        """As recorded, only the control variable of a project's env reaches the shell; `opposite` lets all three through."""
+        env = settings["env"]
+        seen = {k: v for k, v in env.items() if not self.recorded or k == "DW_PROBE_CONTROL"}
+        text = "\n".join(f"{k}={v}" for k, v in seen.items()) + "\nEND"
+        return done(stream(init(), tool_use("Bash", command="env | grep"), tool_result(text), result()))
 
     def matcher(self, settings: dict) -> subprocess.CompletedProcess:
         def fires(matcher: str, tool: str) -> bool:

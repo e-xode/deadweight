@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.33.0 — 2026-11-05
+
+**`audit.py` changed: floors set with 0.32.0 no longer compare** (`34-floor` refuses two auditors). Run `audit.py --set-floor` once and commit `floor.json`. What can **raise** a count: a `24-settings-scope` ERROR for each entry of a project's or local `env` block that Claude Code drops (see Added); nothing else. What can **lower** one: nothing. The message of `42-permissions-path-anchor` gains a sentence, with no change of count. The regenerated vocabulary of check 46 gains 12 terms (1,408), literal examples from the new and re-read references. Measured on the 21 repositories of one workspace (read-only, 2026-11-05): no repository has such an `env` entry, so no finding changes anywhere.
+
+### Added
+
+- **`24-settings-scope` (ERROR) for `env` entries a project cannot set** (`checks/settings.py`, `vocabulary/settings.py`). The settings reference lists variables that "project and local settings can't set" (where Claude Code writes its files: `XDG_*`, `CLAUDE_CODE_TMPDIR`...; the OpenTelemetry exporter variables; start-up, sync and sign-in variables; `CLAUDE_AX_*`), and a few ignored from every file. Claude Code drops each one and "logs a warning you can see with `claude --debug`". Measured on 2.1.318 (Linux, Haiku, one run each): `XDG_CONFIG_HOME`, `CLAUDE_CODE_TMPDIR` and `CLAUDE_CODE_PLUGIN_CACHE_DIR` in a project's `env` did not reach a shell command while a control variable did; `--debug` logged one warning per variable; a `-p` run printed nothing. The telemetry off values (`none`, `0`/`false`/`no`/`off` for the three content variables) still apply and are not flagged. The check does not read the Claude Code version: on a release before the version that began ignoring a group (2.1.251, 2.1.282, 2.1.290 and others, per the documentation), the variable may still have applied. Two corpus cases (`24-env-ignored-in-project`, `24-env-ignored-witnesses`) and a replayable probe (`probes/run_probes.py`, `24-settings-env-ignored`).
+- A reported `claude plugin validate --strict` failure on an unquoted `argument-hint` was read: on 2.1.318 with a one-command fixture the quoted and the unquoted forms give the same output (a missing `author` warning, which `--strict` turns into exit 1) and the validator does not mention the frontmatter. It does not read a command's frontmatter in that fixture; not claimed beyond it.
+
+### Changed
+
+- `42-permissions-path-anchor` says that a rule in a file passed with `claude --settings <file>` anchors at that file's folder, which the audit cannot see (permissions, "Where a pattern anchors"). A limit of the check, not a defect of the rule.
+- `references/claude-md-anatomy.md` states the per-file limit of a subdirectory `CLAUDE.md` (40,000 characters on a 200K window, v2.1.309) beside the 4 MiB line, which an eval showed models applying to every `CLAUDE.md`.
+- `evals/`: six cases for the 0.30.0 to 0.32.0 checks, a severity variant for the bare agent name, and a narrower criterion for `on-demand-file-over-limit`; `evals/PROVENANCE.md` gives the runs.
+
+### Not done
+
+- Windows variable names (`SystemRoot`, `ComSpec`, `ProgramFiles`...) are matched with the documentation's spelling; Windows folds the case of environment names and the check does not (how Claude Code matches them on Windows is not verified).
+- A nested plugin manifest (`.claude-plugin/plugin.json` beside a root one; anthropics/claude-code#106574): the report is about the claude.ai personal-marketplace sync, a size or file-count limit its author did not prove; nothing to measure with the local binary, no rule.
+
 ## 0.32.0 — 2026-11-03
 
 **`audit.py` changed: floors set with 0.31.0 no longer compare** (`34-floor` refuses two auditors). Run `audit.py --set-floor` once and commit `floor.json`. What can **raise** a count: the new `54-agents-md-import` NOTICE, only in a repository that has an `AGENTS.override.md` not ignored by git (the signal that Codex reads it), for each `AGENTS.md` or `AGENTS.override.md` that holds an `@path` import outside code and comments. Not counted: an `AGENTS.md` whose folder also holds a non-ignored `AGENTS.override.md` (Codex reads one file per folder, the override), and an `AGENTS.override.md` that no `CLAUDE.md` imports (Claude Code does not read it, so nothing diverges; `54-agents-md-variant` already reports it). Nothing lowers a count. Measured on the 21 repositories of one workspace (the 0.31.0 and 0.32.0 auditors run on each, read-only, 2026-11-03): no finding changes anywhere.

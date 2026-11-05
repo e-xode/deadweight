@@ -9,7 +9,7 @@
 
 Contents: [Files and surfaces](#files-and-surfaces) · [Instructions frontmatter](#instructions-frontmatter) · [Prompts and custom agents](#prompts-and-custom-agents) · [Precedence](#precedence) · [What Copilot reads from a Claude Code configuration](#what-copilot-reads-from-a-claude-code-configuration) · [What audit.py checks, and what it does not](#what-auditpy-checks-and-what-it-does-not)
 
-Verified against the docs on 2026-09-28.
+Verified against the docs on 2026-09-28; VS Code pages re-read on 2026-11-05.
 
 Sources read for this page, official domains only (docs.github.com, code.visualstudio.com,
 github.blog/changelog). Each fact below names its short label in parentheses:
@@ -21,7 +21,9 @@ github.blog/changelog). Each fact below names its short label in parentheses:
 - **create-custom-agents** — https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/create-custom-agents
 - **agents-configuration** — https://docs.github.com/en/copilot/reference/custom-agents-configuration
 - **code-review-tutorial** — https://docs.github.com/en/copilot/tutorials/customize-code-review
-- **vscode-instructions** — https://code.visualstudio.com/docs/agent-customization/custom-instructions
+- **vscode-instructions** — https://code.visualstudio.com/docs/agent-customization/custom-instructions (rewritten as a how-to by 2026-11-05; formats, frontmatter, activation and settings moved to the next page)
+- **vscode-instructions-reference** — https://code.visualstudio.com/docs/agents/reference/custom-instructions-reference
+- **vscode-ai-settings** — https://code.visualstudio.com/docs/agents/reference/ai-settings (setting descriptions and their default values)
 - **vscode-custom-agents** — https://code.visualstudio.com/docs/agent-customization/custom-agents (the former custom-chat-modes address redirects there)
 - **vscode-agent-file-reference** — https://code.visualstudio.com/docs/agents/reference/custom-agent-file-reference
 - **changelog-agents-md** — https://github.blog/changelog/2025-08-28-copilot-coding-agent-now-supports-agents-md-custom-instructions/
@@ -43,7 +45,8 @@ another, with no error anywhere.
 
 `.github/copilot-instructions.md`: "These are specified in a `copilot-instructions.md` file in
 the `.github` directory of the repository" (repo-instructions). The VS Code page locates and
-names it identically for "project-wide guidance" (vscode-instructions). The coding-agent
+names it identically, as a project instructions file for the Copilot and Local harnesses:
+"`.github/copilot-instructions.md` or `AGENTS.md`" (vscode-instructions, read 2026-11-05). The coding-agent
 changelog confirms it stays read alongside newer formats: "the agent continues to support
 GitHub's `.github/copilot-instructions.md` and `.github/instructions/**.instructions.md`
 formats, plus `CLAUDE.md` and `GEMINI.md` files" (changelog-agents-md). Code review lists it at
@@ -51,8 +54,11 @@ the same level as `AGENTS.md` and `*.instructions.md` (code-review-tutorial). It
 CLI is not documented in these sources — the CLI page names `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`
 and `*.instructions.md`, not `copilot-instructions.md` (cli-instructions).
 
-`.github/instructions/*.instructions.md`: "VS Code automatically attaches files with an applyTo
-pattern that matches the files being changed" (vscode-instructions). Copilot CLI reads the same
+`.github/instructions/*.instructions.md`: "In Copilot sessions, `applyTo` targets files the agent
+works with. In Local, matching file context can attach instructions automatically when
+`chat.includeApplyingInstructions` is on" (vscode-instructions-reference, read 2026-11-05; this
+reference earlier quoted an unconditional automatic attachment by VS Code — it is now stated for the Local harness and tied to that setting, whose default is `true`
+per vscode-ai-settings). Copilot CLI reads the same
 extension but narrower: "Modular repository instructions, discovered in the standard locations
 but not intermediate directories" (cli-instructions) — unlike `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`,
 which the CLI also discovers in intermediate directories. Whether plain Copilot Chat on github.com
@@ -66,44 +72,54 @@ review reads `.agent.md` files is not documented in these sources.
 
 ## Instructions frontmatter
 
-Example frontmatter for `.instructions.md` (vscode-instructions):
+Example frontmatter for `.instructions.md` (vscode-instructions-reference, read 2026-11-05):
 
 ```yaml
 ---
-name: 'Python testing'
-description: 'Use when creating or updating Python unit tests.'
-applyTo: '**/*.py'
+name: 'Python tests'
+description: 'Use when creating or updating Python tests.'
+applyTo: 'tests/**/*.py'
 ---
 ```
 
-- `applyTo`: "Glob pattern that automatically applies the instructions to matching files,
-  relative to the workspace root. Use `**` to match all files." (vscode-instructions)
-- `description`: "Describes the tasks for which the file is relevant. Include it for on-demand
-  discovery." (vscode-instructions)
-- `name`: appears in the example above; the sources read for this page document nothing further
-  about how it is used — not documented.
-- Without `applyTo` or `description`, the documented behaviour is to "attach the file manually
-  when you want to use it" (vscode-instructions): no automatic discovery.
+Field meanings below were moved from vscode-instructions to vscode-instructions-reference and
+reworded; quotations re-read on 2026-11-05.
+
+- `applyTo`: "One or more comma-separated glob patterns for matching files. Use `**` for all
+  files. There is no default pattern." Patterns "are relative to the workspace or project root,
+  not the directory containing the instructions file" (vscode-instructions-reference).
+- `description`: "Describes the relevant task. In Local sessions, the agent can use it to decide
+  whether to load the file on demand." (vscode-instructions-reference) — the on-demand use is now
+  stated for the Local harness only.
+- `name`: "Display name in the UI. Defaults to the file name." (vscode-instructions-reference;
+  this reference earlier said it was not documented).
+- Without `applyTo` or `description`: "For Local sessions, omitting both `description` and
+  `applyTo` leaves the file available for manual attachment rather than automatic activation"
+  (vscode-instructions-reference). The page states this for Local sessions; for the other
+  harnesses it says nothing about this case.
 - `excludeAgent`, documented only in the changelog: "Set `excludeAgent: \"code-review\"` to hide
   your instructions file from Copilot code review. Set `excludeAgent: \"coding-agent\"` to hide
   your instructions file from Copilot coding agent." Default, when absent: "your instructions
   file will be used by all agents" (changelog-exclude-agent). Only these two string values are
   documented; nothing is said about a value for VS Code Chat or the CLI.
-- Whether `applyTo` accepts a comma-separated list of several glob patterns, and how a comma
-  inside a brace group such as `**/*.{css,scss}` is parsed, is **not documented** in the sources
-  read for this page.
+- A comma-separated list of several glob patterns is now documented (see `applyTo` above; the
+  pattern table's example is `**/*.ts, **/*.tsx`). How a comma inside a brace group such as
+  `**/*.{css,scss}` is parsed is still **not documented** in the sources read for this page.
 
 ## Prompts and custom agents
 
 Custom agents were renamed from custom chat modes: "Custom agents were previously known as custom
-chat modes. The functionality remains the same" (vscode-custom-agents), and "If you have existing
-`.chatmode.md` files, rename them to `.agent.md` and place them in one of the supported custom agent
-locations" (vscode-custom-agents). The supported workspace locations are `.github/agents` and, in
-Claude format, `.claude/agents`; `.github/chatmodes` is not among them (vscode-custom-agents), yet
+chat modes. If you have `.chatmode.md` files, rename them to `.agent.md` and place them in a
+supported custom agent location" (vscode-agent-file-reference, read 2026-11-05). This text moved
+there from vscode-custom-agents, and the earlier sentence saying the functionality is unchanged
+is no longer on either page. The supported workspace locations are `.github/agents`
+and, in Claude format, `.claude/agents`; `.github/chatmodes` is not among them
+(vscode-agent-file-reference), yet
 it is a deprecated location rather than an unread one: the [VS Code 1.106 release notes](https://code.visualstudio.com/updates/v1_106) say existing chat
 modes "continue to work and are automatically treated as custom agents" — the same host also recognizes a Claude-format
 location: its location table lists `.claude/agents` under "Workspace (Claude format)", holding
-".md files in the Claude agent format" (vscode-custom-agents, read 2026-10-21).
+".md files in the Claude agent format" (vscode-agent-file-reference, read 2026-11-05; the table
+was on vscode-custom-agents when read on 2026-10-21).
 
 Naming and size limits for the cloud agent's `.agent.md` (create-custom-agents): "the filename may
 only contain the following characters: `.`, `-`, `_`, `a-z`, `A-Z`, `0-9`," and "The prompt can be
@@ -138,9 +154,11 @@ sessions" (org-instructions, read 2026-10-29). The wording this reference quoted
 "Copilot Chat on GitHub.com" among the supported surfaces; the page no longer does, so do not promise
 organisation instructions in chat.
 
-Between several files of the same type in VS Code, no tie-break is documented: "Applicable
-instruction sources are additive. Do not depend on a file order or precedence rule to resolve
-conflicts because discovery and merge behavior can differ by harness" (vscode-instructions). The
+Between several files of the same type in VS Code, no tie-break is documented: "There is no
+precedence rule that applies across all harnesses," and "Local can include multiple applicable
+instruction files. Avoid contradictory rules rather than relying on their order"
+(vscode-instructions-reference, read 2026-11-05; the "additive" wording quoted here before is
+gone, the substance is unchanged). The
 nearest-match rule for several `AGENTS.md` files is not on that page as read on 2026-10-17; it is
 documented for Copilot on GitHub: "When Copilot is working, the nearest `AGENTS.md` file in the
 directory tree will take precedence" (repo-instructions).
@@ -149,8 +167,8 @@ directory tree will take precedence" (repo-instructions).
 
 | File | coding agent | CLI | code review | VS Code (Local harness) |
 | --- | --- | --- | --- | --- |
-| `AGENTS.md` | yes, incl. nested | yes, incl. intermediate dirs | yes | gated, nested off by default |
-| `CLAUDE.md` | yes | yes | not documented | gated |
+| `AGENTS.md` | yes, incl. nested | yes, incl. intermediate dirs | yes | gated (on by default), nested off by default |
+| `CLAUDE.md` | yes | yes | not documented | gated (on by default) |
 | `GEMINI.md` | yes | yes | not documented | not documented |
 
 Coding agent: "Alongside `AGENTS.md`, the agent continues to support GitHub's
@@ -168,30 +186,51 @@ directories between them, and any directories nested in the path of a file it is
 Code review: `AGENTS.md` is listed — "`AGENTS.md`: Repository-level agent-specific instructions"
 (code-review-tutorial). Whether it reads `CLAUDE.md` or `GEMINI.md` is not documented.
 
-VS Code Local harness (this reference earlier quoted it as the Local agent; as read on
-2026-10-17 the page speaks of harnesses: "Each harness uses its own discovery rules and file
-formats"): "The `chat.useAgentsMdFile` setting controls whether instructions from
-workspace-root AGENTS.md files are automatically attached to chat requests and is enabled by
-default." For nested files, which the page marks "experimental and might change or be removed": "Set both
-`chat.useAgentsMdFile` and `chat.useNestedAgentsMdFiles` to true to discover nested AGENTS.md files. The nested-file setting is disabled by default." For
-`CLAUDE.md`: "configure the `chat.useClaudeMdFile` setting" (vscode-instructions). Whether
-`chat.useClaudeMdFile` defaults to on or off is **not documented** on the page as read on
-2026-10-22. (The same two quotes read differently on 2026-10-21: the page was rewritten within a
-day, and then did not say whether `chat.useAgentsMdFile` was on by default.) These settings are scoped to the Local harness; for the page's Anthropic Claude
-harness: "For Anthropic Claude sessions, use `CLAUDE.md` at the repository root for project-wide
-guidance." `GEMINI.md` is not mentioned on that page at all — silence, not a confirmed absence. The same page separately recognizes Claude Code's own rule
-files: "For `.claude/rules` instructions files, use a `paths` property instead of `applyTo` for
-glob patterns" (vscode-instructions).
+VS Code Local harness (this reference earlier quoted it as the Local agent; the pages speak of
+harnesses: "The selected agent harness, not the language model, determines instruction support"
+(vscode-instructions-reference, read 2026-11-05; it replaces the sentence quoted here on
+2026-10-17 about each harness having its own discovery rules, no longer on the page)).
+Settings and defaults moved off vscode-instructions; as read on 2026-11-05:
+
+- Workspace-root `AGENTS.md`: "Workspace-root `AGENTS.md` is included when `chat.useAgentsMdFile`
+  is on" (vscode-instructions-reference). The setting "Automatically attach instructions from
+  workspace-root `AGENTS.md` files to chat requests in Local harness sessions only", default
+  column `true` (vscode-ai-settings).
+- Nested `AGENTS.md`: "Nested files require both that setting and `chat.useNestedAgentsMdFiles`",
+  marked "experimental and might change or be removed", and "Local nested-file discovery is
+  experimental and off by default. When enabled, it lists nested files and their folder locations
+  so the agent can load relevant instructions on demand" (vscode-instructions-reference); default
+  column `false` (vscode-ai-settings). Nested files are listed for on-demand loading, not attached.
+- `CLAUDE.md`: `chat.useClaudeMdFile` is to "Enable or disable using `CLAUDE.md` files as always-on
+  custom instructions in Local sessions", default column `true` (vscode-ai-settings); "For Claude
+  instruction files, Local checks the workspace-root `CLAUDE.md`, `.claude/CLAUDE.md`,
+  `~/.claude/CLAUDE.md`, and `CLAUDE.local.md`" (vscode-instructions-reference). This **changes**
+  what this reference said before (default not documented, as read on 2026-10-22): the default is
+  now documented, and it is on.
+
+These settings are scoped to the Local harness: "These settings control Local discovery and
+activation, not the native discovery rules of other harnesses" (vscode-instructions-reference).
+For the Anthropic Claude harness, the supported-formats table lists project instructions as
+"`CLAUDE.md` or `.claude/CLAUDE.md`" (vscode-instructions-reference); the sentence quoted here
+before, which pointed Anthropic Claude sessions to a repository-root `CLAUDE.md`, is no longer on
+either page. `GEMINI.md` is not mentioned on vscode-instructions, vscode-instructions-reference or
+vscode-ai-settings — silence, not a confirmed absence. Claude Code's own rule files are
+recognized: "Markdown rules in `.claude/rules` use `paths` instead of `applyTo`", and "Local also
+reads this format" (vscode-instructions-reference, read 2026-11-05; moved from
+vscode-instructions).
 
 **Consequence for a Claude Code user** (reading, not a quote): a repository's `CLAUDE.md` reaches
 Copilot's cloud coding agent and Copilot CLI without any change on the repository's part — both
-list it as a supported format next to `AGENTS.md`. Inside VS Code, the same file only reaches
-Copilot Chat's Local harness if `chat.useClaudeMdFile` is turned on, and whether that ships on or
-off is not documented here, so a Claude Code user cannot assume that opening the same repository
-in VS Code gives Copilot Chat the instructions Claude Code uses. Directory-scoped guidance fares
-worse: nested `AGENTS.md` files are off by default in VS Code, and no equivalent nested toggle for
-`CLAUDE.md` is documented in these sources — so instructions that Claude Code picks up from a
-subdirectory may not reach VS Code's Local harness at all.
+list it as a supported format next to `AGENTS.md`. Inside VS Code, the same file reaches
+Copilot Chat's Local harness through `chat.useClaudeMdFile`, documented as on by default since the
+2026-11-05 reading — but a user or workspace setting can turn it off, and the Copilot harness in
+VS Code lists `.github/copilot-instructions.md` or `AGENTS.md`, not `CLAUDE.md`, as its project
+instructions, so a Claude Code user cannot assume that every harness in VS Code gives Copilot the
+instructions Claude Code uses. Directory-scoped guidance fares worse: nested `AGENTS.md` files are
+off by default in VS Code's Local harness, and the `CLAUDE.md` locations Local checks are the
+workspace root, `.claude/`, the home directory and `CLAUDE.local.md` — no subdirectory `CLAUDE.md`
+is listed — so instructions that Claude Code picks up from a subdirectory may not reach VS Code's
+Local harness at all.
 
 ## What audit.py checks, and what it does not
 
@@ -199,9 +238,9 @@ These ids are implemented in `audit.py` (0.20.0), measured on public repositorie
 
 | Check | Reads | Fires on |
 | --- | --- | --- |
-| `56-copilot-chatmode` | `.github/chatmodes/*.chatmode.md` | file present in the deprecated location — NOTICE. The workspace location is now `.github/agents` (vscode-custom-agents); VS Code still loads a chat mode as a custom agent (VS Code 1.106 release notes). |
+| `56-copilot-chatmode` | `.github/chatmodes/*.chatmode.md` | file present in the deprecated location — NOTICE. The workspace location is now `.github/agents` (vscode-agent-file-reference); VS Code still loads a chat mode as a custom agent (VS Code 1.106 release notes). |
 | `56-copilot-instructions-name` | files under `.github/instructions/` | a file not ending `.instructions.md` — WARN. The extension is part of the documented discovery contract (vscode-instructions); anything else is not read, without an error. |
-| `56-copilot-apply-to` | frontmatter of `.github/instructions/*.instructions.md` | `applyTo` glob matching no file in the repository — NOTICE, measured 4 of 18 real on 98 public repositories, most of the rest in toolkits that distribute instruction files (**House**: evaluated against the working tree, not documented behaviour, a design heuristic only); neither `applyTo` nor `description` present — NOTICE, since the file then requires manual attachment (vscode-instructions). |
+| `56-copilot-apply-to` | frontmatter of `.github/instructions/*.instructions.md` | `applyTo` glob matching no file in the repository — NOTICE, measured 4 of 18 real on 98 public repositories, most of the rest in toolkits that distribute instruction files (**House**: evaluated against the working tree, not documented behaviour, a design heuristic only); neither `applyTo` nor `description` present — NOTICE, since the file then requires manual attachment in Local sessions (vscode-instructions-reference). |
 | `56-copilot-reads-claude-md` | `./CLAUDE.md` only, with Copilot files present | `CLAUDE.md` names a Claude Code-only mechanism (`/memory`, `/hooks`, `/doctor`, the `Task` or `Skill` tool, `.claude/commands`, `.claude/hooks`, `.claude/settings.json`) that Copilot's agent, CLI and code review read as instructions they cannot follow (NOTICE). Not counted: subagents and `.claude/rules/` (Copilot has custom agents, VS Code reads `.claude/rules/`), `.claude/agents` (VS Code: "Workspace (Claude format)"), the 13 slash commands the Copilot CLI reference documents, and `.claude/hooks` / `.claude/settings.json` when `.vscode/settings.json` sets `"chat.useClaudeHooks": true` (comments removed first: settings.json is JSON with Comments; VS Code hooks, off by default; a user-level setting is not visible from the repository). |
 
 **Not checked** (read it by hand, or ask the surface directly):

@@ -402,3 +402,19 @@ runs per arm, model of the session, judge of three votes.
   `on-demand-file-over-limit` 3/3 / 0/3, `import-punctuation-not-loaded` 2/3 / 0/3 (one with-plugin run
   judged a fail by three votes of FAIL, not read; the case stays a witness). Cost 4.72 USD.
 - Cost of the runs: 4.16 USD with and without the plugin, 3.02 USD on 0.28.0.
+
+## Six cases added 2026-11-05 (releases 0.30.0 to 0.32.0)
+
+`frontmatter-early-close`, `skill-hook-event-never-fires`, `plugin-agent-bare-name`, `skilloverrides-plugin-skill`, `command-argument-hint-unquoted`,
+`agents-md-import-codex`. Sources outside the author's description: public reports (anthropics/claude-code#103059, #103350, #105570,
+anthropics/claude-plugins-official#6885, openai/codex#54662) and the probes recorded in `evidence.json`. Written by the session that wrote the checks, so
+the echo caveat above applies; the ablation delta is what is read. Four criteria files were **narrowed after a first run** (they required details beyond the
+cause, the fix and the evidence label, and failed answers that were right on all three); first-run scores are kept by the maintainer. Claude Code 2.1.318,
+10 runs per arm, pinned models. After revision (with / without the plugin): Sonnet 5.5 0.80/0.40, 1.00/1.00, 1.00/0.00, 0.90/0.00; Haiku 5.5 0.20/0.00,
+1.00/0.60, 0.80/0.00, 0.80/0.00; Opus 5.5 1.00/0.00, 1.00/1.00, 1.00/0.00, 0.90/1.00 (order: frontmatter-early-close, plugin-agent-bare-name,
+skill-hook-event-never-fires, skilloverrides-plugin-skill). `plugin-agent-bare-name` has a null delta on Sonnet and Opus: it does not show the plugin helps.
+
+`plugin-agent-bare-name` shows no plugin effect on Sonnet 5.5 and Opus 5.5 (1.00 with and without): a plugin's namespacing is common knowledge. Added
+`plugin-agent-bare-name-severity` (2026-11-05), which asks whether the six bare-name commands are a release blocker and how sure one can be: the answer that
+only the plugin's measurement (9 of 9 command runs used the scoped name) supports. Sonnet 5.5, 10 runs: 1.00 with the plugin, 0.00 without. Haiku 5.5 did not load
+the skill (0/10) and scored 0.00. The first case is kept as a regression witness, not as evidence that the plugin helps.

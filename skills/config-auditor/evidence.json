@@ -275,6 +275,20 @@
    ],
    "tested": null,
    "tested_note": "Not run: Codex is not installed where this was written. Read, 2026-10-23: codex-rs/core/src/agents_md.rs, function read_agents_md, commit 30587d78 (main that day): each file found from the root to the working directory is read, cut to project_doc_max_bytes and pushed as it is; no step resolves `@`. Only that file was read; a resolution elsewhere in the chain is not excluded. Signal used to say Codex reads the repository: an AGENTS.override.md not ignored by git (Codex AGENTS.md guide). A `.codex/` folder is not used: not verified."
+  },
+  "24-settings-env-ignored": {
+   "documented": "https://code.claude.com/docs/en/settings-reference (\"Variables Claude Code ignores in env\", \"When Claude Code applies env values\"; read 2026-11-05)",
+   "documented_note": "Quoted: project and local settings \"can't set variables that a checked-out repository shouldn't control\"; Claude Code \"drops each one, apart from a few values that turn telemetry off, and logs a warning you can see with `claude --debug`\". The lists in the check are the documentation's, by name and by family (`XDG_*`, `CLAUDE_AX_*`, `OTEL_EXPORTER_OTLP_*` with the listed suffixes). Some are ignored from every file. Version bounds are documented per group (v2.1.251, v2.1.282, v2.1.290 and others): the check does not read the Claude Code version, so on an older release a variable may still have applied. Reported as a user problem in anthropics/claude-code#107139. Id used: `24-settings-scope`.",
+   "reported": [
+    "https://github.com/anthropics/claude-code/issues/107139"
+   ],
+   "tested": {
+    "date": "2026-11-05",
+    "claude_code": "2.1.318",
+    "system": "Linux",
+    "how": "claude -p --model claude-haiku-5-5 --setting-sources project,local --strict-mcp-config --no-session-persistence --allowedTools Bash; a project `.claude/settings.local.json` env block holding XDG_CONFIG_HOME, CLAUDE_CODE_TMPDIR, CLAUDE_CODE_PLUGIN_CACHE_DIR and a control variable; the model ran `env | grep` on the four names; second run with --debug.",
+    "result": "Only the control variable reached the shell command. With --debug, one WARN line per dropped variable: \"... in .claude/settings.local.json is ignored - project-scoped settings can't set this key. Set it in ~/.claude/settings.json or managed settings instead.\" Without --debug nothing was printed (stderr empty). One run each; three variables of the listed families, not the whole list. The user-settings side and the telemetry off values were not run."
+   }
   }
  }
 }

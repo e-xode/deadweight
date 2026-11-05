@@ -488,6 +488,32 @@ WINDOWS_RESERVED = '<>:"|?*'
 IS_WINDOWS = os.name == "nt"
 
 
+def probe_env_ignored(ctx: Context) -> Verdict:
+    """24-settings-env-ignored: a project's `env` cannot set XDG_CONFIG_HOME or CLAUDE_CODE_TMPDIR; a control variable passes.
+
+    The shared `.claude/settings.json` holds the three. A Bash command prints the environment lines;
+    the verdict is read from the VALUES the shell sees (the file's value must not appear for the
+    two variables the documentation lists, and must for the control)."""
+    repo = git_init(ctx.tmp / "shop-repo")
+    write(repo / ".claude" / "settings.json", json.dumps({"env": {
+        "DW_PROBE_CONTROL": "control-kestrel-41", "XDG_CONFIG_HOME": "/nonexistent/dw-probe-xdg",
+        "CLAUDE_CODE_TMPDIR": "/nonexistent/dw-probe-tmp"}}))
+    events = ctx.ask(repo, "Run exactly this shell command with the Bash tool, once, then reply with the single word "
+                           "done: env | grep -E '^(DW_PROBE_CONTROL|XDG_CONFIG_HOME|CLAUDE_CODE_TMPDIR)=' ; echo END",
+                     "--allowedTools", "Bash")
+    results = tool_results(events)
+    if not results:
+        raise ProbeError(f"no tool call in the stream ({len(events)} events)")
+    text = "\n".join(body for _, body in results)
+    if "END" not in text:
+        raise ProbeError("the command did not run to its end marker")
+    control = "control-kestrel-41" in text
+    leaked = [v for v in ("/nonexistent/dw-probe-xdg", "/nonexistent/dw-probe-tmp") if v in text]
+    if control and not leaked:
+        return "PASS", "the control variable reached the shell; the two listed variables did not"
+    return "FAIL", f"control seen: {control}; project values that got through: {leaked}"
+
+
 def creatable(rel: str, windows: bool | None = None) -> bool:
     """False for a relative path this system cannot create (Windows only: reserved characters,
     or a part ending with a period or a space)."""
@@ -582,6 +608,8 @@ PROBES: tuple[Probe, ...] = (
     Probe("frontmatter-bom", "tested", True, 1, probe_bom_frontmatter),
     Probe("35-hooks-shape", "tested_skill_hooks_empty", True, 1, probe_skill_hooks_empty),
     Probe("01-claude-md-import-syntax", "tested", True, 1, probe_import_syntax),
+    Probe("24-settings-env-ignored", "tested", True, 1, probe_env_ignored,
+          "three variables of the documented list, from the shared settings.json; the user side and the telemetry off values are not replayed"),
 )
 
 # Recorded tests left out, and why. Each key is an evidence.json entry.

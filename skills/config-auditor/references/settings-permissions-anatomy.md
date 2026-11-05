@@ -79,6 +79,16 @@ A key outside its scope is ignored; the table is not reproduced here, audit.py c
   which reads the rule, not through the harness: the setting holds when the rule is not read.
 - **`24-settings-scope`** (ERROR) — a key ignored in the file it sits in. Examples [doc]:
   - `modelPicker` — *User or managed*: a cloned repository cannot relabel the picker.
+  - `env` entries — a project's or local `env` block cannot set the variables that choose where Claude Code writes its
+    files (`CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_TMPDIR`, `HOME`, `TMPDIR`, the `XDG_*` family), the OpenTelemetry exporter
+    variables (apart from their telemetry-off values: `none` for the three selectors, an off value for the three
+    content ones), the start-up and sync variables (`CLAUDE_CODE_PROCESS_WRAPPER`, `CLAUDE_CODE_PLUGIN_CACHE_DIR`...),
+    the sign-in variables, `CLAUDE_AX_*` and a few more; a handful are ignored from every file
+    (`CLAUDE_CODE_REMOTE`, `CLAUDE_CODE_RESTRICTED`...). [doc] settings-reference, "Variables Claude Code ignores in
+    env", which also bounds them by version (2.1.251, 2.1.282, 2.1.290): the check does not read the version.
+    Claude Code "logs a warning you can see with `claude --debug`" [doc]. [measured, 2.1.318, Linux, one run] a `-p`
+    run prints nothing, and `XDG_CONFIG_HOME`, `CLAUDE_CODE_TMPDIR` and `CLAUDE_CODE_PLUGIN_CACHE_DIR` set in a
+    project's env did not reach a Bash command while a control variable did. Names are exact (POSIX is case-sensitive).
   - `worktree.location` — *User*, "in `~/.claude/settings.json` on the remote machine": a
     project file cannot move Desktop SSH worktrees. The auditor bars it from `settings.local.json`
     too, as it does the *User or managed* keys (the Scope lists no Local; not probed).

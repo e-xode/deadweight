@@ -122,6 +122,13 @@ and "How CLAUDE.md files load"). All files are concatenated, none overrides anot
   target.** Checked by `01-claude-md-lines` (WARN).
 - **Doc** (same page, "How it works"): "Claude Code loads a CLAUDE.md file of up to 4 MiB in full
   and skips a larger file." Above 4 MiB the file is **ignored entirely**, not truncated.
+- **Doc** (same page; added in v2.1.309): a **subdirectory** `CLAUDE.md` or `CLAUDE.local.md`, or a rules file
+  that loads on demand, has its own, much lower per-file limit: "When a subdirectory `CLAUDE.md` or a rules file
+  that loads on demand is over a per-file size limit, Claude receives only the start of it" - 40,000 characters
+  on a 200K context window (150,000 to 200,000 on a 1M window, by model). So a 55,000-character
+  `src/billing/CLAUDE.md` loads, and Claude quotes its first rules, but the rules near its end are not in
+  context: this is not the 4 MiB skip, and not the model forgetting. Before v2.1.309 the limit was not applied.
+  Checked by `14-ondemand-file-size` (NOTICE, 40,000 characters; the audit cannot see the window).
 - **House convention**: `01-claude-md-size` raises a NOTICE above **12 KB** (WARN under `profile: house`). Reason: a line count
   does not cap tokens — 150 long lines cost more than 200 short ones — and the always-loaded
   budget (`17-always-loaded-budget`) needs a byte figure. It is doctrine, not a platform limit:

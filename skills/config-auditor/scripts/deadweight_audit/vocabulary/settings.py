@@ -183,3 +183,41 @@ BUILTIN_OUTPUT_STYLES = {"Default", "Explanatory", "Learning", "Proactive", "Con
 
 
 PROJECT_SCOPE_IGNORED_MODES = {"bypassPermissions", "auto"}
+
+
+# Variables a project's or local `env` block cannot set (settings-reference, "Variables Claude Code
+# ignores in env", read 2026-11-05). "Claude Code drops each one, apart from a few values that turn
+# telemetry off, and logs a warning you can see with `claude --debug`"; a `-p` run shows nothing.
+# Measured 2026-11-05 on 2.1.318 (Linux, Haiku): XDG_CONFIG_HOME, CLAUDE_CODE_TMPDIR and
+# CLAUDE_CODE_PLUGIN_CACHE_DIR in .claude/settings.local.json do not reach a Bash command while a
+# control variable does, and `--debug` logs "... is ignored - project-scoped settings can't set this key".
+ENV_IGNORED_PROJECT_NAMES = frozenset({
+    "CLAUDE_CONFIG_DIR", "CLAUDE_CODE_TMPDIR", "HOME", "TMPDIR", "TMP", "TEMP",
+    "SystemRoot", "ComSpec", "ProgramData", "LOCALAPPDATA", "PATHEXT", "PSModulePath",
+    "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432",
+    "OTEL_LOG_RAW_API_BODIES", "ENABLE_BETA_TRACING_DETAILED", "BETA_TRACING_ENDPOINT",
+    "CLAUDE_CODE_ENABLE_TELEMETRY", "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA", "ENABLE_ENHANCED_TELEMETRY_BETA",
+    "OTEL_LOGS_EXPORTER", "OTEL_METRICS_EXPORTER", "OTEL_TRACES_EXPORTER",
+    "OTEL_LOG_USER_PROMPTS", "OTEL_LOG_ASSISTANT_RESPONSES", "OTEL_LOG_TOOL_CONTENT", "OTEL_LOG_TOOL_DETAILS",
+    "OTEL_EXPORTER_PROMETHEUS_HOST", "OTEL_EXPORTER_PROMETHEUS_PORT",
+    "CLAUDE_CODE_PROCESS_WRAPPER", "CLAUDE_CODE_SYNC_SKILLS", "CLAUDE_CODE_SYNC_PLUGINS",
+    "CLAUDE_CODE_PLUGIN_CACHE_DIR", "CLAUDE_CODE_PLUGIN_SEED_DIR",
+    "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_OAUTH_REFRESH_TOKEN", "CLAUDE_CODE_OAUTH_SCOPES",
+    "CLAUDE_CODE_USER_DIALOG_TIMEOUT_MS", "CLAUDE_CODE_DISABLE_ATTACHMENTS", "CLAUDE_CODE_DISABLE_FILE_MENTIONS",
+})
+ENV_IGNORED_PROJECT_PREFIXES = ("XDG_", "CLAUDE_AX_")
+# `OTEL_EXPORTER_OTLP_*` whose name ends in one of these, generic or per signal.
+ENV_IGNORED_PROJECT_OTLP_SUFFIXES = ("_ENDPOINT", "_HEADERS", "_PROTOCOL", "_CERTIFICATE", "_CLIENT_KEY", "_INSECURE")
+# Telemetry variables whose OFF value still applies from a project: `none` for the selectors, an off value for the content ones.
+ENV_OFF_VALUE_SELECTORS = frozenset({"OTEL_LOGS_EXPORTER", "OTEL_METRICS_EXPORTER", "OTEL_TRACES_EXPORTER"})
+ENV_OFF_VALUE_CONTENT = frozenset({"OTEL_LOG_USER_PROMPTS", "OTEL_LOG_TOOL_CONTENT", "OTEL_LOG_TOOL_DETAILS"})
+ENV_OFF_WORDS = frozenset({"0", "false", "no", "off"})
+# Ignored from EVERY settings file (user and managed too): read from the launch environment only, or owned by Claude Code.
+ENV_IGNORED_EVERYWHERE = frozenset({
+    "CLAUDE_CODE_REMOTE", "CLAUDE_CODE_ACCOUNT_UUID", "CLAUDE_CODE_MESSAGING_SOCKET", "CLAUDE_CODE_MESSAGING_TOKEN",
+    "CLAUDE_CODE_PROJECT_DIR_NAME", "CLAUDE_CODE_RESTRICTED",
+    "CLAUDE_CODE_DISABLE_POWERSHELL_CMD_RM_DENY", "CLAUDE_CODE_DISABLE_DANGEROUS_RM_TIMEOUT",
+    "CLAUDE_CODE_DISABLE_SUBSTITUTION_RM_PROMPT", "CLAUDE_CODE_DISABLE_INLINE_SHELL_RM_PROMPT",
+    "CLAUDE_CODE_DISABLE_MOUNTED_DRIVE_RM_PROMPT", "CLAUDE_CODE_EVEN_MORE_DANGEROUSLY_SKIP_PERMISSIONS",
+    "CLAUDE_CODE_WARN_DISK_FREE_GIB", "CLAUDE_CODE_WARN_MEMORY_FREE_GIB",
+})
