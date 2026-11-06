@@ -82,14 +82,15 @@ about an imported file outside the project gives its path, never its content.
 ## What it writes
 
 - **The audit** writes nothing, unless you ask it to (`--set-floor` writes `.claude/audit/floor.json`).
-- **The session-start hook** creates `${XDG_CACHE_HOME:-~/.cache}/claude-audit/` if needed and writes one
+- **The session-start hook** (written into your project's settings by `deadweight --setup-statusline`; the plugin itself declares none) creates `${XDG_CACHE_HOME:-~/.cache}/claude-audit/` if needed and writes one
   file there: `<project folder name>-<first 8 hex digits of the md5 of its path>.json`, through a temporary
   `*.tmp` file in the same folder that a failed write can leave behind. It holds the project folder name,
   the counts, the auditor's sha, the plugin version, the layout, the time, and every finding with its
   message and location. `deadweight` and `deadweight --fresh` (which runs the hook again) show that file.
 - **`deadweight --setup-statusline`**, only when you run it, writes in each host it finds:
   - Claude Code (`CLAUDE_CONFIG_DIR` or `~/.claude` exists): the `statusLine` key of
-    `.claude/settings.json`, then the launcher `.claude/statusline.py`, in your project.
+    `.claude/settings.json`, then the launcher `.claude/statusline.py`, then one `SessionStart` hook in
+    `.claude/settings.json` that runs `.claude/statusline.py --measure`, in your project.
   - Copilot CLI (`$COPILOT_HOME` or `~/.copilot` exists): the `statusLine` key of `settings.json`, then
     the launcher `deadweight-statusline.py`, in that folder - a user setting, for every project.
 

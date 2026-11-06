@@ -216,6 +216,26 @@ def _frontmatter_flags(hooks):
     return hooks
 
 
+# The one hook `deadweight --setup-statusline` writes into a project's settings (bin/deadweight, HOOK_COMMAND;
+# a test keeps the two strings equal). It prints nothing, so the notice below, which says that what a hook on
+# SessionStart prints is paid in tokens, would be false about the project's own status line (external audit of
+# 0.34.0, second pass, B-01). Only this exact command on SessionStart is exempt: any other handler beside it,
+# or the same command on another event, is still reported. The test is on the command STRING only: it does not
+# check that `.claude/statusline.py` is the launcher the setup writes (third review of 0.34.0, C-01).
+SETUP_STATUSLINE_HOOK = 'python3 "$CLAUDE_PROJECT_DIR"/.claude/statusline.py --measure'
+
+
+def _only_the_setup_hook(entries) -> bool:
+    handlers = []
+    for entry in entries:
+        if not isinstance(entry, dict) or not isinstance(entry.get("hooks"), list):
+            return False
+        handlers.extend(entry["hooks"])
+    return bool(handlers) and all(
+        isinstance(h, dict) and h.get("type", "command") == "command"
+        and h.get("command") == SETUP_STATUSLINE_HOOK for h in handlers)
+
+
 def check_hooks(ctx: AuditContext, report: Report) -> None:
     """Hooks: the only configuration that executes, and the last one audited.
 
@@ -620,7 +640,8 @@ def _audit_hooks(ctx: AuditContext, report: Report, hooks, rel: str, path: Path,
                         report.add("35-hooks-command", "WARN",
                                    f"{spot} in '{rel}' runs '{token}' directly, but it is not "
                                    "executable (chmod +x).", str(path))
-        if event in CONTEXT_INJECTING_HOOK_EVENTS:
+        if event in CONTEXT_INJECTING_HOOK_EVENTS and not (
+                event == "SessionStart" and _only_the_setup_hook(entries)):
             injecting.append(event)
 
     if injecting:

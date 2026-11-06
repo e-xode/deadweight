@@ -667,6 +667,94 @@
    ]
   },
   {
+   "id": "35-status-line-hook",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/statusline.py": "print()\n",
+    ".claude/settings.json": "{\"hooks\": {\"SessionStart\": [{\"matcher\": \"startup|resume\", \"hooks\": [{\"type\": \"command\", \"command\": \"python3 \\\"$CLAUDE_PROJECT_DIR\\\"/.claude/statusline.py --measure\", \"timeout\": 20}]}]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-context",
+     "NOTICE",
+     0
+    ],
+    [
+     "35-hooks-command",
+     "ERROR",
+     0
+    ]
+   ]
+  },
+  {
+   "id": "35-status-line-hook-witnesses",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/statusline.py": "print()\n",
+    ".claude/settings.json": "{\"hooks\": {\"SessionStart\": [{\"hooks\": [{\"type\": \"command\", \"command\": \"python3 \\\"$CLAUDE_PROJECT_DIR\\\"/.claude/statusline.py --measure\", \"timeout\": 20}, {\"type\": \"command\", \"command\": \"echo shop\"}]}]}}\n",
+    ".claude/settings.local.json": "{\"hooks\": {\"UserPromptSubmit\": [{\"hooks\": [{\"type\": \"command\", \"command\": \"python3 \\\"$CLAUDE_PROJECT_DIR\\\"/.claude/statusline.py --measure\", \"timeout\": 20}]}]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-context",
+     "NOTICE",
+     2
+    ]
+   ]
+  },
+  {
+   "id": "35-status-line-hook-witnesses-2",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/statusline.py": "print()\n",
+    ".claude/settings.json": "{\"hooks\": {\"SessionStart\": [{\"hooks\": [{\"type\": \"command\", \"command\": \"python3 \\\"$CLAUDE_PROJECT_DIR\\\"/.claude/statusline.py --measure\", \"timeout\": 20}]}, {\"hooks\": [{\"type\": \"command\", \"command\": \"echo shop\"}]}]}}\n",
+    ".claude/settings.local.json": "{\"hooks\": {\"SessionStart\": [{\"hooks\": [{\"type\": \"command\", \"command\": \"python3 \\\"$CLAUDE_PROJECT_DIR\\\"/.claude/statusline.py --measure; cat README.md\"}]}]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-context",
+     "NOTICE",
+     2
+    ]
+   ]
+  },
+  {
+   "id": "35-status-line-hook-witnesses-3",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/statusline.py": "print()\n",
+    ".claude/settings.json": "{\"hooks\": {\"SessionStart\": [{\"hooks\": []}]}}\n",
+    ".claude/settings.local.json": "{\"hooks\": {\"SessionStart\": [{\"hooks\": [{\"type\": \"command\", \"command\": \"python3 '$CLAUDE_PROJECT_DIR'/.claude/statusline.py --measure\"}]}]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-context",
+     "NOTICE",
+     2
+    ]
+   ]
+  },
+  {
+   "id": "35-status-line-hook-witnesses-4",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/statusline.py": "print()\n",
+    ".claude/settings.json": "{\"hooks\": {\"SessionStart\": [{\"hooks\": [{\"type\": \"http\", \"command\": \"python3 \\\"$CLAUDE_PROJECT_DIR\\\"/.claude/statusline.py --measure\"}]}]}}\n"
+   },
+   "git": true,
+   "expected": [
+    [
+     "35-hooks-context",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
    "id": "35-timeout-async-and-severity",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",

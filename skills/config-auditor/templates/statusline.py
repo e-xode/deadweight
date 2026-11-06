@@ -4,7 +4,7 @@
 Installed by `deadweight --setup-statusline`, which also wires the setting. You can
 copy it to .claude/statusline.py yourself and point `statusLine` at it.
 
-The SessionStart hook measures and caches the result OUTSIDE the repository; this
+The SessionStart hook (written into the project's settings by the setup) measures and caches the result OUTSIDE the repository; this
 reads it and never measures. The status line "runs locally and does not consume API
 tokens", so the counts reach you for free while the model's context stays clean.
 

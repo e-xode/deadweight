@@ -98,8 +98,9 @@ and "How CLAUDE.md files load"). All files are concatenated, none overrides anot
 - "Without the backslashes, the path ends at the first space"; "A path wrapped in quotes isn't
   imported at all".
 
-**Tested** (2.1.302, Linux, one `claude -p` run with an `InstructionsLoaded` hook;
-`evidence.json`, `01-claude-md-import-syntax`, replayed by `probes/run_probes.py`):
+**Tested, not documented** — the memory page states the space, quote and code-span rules above, not these (2.1.302,
+Linux, one `claude -p` run with an `InstructionsLoaded` hook; `evidence.json`,
+`01-claude-md-import-syntax`, replayed by `probes/run_probes.py`):
 
 - Loaded: `@docs/x.md` followed by a space, a line end or the end of the file; `@./docs/x.md`;
   `@docs/x.md/` (as `docs/x.md`); `@docs/NOTES` with no extension.
@@ -113,6 +114,11 @@ and "How CLAUDE.md files load"). All files are concatenated, none overrides anot
   without its own imports. `@docs/x.md` inside `docs/a.md` looked for `docs/docs/x.md` only.
 - Not probed: other neighbours (`*`, `[`, `]`, `>`, `|`, `-`), `@~/`, absolute paths. The auditor
   keeps reading those as imports, and does not read an `@path` with no extension.
+- **Check a fix** [doc]: an `InstructionsLoaded` hook fires for imported files too — "with
+  `load_reason` set to `include` as for any other imported file"
+  ([hooks § InstructionsLoaded](https://code.claude.com/docs/en/hooks#instructionsloaded)); the
+  probe above used one. `/memory` "lists your CLAUDE.md, CLAUDE.local.md, and other memory file
+  locations" ([memory](https://code.claude.com/docs/en/memory)).
 
 ## Size
 

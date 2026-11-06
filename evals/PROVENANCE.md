@@ -360,8 +360,8 @@ graded on the current documentation, not on the issue.
 Written from the documentation for the `50-security-sandbox-weakened` check, by the session that
 wrote the check: an echo of the check, not a case from a user's report. It measures whether the skill
 is loaded and the doctrine applied, not whether the check is right; the corpus cases fix that. No
-result of running it is recorded in this repository, so none is claimed. The four oldest evals above
-have no entry either.
+result of running it was recorded in 0.28.0, so none was claimed. A measurement made for 0.34.0 is in the last section of this file.
+The four oldest evals above have no entry either.
 
 ## Four cases added on 2026-10-29 - a coverage audit, and what they do and do not prove
 
@@ -418,3 +418,22 @@ skill-hook-event-never-fires, skilloverrides-plugin-skill). `plugin-agent-bare-n
 `plugin-agent-bare-name-severity` (2026-11-05), which asks whether the six bare-name commands are a release blocker and how sure one can be: the answer that
 only the plugin's measurement (9 of 9 command runs used the scoped name) supports. Sonnet 5.5, 10 runs: 1.00 with the plugin, 0.00 without. Haiku 5.5 did not load
 the skill (0/10) and scored 0.00. The first case is kept as a regression witness, not as evidence that the plugin helps.
+
+## Reference facts added for 0.34.0, and what each measurement shows (2026-11-05)
+
+A search for content missing from the references took evals that fail with the plugin and asked, for each, what a reader of the references could not find. Where a sourced
+fact was missing, it was added to a reference and the case re-run. **Loading was forced**: the prompt starts with "Use the config-auditor skill. ", so the figure measures what the
+references let a model say once the skill is read, not whether it is chosen. Claude Code 2.1.318, Linux, judge of three votes per run, the criteria file unchanged between the
+two arms, one variable changed (the reference text). Scores are the share of runs judged a pass, with the plugin before / after:
+
+| Case | Model | Runs per arm | Before | After | What was added |
+| --- | --- | --- | --- | --- | --- |
+| `sandbox-weakened` | Haiku 5.5 | 30 | 0.43 | 0.80 | two quotes from the settings reference: what `allowLocalBinding` allows, and the condition of `enableWeakerNestedSandbox` |
+| `user-scope-agent-key` | Sonnet 5.5 | 15 | 0.33 | 0.80 | the refusal to audit `~/.claude` as a project, and the documentation's general rule it had been attributed to |
+| `plugin-container` | Sonnet 5.5 | 30 (two batches of 15) | 0.40 | 0.83 | the project checks that are skipped on a plugin |
+| `import-punctuation-not-loaded` | Sonnet 5.5 | 15 | 0.47 | 0.93 | how to confirm that an import is loaded: an `InstructionsLoaded` hook, `/memory` |
+
+Limits. The two 15-run batches of `plugin-container` scored 0.60 and 0.20 before the change, so one batch of 15 is noisy; the figure above pools them. Without the plugin, `user-scope-agent-key` and `import-punctuation-not-loaded` scored 0 of 15; the maintainer's notes give no figure for the other two. In these runs `Bash` did not start in the eval sandbox (the socket path of a
+long `TMPDIR`, then a kernel setting on the machine), so what the skill says to do when its script cannot run is what was measured, not a run of the script. Three changes to
+`SKILL.md` routing that raised other cases in the same search (`probe-fixture-visible`, `silent-agent`, `frontmatter-early-close`) are not in 0.34.0 for that reason. The run
+outputs are not in this repository (`evals/results/` is ignored), so these scores are the maintainer's report, like the older entries.

@@ -41,6 +41,7 @@ All doc, [sub-agents]:
 - **The filename does not have to match `name`.** Keeping them equal is a readability habit, not a rule.
 - **Duplicate `name` in the same tree**: one file is loaded, chosen by filesystem read order — no
   documented precedence. `[08-agent-frontmatter]` warns.
+- **User scope is not audited as a project** [house, `audit.py`]. `~/.claude` (or `CLAUDE_CONFIG_DIR`) holds USER-scope configuration, whose rules differ from a project's: project rules applied to it gave 8 errors and 6 warnings on one machine, such as `defaultMode` "ignored at project scope" in user settings, where it is honoured. So `audit.py --root ~` or `--root ~/.claude` reports layout `none` and says so instead of auditing. A `--layout` given explicitly audits as asked: under `~/.claude` with a warning that project-scope findings may not apply; under `~` itself without that warning (measured 2026-11-06 with `--root ~ --layout project`: `~/.claude/settings.json` is read with project rules, `defaultMode` included), so its findings on user settings are not to be trusted. `deadweight --environment` lists what the account adds, as information only.
 - **A `:` in `name`** is reserved for plugin-scoped identifiers: since 2.1.218 the file is not loaded,
   and the error goes only to the debug log. `[08-agent-frontmatter]` reports it as ERROR.
 - A frontmatter that does not parse can be found with `claude plugin validate .claude/agents`, which
@@ -81,7 +82,7 @@ finding names the field it was meant to be - except, in a plugin, for a field th
 whatever its spelling (`permissionMode`, `mcpServers`, `initialPrompt`, `hooks`): renaming it applies
 nothing there. Any other key is **undocumented, not proven ignored**: `observer` is accepted by recent
 builds (reported in anthropics/claude-code#93109), so nothing guarantees whether it is read, now or
-after an update.
+after an update. Answer neither "it is ignored" nor "it works": the doc's general rule (an unrecognized field is ignored without an error) and the report disagree for this key, and only a probe on the installed version settles it.
 
 | Field | What the doc says | Note |
 | --- | --- | --- |

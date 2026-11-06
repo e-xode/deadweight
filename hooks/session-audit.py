@@ -41,8 +41,11 @@ conversation, not the configuration on disk.
 Writes:   ${XDG_CACHE_HOME:-~/.cache}/claude-audit/<project>-<md5 of its path, 8>.json - the
           counts and every finding's message and location - and nothing else
 Read by:  templates/statusline.py and `deadweight`
-Opt out:  `claude plugin disable <this plugin> --scope project` - the
-          granularity is the whole plugin, not this hook.
+Run by:   a SessionStart hook in the PROJECT's `.claude/settings.json`, written by
+          `deadweight --setup-statusline` (command: `statusline.py --measure`). The plugin
+          declares no hook: its directory accepts `command` hooks only from verified
+          organizations, and 0.33.0 was refused for this one.
+Opt out:  delete that entry from the project's settings.
 """
 import datetime
 import hashlib

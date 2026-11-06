@@ -4,9 +4,12 @@
 The plugin's only dependency is Python, but its hook ran through bash and GNU
 coreutils until 0.14.1, and failed on every macOS session with its errors discarded.
 No check caught it because every check ran on Linux. This one runs the pieces the
-way the harness does - the hook command from hooks.json, `deadweight --fresh`, the
-status line fed a JSON payload - on a throwaway project, and fails on the first
-piece that does not produce what the next one reads.
+way the harness does - `deadweight --setup-statusline`, the hook command it writes
+into the project's settings, `deadweight --fresh`, the status line fed a JSON payload -
+on a throwaway project, and fails on the first piece that does not produce what the
+next one reads. Since 0.34.0 the plugin declares no hook (the plugin directory refuses
+a hook of type `command` from an unverified organization): the hook lives in the
+project's settings, written by the setup, so that is the command tested here.
 
     python3 .github/smoke/portability.py [plugin_root]
 """
@@ -33,12 +36,27 @@ def main():
     (project / ".git").mkdir(parents=True)
     (project / "CLAUDE.md").write_text("# shop-api\n\nRun `make test` before any change.\n", encoding="utf-8")
     cache_home = work / "cache"
-    env = dict(os.environ, CLAUDE_PROJECT_DIR=str(project), CLAUDE_PLUGIN_ROOT=str(PLUGIN),
-               XDG_CACHE_HOME=str(cache_home))
+    # A Claude Code home that knows where the plugin is installed, as the launcher looks it up;
+    # no Copilot home, so the setup writes only the Claude Code side. No CLAUDE_PLUGIN_ROOT: a hook
+    # in a project's settings does not get one.
+    claude_home = work / "claude"
+    (claude_home / "plugins").mkdir(parents=True)
+    (claude_home / "plugins" / "installed_plugins.json").write_text(json.dumps(
+        {"plugins": {"deadweight@e-xode": [{"scope": "user", "installPath": str(PLUGIN)}]}}), encoding="utf-8")
+    env = {k: v for k, v in os.environ.items() if k != "CLAUDE_PLUGIN_ROOT"}
+    env.update(CLAUDE_PROJECT_DIR=str(project), XDG_CACHE_HOME=str(cache_home),
+               CLAUDE_CONFIG_DIR=str(claude_home), COPILOT_HOME=str(work / "no-copilot"))
 
-    # 1. The hook, through the exact command the harness runs, in a shell.
-    command = json.loads((PLUGIN / "hooks" / "hooks.json").read_text(encoding="utf-8"))
-    command = command["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+    # 0. The setup, which writes the status line, its launcher and the hook into the project.
+    setup = subprocess.run([sys.executable, str(PLUGIN / "bin" / "deadweight"), "--setup-statusline"], env=env,
+                           cwd=project, capture_output=True, text=True, timeout=60)
+    print(f"deadweight --setup-statusline: exit {setup.returncode}")
+    if setup.returncode != 0:
+        fail(f"the setup failed: {setup.stdout[:300]} {setup.stderr[:300]}")
+    settings = json.loads((project / ".claude" / "settings.json").read_text(encoding="utf-8"))
+
+    # 1. The hook, through the exact command the setup wrote, in a shell.
+    command = settings["hooks"]["SessionStart"][0]["hooks"][0]["command"]
     # The shell the harness uses. On Windows that is Git Bash (CLAUDE_CODE_GIT_BASH_PATH, or
     # the first bash on PATH), not the WSL launcher that CreateProcess finds in System32
     # BEFORE the PATH - which a bare "bash" here resolved to, and which fails on a

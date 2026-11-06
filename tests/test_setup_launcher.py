@@ -36,7 +36,7 @@ def command():
     return mod
 
 
-class LauncherAfterWire(unittest.TestCase):
+class Fixture(unittest.TestCase):
     def setUp(self) -> None:
         self.mod = command()
         self.tmp = tempfile.TemporaryDirectory()
@@ -51,10 +51,13 @@ class LauncherAfterWire(unittest.TestCase):
 
     def project(self, settings: str) -> Path:
         root = self.base / "shop-api"
-        (root / ".claude").mkdir(parents=True)
+        (root / ".claude").mkdir(parents=True, exist_ok=True)
         (root / ".claude" / "settings.json").write_text(settings, encoding="utf-8")
         (root / ".claude" / "statusline.py").write_text(MINE, encoding="utf-8")
         return root
+
+
+class LauncherAfterWire(Fixture):
 
     def test_claude_other_status_line_keeps_the_file(self):
         root = self.project(json.dumps({"statusLine": {"type": "command", "command": "shop-status"}}))
@@ -99,7 +102,7 @@ class LauncherAfterWire(unittest.TestCase):
 
     def bare_project(self, settings: str | None) -> Path:
         root = self.base / "shop-web"
-        (root / ".claude").mkdir(parents=True)
+        (root / ".claude").mkdir(parents=True, exist_ok=True)
         if settings is not None:
             (root / ".claude" / "settings.json").write_text(settings, encoding="utf-8")
         return root
@@ -359,6 +362,184 @@ class LauncherAfterWire(unittest.TestCase):
             self.assertEqual(self.quiet(self.mod.setup_statusline, root), 3)
         self.assertTrue((home / "deadweight-statusline.py").is_file())
         self.assertEqual((root / ".claude" / "settings.json").read_text(encoding="utf-8"), "{}\n")
+
+
+class SessionStartHookInProjectSettings(Fixture):
+    """0.34.0: the hook is written into the project's settings, the plugin declares none.
+
+    Anthropic's plugin directory refused 0.33.0 for the plugin's own hook of type `command`.
+    """
+
+    def groups(self, root: Path):
+        data = json.loads((root / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        return data["hooks"]["SessionStart"]
+
+    def test_the_plugin_declares_no_hook(self):
+        # The places this plugin could declare a hook (plugin directory rule LOCAL_CODE_HOOK_COMMAND).
+        import re
+        self.assertFalse((ROOT / "hooks" / "hooks.json").exists())
+        manifest = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        self.assertNotIn("hooks", manifest)
+        market = json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+        for entry in market.get("plugins", []):
+            self.assertNotIn("hooks", entry)
+        for folder in ("skills", "agents", "commands"):
+            for f in (ROOT / folder).rglob("*.md"):
+                text = f.read_text(encoding="utf-8")
+                front = text.split("---", 2)[1] if text.startswith("---") else ""
+                self.assertIsNone(re.search(r"^hooks\s*:", front, re.M), f)
+
+    def test_setup_writes_one_hook_that_runs_the_launcher(self):
+        root = self.project("{}\n")
+        self.assertEqual(self.quiet(self.mod.setup_claude, root), 0)
+        (group,) = self.groups(root)
+        self.assertEqual(group["matcher"], "startup|resume")
+        self.assertEqual(group["hooks"], [{"type": "command", "command": self.mod.HOOK_COMMAND, "timeout": 20}])
+        self.assertEqual(self.mod.HOOK_COMMAND,
+                         'python3 "$CLAUDE_PROJECT_DIR"/.claude/statusline.py --measure')
+
+    def test_setup_twice_writes_it_once(self):
+        root = self.project("{}\n")
+        self.quiet(self.mod.setup_claude, root)
+        self.assertEqual(self.quiet(self.mod.setup_claude, root), 0)
+        self.assertEqual(len(self.groups(root)), 1)
+
+    def test_another_session_start_hook_is_kept_beside_it(self):
+        mine = {"hooks": [{"type": "command", "command": "shop-banner"}]}
+        root = self.project(json.dumps({"hooks": {"SessionStart": [mine], "Stop": [mine]}}))
+        self.assertEqual(self.quiet(self.mod.setup_claude, root), 0)
+        groups = self.groups(root)
+        self.assertEqual(groups[0], mine)
+        self.assertEqual(len(groups), 2)
+        data = json.loads((root / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["hooks"]["Stop"], [mine])
+
+    def test_an_unusual_hooks_shape_writes_nothing_at_all(self):
+        # External audit of 0.34.0, A-00: the statusLine and the launcher used to be written first.
+        for shape in ({"hooks": []}, {"hooks": {"SessionStart": "shop-banner"}}, {"hooks": "x"}, []):
+            with self.subTest(shape=shape):
+                root = self.project(json.dumps(shape))
+                settings = root / ".claude" / "settings.json"
+                before = settings.read_bytes()
+                self.assertEqual(self.quiet(self.mod.setup_claude, root), 2)
+                self.assertEqual(settings.read_bytes(), before)
+                self.assertEqual((root / ".claude" / "statusline.py").read_text(encoding="utf-8"), MINE)
+                self.assertEqual(self.quiet(self.mod.wire_hook, settings), 2)
+                self.assertEqual(settings.read_bytes(), before)
+
+    def test_a_null_session_start_counts_as_absent(self):
+        # A-01: this raised TypeError after the statusLine and the launcher were written.
+        root = self.project(json.dumps({"hooks": {"SessionStart": None}}))
+        self.assertEqual(self.quiet(self.mod.setup_claude, root), 0)
+        self.assertEqual(len(self.groups(root)), 1)
+
+    def test_a_group_that_is_not_usual_is_skipped_not_fatal(self):
+        odd = [{"hooks": 3}, "text", {"matcher": "x"}]
+        root = self.project(json.dumps({"hooks": {"SessionStart": odd}}))
+        self.assertEqual(self.quiet(self.mod.setup_claude, root), 0)
+        groups = self.groups(root)
+        self.assertEqual(groups[:3], odd)
+        self.assertEqual(len(groups), 4)
+
+    def test_setup_reports_a_failed_hook(self):
+        # A-02: setup_claude ignoring wire_hook's code survived every mutation.
+        root = self.project("{}\n")
+        with mock.patch.object(self.mod, "wire_hook", return_value=2):
+            self.assertEqual(self.quiet(self.mod.setup_claude, root), 2)
+
+    def test_a_failed_hook_write_does_not_claim_the_settings_are_as_they_were(self):
+        # A-03: `wire` had already set the statusLine, so "left as they were" was false.
+        root = self.project("{}\n")
+        settings = root / ".claude" / "settings.json"
+        real = Path.write_text
+
+        def refuse(self_, *a, **k):
+            if self_ == settings and "SessionStart" in a[0]:
+                raise OSError("disk full")
+            return real(self_, *a, **k)
+
+        err = io.StringIO()
+        with mock.patch.object(Path, "write_text", refuse), contextlib.redirect_stderr(err), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(self.mod.setup_claude(root), 2)
+        self.assertNotIn("as they were", err.getvalue())
+        self.assertIn("statusLine", err.getvalue())
+        self.assertIn("statusLine", json.loads(settings.read_text(encoding="utf-8")))
+
+    def test_another_status_line_gets_no_hook(self):
+        settings = json.dumps({"statusLine": {"type": "command", "command": "shop-status"}})
+        root = self.project(settings)
+        self.assertEqual(self.quiet(self.mod.setup_claude, root), 1)
+        self.assertEqual((root / ".claude" / "settings.json").read_text(encoding="utf-8"), settings)
+
+    def test_the_launcher_measure_runs_the_installed_plugins_audit_script(self):
+        # The launcher finds the plugin through installed_plugins.json, then runs hooks/session-audit.py.
+        import subprocess, sys
+        home = self.base / "claude"
+        (home / "plugins").mkdir(parents=True)
+        (home / "plugins" / "installed_plugins.json").write_text(json.dumps(
+            {"plugins": {"deadweight@e-xode": [{"scope": "user", "installPath": str(ROOT)}]}}), encoding="utf-8")
+        project = self.base / "shop-api"
+        project.mkdir()
+        cache = self.base / "cache"
+        env = dict(os.environ, CLAUDE_CONFIG_DIR=str(home), CLAUDE_PROJECT_DIR=str(project),
+                   XDG_CACHE_HOME=str(cache))
+        run = subprocess.run([sys.executable, str(self.mod.LAUNCHER), "--measure"], env=env,
+                             capture_output=True, text=True, timeout=60)
+        self.assertEqual((run.returncode, run.stdout), (0, ""), run.stderr)
+        self.assertEqual(len(list((cache / "claude-audit").glob("shop-api-*.json"))), 1)
+
+    def run_launcher(self, *args, config=None):
+        import subprocess, sys
+        project = self.base / "shop-api"
+        project.mkdir(exist_ok=True)
+        cache = self.base / "cache"
+        env = dict(os.environ, CLAUDE_CONFIG_DIR=str(config or self.base / "empty-claude"),
+                   COPILOT_HOME=str(self.base / "empty-copilot"), CLAUDE_PROJECT_DIR=str(project),
+                   XDG_CACHE_HOME=str(cache))
+        run = subprocess.run([sys.executable, str(self.mod.LAUNCHER), *args], env=env, stdin=subprocess.DEVNULL,
+                             capture_output=True, text=True, timeout=60)
+        return run, cache
+
+    def test_measure_without_the_plugin_prints_nothing_and_exits_0(self):
+        # Second pass, A-02: the hook sits in a file every teammate runs, and SessionStart stdout enters the context.
+        run, cache = self.run_launcher("--measure")
+        self.assertEqual((run.returncode, run.stdout), (0, ""), run.stderr)
+        self.assertFalse(cache.exists())
+
+    def test_measure_is_read_from_the_first_argument_only(self):
+        # Second pass, A-04: `copilot --measure` is the status line for Copilot, not a measurement.
+        home = self.base / "claude"
+        (home / "plugins").mkdir(parents=True)
+        (home / "plugins" / "installed_plugins.json").write_text(json.dumps(
+            {"plugins": {"deadweight@e-xode": [{"scope": "user", "installPath": str(ROOT)}]}}), encoding="utf-8")
+        run, cache = self.run_launcher("copilot", "--measure", config=home)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertFalse(cache.exists())
+
+    def test_the_audit_does_not_report_the_hook_the_setup_writes(self):
+        import importlib
+        hooks_module = importlib.import_module("deadweight_audit.checks.hooks")
+        self.assertEqual(hooks_module.SETUP_STATUSLINE_HOOK, self.mod.HOOK_COMMAND)
+
+    def test_a_failed_hook_write_puts_back_the_settings_as_wire_left_them(self):
+        # Second pass, A-03: the test raised before anything reached the file, so restore() never ran.
+        root = self.project("{}\n")
+        settings = root / ".claude" / "settings.json"
+        real = Path.write_text
+
+        def truncate_then_refuse(self_, *a, **k):
+            if self_ == settings and "SessionStart" in a[0]:
+                real(self_, "")
+                raise OSError("disk full")
+            return real(self_, *a, **k)
+
+        with mock.patch.object(Path, "write_text", truncate_then_refuse), \
+                contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(self.mod.setup_claude(root), 2)
+        data = json.loads(settings.read_text(encoding="utf-8"))
+        self.assertIn("statusLine", data)
+        self.assertNotIn("hooks", data)
 
 
 if __name__ == "__main__":

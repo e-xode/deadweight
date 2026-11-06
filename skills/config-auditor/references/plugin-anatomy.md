@@ -179,6 +179,8 @@ Blind spots it documents itself: a root `SKILL.md` of a plugin not sitting in a 
 
 ## What audit.py adds
 
+**What still runs on a plugin, what is skipped** [house, `audit.py`]. The layout is detected from `.claude-plugin/plugin.json` (or forced with `--layout`). The skill-level checks run on every `SKILL.md` wherever it lives; the project-level checks (`PROJECT_ONLY` in `deadweight_audit/registry.py`: `CLAUDE.md`, rules, settings, skills index, cross-references, `17-always-loaded-budget`) are skipped, because a plugin has no `CLAUDE.md`, settings, rules or skills index - the run says how many it skipped. The budget check inverts: `17` caps what a project loads for itself, `30-plugin-cost` reports what the plugin's descriptions cost **each consuming project**, every turn.
+
 | Check | Fires on |
 | --- | --- |
 | `44-plugin-layout` | component directories inside `.claude-plugin/` |

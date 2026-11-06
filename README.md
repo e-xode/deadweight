@@ -144,7 +144,7 @@ or **none** — a repository with no Claude Code configuration, which gets no fi
 | what your account, plugins, mods and MCP servers add to every session, beyond the project | `deadweight --environment` (estimate from file sizes); `--measure` adds a measurement (four `claude -p` runs on Haiku, a few cents; runs the project's hooks, MCP servers and mods) — see below |
 | the counts in your status line | `deadweight --setup-statusline` from the project's root — Claude Code, Copilot CLI or both — then a new session |
 | to stop the configuration from getting worse | `--set-floor` once, `--check-floor` in CI — see [The ratchet](#the-ratchet) |
-| to turn it off in one project | `claude plugin disable deadweight --scope project` |
+| to turn it off in one project | `claude plugin disable deadweight --scope project`; if the status line was set up, also delete the `SessionStart` hook whose command ends in `statusline.py --measure` from the project's `.claude/settings.json`: the launcher finds the plugin in `installed_plugins.json` without reading which plugins are enabled, so the hook goes on measuring |
 
 `deadweight` is on the Bash tool's `PATH` while the plugin is enabled, so Claude can run it. To run
 it from your own shell, define it once:
@@ -207,18 +207,25 @@ finds on the machine, because the two keep the setting at different levels:
 
 | Host | Where the line is set | Covers |
 | --- | --- | --- |
-| Claude Code | `.claude/statusline.py`, and `statusLine` in the project's `.claude/settings.json` | this project |
+| Claude Code | `.claude/statusline.py`, and `statusLine` plus a `SessionStart` hook in the project's `.claude/settings.json` | this project |
 | Copilot CLI | `~/.copilot/deadweight-statusline.py`, and `statusLine` in `~/.copilot/settings.json` | every project: a repository's `.github/copilot/settings.json` ignores the key |
 
 A plugin cannot ship a `statusLine` itself, in either host, so this one command is the shortest
 honest path. The line shows up on the next session.
+
+The `SessionStart` hook that fills the line's cache is written into the same settings file, not
+shipped by the plugin: Anthropic's plugin directory accepts a plugin that declares a hook of type
+`command` only from a verified organization, and 0.33.0 was refused for that one hook. Copilot CLI:
+no hook is written (this repository has not measured where Copilot CLI reads one from), so its line
+stays empty until `deadweight --fresh` runs in the project.
 
 The file it writes is a launcher, not the status line: it finds the plugin installed for the
 project and runs its template, so an update reaches the line at the next session without running
 the setup again. Until 0.13.1 it was a copy, and a copy stays at the version it was taken from —
 run the setup once more to replace one.
 
-**Already have a status line?** The setup leaves it untouched. Add the audit to it instead: load
+**Already have a status line?** The setup leaves it untouched and writes no hook either, so nothing refreshes the numbers: run `deadweight --fresh` when you want them updated, or put
+`python3 <installPath>/hooks/session-audit.py` in a `SessionStart` hook of your own (the path changes at each plugin update). To show the segment in your line, load
 `skills/config-auditor/templates/statusline.py` from the plugin's install path and call
 `segment(project_dir)`, which returns the segment as a string, or `""` where no audit has run. The
 install path is the `installPath` of the plugin's entry in `~/.claude/plugins/installed_plugins.json`;
@@ -366,8 +373,9 @@ floor nor the overlay.
 
 ## Two channels, two prices
 
-The `SessionStart` hook runs the audit and caches the result in
-`${XDG_CACHE_HOME:-~/.cache}/claude-audit/`, **outside** the repository. It prints **nothing**.
+The `SessionStart` hook that `--setup-statusline` writes into your project's settings runs the audit
+and caches the result in `${XDG_CACHE_HOME:-~/.cache}/claude-audit/`, **outside** the repository. It
+prints **nothing**. Until 0.33.0 the plugin declared this hook itself.
 
 That silence rests on a measurement: a plugin hook's stdout **enters the model's context** — a
 probe plugin printing marker lines had them read back verbatim by a fresh session. Whatever a hook
@@ -379,7 +387,8 @@ prints is paid for in every session of every project that installs the plugin.
 | Status line | you | nothing — it "runs locally and does not consume API tokens" |
 
 Numbers a human glances at belong in the status line. The hook runs on `startup` and `resume` only;
-opting out is per project and covers the whole plugin, not the hook alone.
+to opt out, delete the hook entry whose command ends in `statusline.py --measure` from the project's
+`.claude/settings.json`.
 
 ## The doctrine behind the checks
 

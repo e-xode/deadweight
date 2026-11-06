@@ -1,6 +1,6 @@
 """The doctrine check 46 compares against: this plugin's reference names and code terms, frozen.
 
-GENERATED on 2026-11-05 from skills/config-auditor/references/ - do not edit by hand.
+GENERATED on 2026-11-06 from skills/config-auditor/references/ by a maintainer script that is not part of this repository - do not edit by hand.
 Frozen rather than read at run time: a reference page added to the plugin changed findings in
 consuming projects while the auditor's sha stayed the same. Regenerating it is a deliberate change
 of the auditor, and moves its sha.
@@ -28,7 +28,7 @@ DOCTRINE_REFERENCE_NAMES = frozenset({
     'skill-runtime-mechanisms.md',
 })
 
-# 1408 code terms (text between backticks, 2 to 60 characters; generic repository folders,
+# 1418 code terms (text between backticks, 2 to 60 characters; generic repository folders,
 # extension globs, credential env names and fragments between two code spans left out).
 DOCTRINE_CODE_TERMS = frozenset({
     '!~/…',
@@ -132,11 +132,13 @@ DOCTRINE_CODE_TERMS = frozenset({
     '--fix',
     '--help',
     '--json',
+    '--layout',
     '--max-requests',
     '--mcp-config',
     '--model',
     '--permission-mode',
     '--plugin-dir',
+    '--root ~/.claude',
     '--runtime',
     '--runtime <InstructionsLoaded log>',
     '--safe-mode',
@@ -197,6 +199,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     '.claude/skills/<owner>/scripts/<script>',
     '.claude/skills/<skill-name>/SKILL.md',
     '.claude/skills/shop-catalog/scripts/validate_sku.py',
+    '.claude/statusline.py',
     '.cursor/',
     '.cursor/agents/<verifier>.md',
     '.cursor/rules',
@@ -254,6 +257,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     '/permissions',
     '/plugin',
     '/plugin update',
+    '/proc',
     '/relative-to-the-settings-source',
     '/reload-plugins',
     '/resume',
@@ -294,6 +298,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     '14-rule-unknown-field',
     '15-skill-index',
     '16-reference-size',
+    '17',
     '17-always-loaded-budget',
     '18-see-skill-target',
     '1h',
@@ -540,6 +545,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     'Monitor',
     'MultiEdit',
     'NotebookEdit',
+    'PROJECT_ONLY',
     'Path contains ".."',
     'PermissionDenied',
     'PermissionRequest',
@@ -800,6 +806,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     'asyncRewake',
     'attribution',
     'audit.py',
+    'audit.py --root ~',
     'audit.py --runtime',
     'auto',
     'autoAllowBashIfSandboxed',
@@ -913,7 +920,10 @@ DOCTRINE_CODE_TERMS = frozenset({
     'data-i18n',
     'data/[ab]*.csv',
     'date',
+    'deadweight --environment',
+    'deadweight --setup-statusline',
     'deadweight_audit/',
+    'deadweight_audit/registry.py',
     'decision',
     'default',
     'defaultEnabled: false',

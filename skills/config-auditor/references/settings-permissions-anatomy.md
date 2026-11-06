@@ -311,6 +311,7 @@ model's usual spelling; "secrets protected by `Read(./.env)`" is only true toget
   `enableWeakerNestedSandbox` (in an unprivileged container the inner sandbox bind-mounts the container's /proc, which "exposes process information"), `enableWeakerNetworkIsolation` (macOS TLS trust service: "a potential data exfiltration path"),
   `network.allowAllUnixSockets` (every Unix socket), `network.allowLocalBinding` (macOS: listen on ports, reach any localhost port; no effect on Linux).
   `allowNestedUserNamespaces` is not here: it is "User or managed" and ignored in a repository's files (above).
+  What the sandboxing page says of two of them [doc]: `enableWeakerNestedSandbox` - "Only use this setting when the outer container already provides the isolation boundary you need, since the setting exposes process information to sandboxed commands that a fresh `/proc` mount would hide"; `network.allowLocalBinding` on macOS - "A localhost service that doesn't require authentication, such as a debugger, can then act for the command outside the sandbox".
   Exempt the file (all its keys) with the reason, e.g. a CI container. Under an admin-required sandbox the four's `true` is ignored in a repository's files (sandboxing); audit.py cannot see managed settings.
 
 ## Not checked by audit.py

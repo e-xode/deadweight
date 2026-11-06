@@ -229,6 +229,82 @@ def wire_then_place(settings: Path, wanted: dict, dest: Path) -> int:
     return 0
 
 
+HOOK_COMMAND = 'python3 "$CLAUDE_PROJECT_DIR"/.claude/statusline.py --measure'
+
+
+def hook_shape_problem(settings: Path) -> str | None:
+    """Why the hook cannot be added to this settings file, or None.
+
+    Checked BEFORE anything is written (external audit of 0.34.0, A-00): `wire_then_place` sets the
+    `statusLine` and writes the launcher, and a hook refused after that left a half-done setup.
+    A file that is not plain JSON is not judged here: `wire` says so itself.
+    """
+    if not settings.is_file():
+        return None
+    try:
+        data = json.loads(settings.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    hooks = data.get("hooks") if isinstance(data, dict) else None
+    if not isinstance(data, dict):
+        return f"{settings} is not a JSON object"
+    if hooks is not None and not isinstance(hooks, dict):
+        return f"`hooks` in {settings} is not an object"
+    groups = hooks.get("SessionStart") if hooks else None
+    if groups is not None and not isinstance(groups, list):
+        return f"`hooks.SessionStart` in {settings} is not a list"
+    return None
+
+
+def wire_hook(settings: Path) -> int:
+    """Add the SessionStart hook that fills the status line's cache. 0 set, 2 not written.
+
+    It lives in the PROJECT's settings, written at the user's request, and not in the plugin:
+    the plugin directory refuses a plugin that declares a hook of type `command` (0.33.0).
+    Matchers `startup` and `resume` only: `clear` and `compact` reset the conversation, not the
+    configuration on disk. Another SessionStart hook of the project is left where it is; this one
+    is added beside it, once (the command string is the identity). A `SessionStart` that is null
+    counts as absent; a group that is not an object, or whose `hooks` is not a list, is skipped.
+    """
+    problem = hook_shape_problem(settings)
+    if problem:
+        print(f"  {problem}; the hook is not added.", file=sys.stderr)
+        return 2
+    data = {}
+    if settings.is_file():
+        try:
+            data = json.loads(settings.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            print(f"  {settings} is not plain JSON; the hook is not added.", file=sys.stderr)
+            return 2
+    hooks = data.get("hooks")
+    if hooks is None:
+        hooks = data["hooks"] = {}
+    groups = hooks.get("SessionStart")
+    if groups is None:
+        groups = hooks["SessionStart"] = []
+    if any(isinstance(h, dict) and h.get("command") == HOOK_COMMAND
+           for g in groups if isinstance(g, dict) and isinstance(g.get("hooks"), list)
+           for h in g["hooks"]):
+        return 0
+    groups.append({"matcher": "startup|resume",
+                   "hooks": [{"type": "command", "command": HOOK_COMMAND, "timeout": 20}]})
+    before = settings.read_bytes() if settings.is_file() else None
+    try:
+        settings.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    except BaseException as exc:
+        undone = restore(settings, before)
+        if not isinstance(exc, OSError):
+            raise
+        # `before` already holds the `statusLine` that `wire` set: it is not "as it was" before the
+        # setup, and saying so was wrong (external audit of 0.34.0, A-03).
+        state = (undone if "could not be put back" in undone
+                 else "the statusLine and the launcher are in place, the hook is not")
+        print(f"  {settings} could not be written ({exc}); {state}.", file=sys.stderr)
+        return 2
+    return 0
+
+
 def setup_claude(root: Path) -> int:
     """Claude Code reads `statusLine` from the project: one line per project."""
     if not ((root / ".git").exists() or (root / ".claude").is_dir()):
@@ -236,11 +312,18 @@ def setup_claude(root: Path) -> int:
               f"  Run the setup from the project's root.", file=sys.stderr)
         return 1
     dest = root / ".claude" / "statusline.py"
+    problem = hook_shape_problem(root / ".claude" / "settings.json")
+    if problem:
+        print(f"Claude Code: {problem}; nothing written.", file=sys.stderr)
+        return 2
     code = wire_then_place(root / ".claude" / "settings.json",
                            {"type": "command", "command": 'python3 "$CLAUDE_PROJECT_DIR"/.claude/statusline.py'},
                            dest)
     if code == 0:
-        print(f"Claude Code: installed for this project\n  {dest}\n  statusLine set in {root / '.claude' / 'settings.json'}")
+        code = wire_hook(root / ".claude" / "settings.json")
+    if code == 0:
+        print(f"Claude Code: installed for this project\n  {dest}\n  statusLine and a SessionStart hook "
+              f"set in {root / '.claude' / 'settings.json'}")
     return code
 
 
@@ -336,7 +419,7 @@ def show(root: Path, only_errors: bool, as_json: bool, with_info: bool = False,
     src = cache_path(root)
     if not src.is_file() or src.stat().st_size == 0:
         print(f"No cached measurement for {root}.\n"
-              f"The SessionStart hook writes it when a session opens here; "
+              f"The SessionStart hook that --setup-statusline wrote writes it when a session opens here; "
               f"`deadweight --fresh` measures now.")
         return 1
     if as_json:

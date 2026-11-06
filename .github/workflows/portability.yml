@@ -3,7 +3,7 @@ name: portability
 # The plugin's only dependency is Python; its hook still ran through bash and GNU
 # coreutils until 0.14.1, and failed at every macOS session with its errors
 # discarded. Every check ran on Linux, so none saw it. This runs what a user runs -
-# the hook command from hooks.json, `deadweight --fresh`, the status line - on each
+# the hook command that `--setup-statusline` writes, `deadweight --fresh`, the status line - on each
 # OS a user may be on.
 
 on:

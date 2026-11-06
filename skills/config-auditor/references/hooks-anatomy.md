@@ -232,7 +232,7 @@ context** Claude sees.
 
 - **`35-hooks-context`** (NOTICE) lists the file's hooks on those four events. Whatever they print is
   paid in tokens on every session or every turn — a cost `/context` does not show before the hook
-  runs, because it prices declarations, not output [inference].
+  runs, because it prices declarations, not output [inference]. One command is exempt: the hook `deadweight --setup-statusline` writes, `python3 "$CLAUDE_PROJECT_DIR"/.claude/statusline.py --measure`, when it is the only handler on `SessionStart` (it prints nothing). The exemption compares that command string only: it does not check that `.claude/statusline.py` is the launcher.
 - [doc] Plain stdout, `additionalContext`, `systemMessage` and `initialUserMessage` are each capped
   at 10,000 characters; beyond, the text is saved to a file and replaced by its path plus a
   2,000-character preview, and Claude is not asked to read the file (`hooks § JSON output`).
