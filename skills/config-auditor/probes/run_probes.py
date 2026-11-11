@@ -635,6 +635,8 @@ NOT_IMPLEMENTED: dict[tuple[str, str], str] = {
                                           "yet (the method is in `how`)",
     ("24-settings-skill-overrides", "tested"): "recorded by a second session on 2.1.317, not re-run "
                                                "here; the runner has no probe for it yet",
+    ("24-settings-deny-instead-of-prompting", "tested"): "recorded by hand on 2.1.322; the runner has no "
+                                                         "probe for it yet (the method is in `how`)",
 }
 
 

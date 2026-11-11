@@ -157,6 +157,69 @@
    ]
   },
   {
+   "id": "24-deny-instead-of-prompting-in-project",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"defaultMode\": \"default\",\n    \"deny\": [\n      \"Bash(rm *)\"\n    ],\n    \"denyInsteadOfPrompting\": true\n  }\n}",
+    ".claude/settings.local.json": "{\n  \"permissions\": {\n    \"denyInsteadOfPrompting\": false\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-scope",
+     "ERROR",
+     2
+    ],
+    [
+     "24-settings-unknown-subkey",
+     "NOTICE",
+     0
+    ],
+    [
+     "24-settings-unknown-subkey",
+     "WARN",
+     0
+    ]
+   ],
+   "gitignore": ".claude/settings.local.json\n",
+   "forbidden_messages": [
+    [
+     "24-settings-unknown-subkey",
+     "denyInsteadOfPrompting"
+    ],
+    [
+     "24-settings-scope",
+     "~/\\.claude\\.json|from managed settings only|without a word|with a warning"
+    ],
+    [
+     "24-settings-scope",
+     "^(?!.*from user or managed settings or `--settings` only)"
+    ]
+   ]
+  },
+  {
+   "id": "24-deny-instead-of-prompting-witnesses",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"Bash(npm test)\"\n    ],\n    \"denyInsteadOfPrompt\": true\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-scope",
+     "ERROR",
+     0
+    ],
+    [
+     "24-settings-unknown-subkey",
+     "NOTICE",
+     1
+    ]
+   ]
+  },
+  {
    "id": "24-documented-subkeys",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
@@ -173,6 +236,62 @@
      "24-settings-keys",
      "INFO",
      1
+    ]
+   ]
+  },
+  {
+   "id": "24-dotted-key-at-top-level",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions.denyInsteadOfPrompting\": true,\n  \"autoMode.classifyAllShell\": true\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-key",
+     "NOTICE",
+     2
+    ],
+    [
+     "24-settings-scope",
+     "ERROR",
+     0
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "24-settings-unknown-key",
+     "^(?!.*nests under that object)"
+    ]
+   ]
+  },
+  {
+   "id": "24-dotted-key-at-top-level-witnesses",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"permissions.denyInsteadOfPrompt\": true\n}",
+    ".claude/settings.local.json": "{\n  \"permissions\": {\n    \"denyInsteadOfPrompting\": true\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-key",
+     "NOTICE",
+     1
+    ],
+    [
+     "24-settings-scope",
+     "ERROR",
+     1
+    ]
+   ],
+   "gitignore": ".claude/settings.local.json\n",
+   "forbidden_messages": [
+    [
+     "24-settings-unknown-key",
+     "nests under"
     ]
    ]
   },

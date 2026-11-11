@@ -79,6 +79,13 @@ A key outside its scope is ignored; the table is not reproduced here, audit.py c
   which reads the rule, not through the harness: the setting holds when the rule is not read.
 - **`24-settings-scope`** (ERROR) — a key ignored in the file it sits in. Examples [doc]:
   - `modelPicker` — *User or managed*: a cloned repository cannot relabel the picker.
+  - `permissions.denyInsteadOfPrompting` (v2.1.319+) — *User or managed*, and `--settings`: "A repository can't set it
+    for you" (settings-reference, the key's entry, read 2026-11-11). Set, a call that would wait on
+    a permission prompt is denied and the turn goes on. [measured, 2.1.322, Linux, Haiku, one run per arm, under `-p`] in a
+    project's `.claude/settings.json` it changed nothing (a `touch` got the ordinary denial); from `--settings` the denial
+    read "no approval surface"; `--debug` logged no line about the project key. Under `-p` a call that would prompt is
+    denied either way, so only the text of the denial tells the two arms apart. Up to 0.34.0 the auditor reported it as
+    an unknown field of `permissions` (`24-settings-unknown-subkey`).
   - `env` entries — a project's or local `env` block cannot set the variables that choose where Claude Code writes its
     files (`CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_TMPDIR`, `HOME`, `TMPDIR`, the `XDG_*` family), the OpenTelemetry exporter
     variables (apart from their telemetry-off values: `none` for the three selectors, an off value for the three

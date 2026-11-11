@@ -437,3 +437,21 @@ Limits. The two 15-run batches of `plugin-container` scored 0.60 and 0.20 before
 long `TMPDIR`, then a kernel setting on the machine), so what the skill says to do when its script cannot run is what was measured, not a run of the script. Three changes to
 `SKILL.md` routing that raised other cases in the same search (`probe-fixture-visible`, `silent-agent`, `frontmatter-early-close`) are not in 0.34.0 for that reason. The run
 outputs are not in this repository (`evals/results/` is ignored), so these scores are the maintainer's report, like the older entries.
+
+## Criteria changed for 0.35.0: scores are not comparable with 0.34.0
+
+Six criteria files were changed after 0.34.0, five of them loosened, after the maintainer re-ran 0.34.0 evals (15 runs per arm; the
+outputs are not in this repository, so this is the maintainer's report). A score of these cases under 0.35.0 does not compare with one under 0.34.0:
+part of a difference can come from the criteria, not from the skill.
+
+| Case | Change |
+| --- | --- |
+| `description-authoring` | the rubric no longer opens with "The run must load the `config-auditor` skill" (the judge does not see the run's tools); `graders/trigger.md` now requires that skill by `input_match`, as `mechanism-question` does; other wordings of the 1,536 point are accepted |
+| `instruction-names-missing-script` | "treat CLAUDE.md as code that is pruned" becomes an optional point |
+| `silent-memory` (`agents-md-unread.md`) | more wordings of "AGENTS.md is not read" match, the negation bound to the verb; witnesses that must and must not match are in `tests/test_eval_graders.py` |
+| `agent-guard-hook-never-runs` | accurate caveats do not fail: frontmatter hooks of a project subagent skipped until its folder is trusted (a `-p` or SDK session does not grant that trust), a plugin agent's `hooks:` ignored |
+| `budget-growth` | a figure the run measured on the sandbox's empty folder and labels as such is not an invented figure |
+| `command-argument-hint-unquoted` | factual correction, not a loosening: `[--dry-run]` opens and closes a flow sequence, the text after it is what a strict parser rejects |
+
+The title of Step 2 of `SKILL.md` changed in the same release (runtime measurement also when the user reports slowness or context cost),
+so `budget-growth` moved for two reasons at once.

@@ -184,6 +184,13 @@ Silent failures by type [doc]:
   **Remedy** (2.1.295+): `"onFailure": "block"` on a `command` or `http` hook makes a timeout, a
   failure to start, an exit code other than 0 or 2, an HTTP error or invalid output do what exit 2
   does on that event (deny on `PermissionRequest`) — see below.
+- [doc] `PostToolUse` after a turn is ended with Ctrl+Enter while a tool runs (v2.1.319+): the hooks
+  run on the result with **10 seconds** to finish, and a `command` hook still running then is killed
+  "whatever its `timeout`"; `async: true` lets it finish but it can no longer block or rewrite the
+  result. Escape cancels them; a message queued with Enter keeps the usual timeout. Ctrl+Enter "acts
+  as `Esc`" — the hooks are cancelled at once — "if you queued a `!` command ahead of your messages or
+  background tasks are disabled", for example with `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS`. Before
+  v2.1.319 they did not start (hooks, "PostToolUse after an interrupt", read 2026-11-11). Not checked.
 
 ## Exit codes: what blocks and what only looks like it
 

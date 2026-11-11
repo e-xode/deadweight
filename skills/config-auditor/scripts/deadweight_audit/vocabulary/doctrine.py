@@ -1,6 +1,6 @@
 """The doctrine check 46 compares against: this plugin's reference names and code terms, frozen.
 
-GENERATED on 2026-11-06 from skills/config-auditor/references/ by a maintainer script that is not part of this repository - do not edit by hand.
+GENERATED on 2026-11-11 from skills/config-auditor/references/ by a maintainer script that is not part of this repository - do not edit by hand.
 Frozen rather than read at run time: a reference page added to the plugin changed findings in
 consuming projects while the auditor's sha stayed the same. Regenerating it is a deliberate change
 of the auditor, and moves its sha.
@@ -28,7 +28,7 @@ DOCTRINE_REFERENCE_NAMES = frozenset({
     'skill-runtime-mechanisms.md',
 })
 
-# 1418 code terms (text between backticks, 2 to 60 characters; generic repository folders,
+# 1421 code terms (text between backticks, 2 to 60 characters; generic repository folders,
 # extension globs, credential env names and fragments between two code spans left out).
 DOCTRINE_CODE_TERMS = frozenset({
     '!~/…',
@@ -484,6 +484,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     'CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1',
     'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
     'CLAUDE_CODE_DISABLE_AUTO_MEMORY=1',
+    'CLAUDE_CODE_DISABLE_BACKGROUND_TASKS',
     'CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1',
     'CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS',
     'CLAUDE_CODE_ENABLE_TELEMETRY=1',
@@ -521,6 +522,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     'EndConversation',
     'EnterPlanMode',
     'EnterWorktree',
+    'Esc',
     'ExitPlanMode',
     'ExitWorktree',
     'Explanatory',
@@ -1206,6 +1208,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     'permissions.defaultMode',
     'permissions.defaultMode: "bypassPermissions"',
     'permissions.deny',
+    'permissions.denyInsteadOfPrompting',
     'pip',
     'plan',
     'platform.claude.com',

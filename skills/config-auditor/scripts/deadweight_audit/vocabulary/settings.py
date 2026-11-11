@@ -65,7 +65,11 @@ SETTINGS_KEYS_USER_LOCAL_MANAGED = frozenset({
 
 SETTINGS_KEYS_USER_MANAGED = frozenset({
     "appendPlugins", "askUserQuestionTimeout", "autoContinueAtUsageLimit", "autoMode", "prependPlugins",
-    "autoMode.classifyAllShell", "bashEditDiffEnabled", "desktopSessionCleanupPeriodDays",
+    "autoMode.classifyAllShell", "bashEditDiffEnabled",
+    # settings-reference, read 2026-11-11: "Scope: User or managed, and `--settings`. A
+    # repository can't set it for you." Added in 2.1.319 (Claude Code changelog). Measured on
+    # 2.1.322 (evidence.json, 24-settings-deny-instead-of-prompting): ignored from a project file.
+    "permissions.denyInsteadOfPrompting", "desktopSessionCleanupPeriodDays",
     "dialogExpiry", "feedbackDrafts", "footerLinksRegexes", "forceLoginGatewayUrl", "modelPicker",
     "pluginConfigs",
     "axScreenReader", "processWrapper", "sandbox.allowAppleEvents", "sandbox.allowNestedUserNamespaces", "sandbox.credentials.allowPlaintextInject",
@@ -73,6 +77,12 @@ SETTINGS_KEYS_USER_MANAGED = frozenset({
     "sandbox.network.strictAllowlist", "sandbox.network.tlsTerminate", "sandbox.ripgrep",
     "skipAutoPermissionPrompt", "spellcheck", "sshConfigs", "sshHostCommands", "vimInsertModeRemaps"
 })
+
+
+# Keys of SETTINGS_KEYS_USER_MANAGED whose documented scope also names the flag: "Scope: User or
+# managed, and `--settings`" (settings-reference, permissions.denyInsteadOfPrompting, read
+# 2026-11-11). Per key, not for the whole set: `axScreenReader`, for one, is "User or managed" alone.
+SETTINGS_KEYS_ALSO_FROM_FLAG = frozenset({"permissions.denyInsteadOfPrompting"})
 
 
 # Scope "User": `~/.claude/settings.json` only (settings-reference, read 2026-10-17). Like the
@@ -128,7 +138,8 @@ SETTINGS_OBJECT_FIELDS = {
     "attribution": {"commit", "pr", "sessionUrl"},
     "autoMode": {"allow", "classifyAllShell", "environment", "hard_deny", "soft_deny"},
     "permissions": {"additionalDirectories", "allow", "ask", "blockReadsOutsideWorkingDirectories",
-                    "blockWritesOutsideWorkingDirectories", "defaultMode", "deny", "disableAutoMode", "disableBypassPermissionsMode"},
+                    "blockWritesOutsideWorkingDirectories", "defaultMode", "deny", "denyInsteadOfPrompting",
+                    "disableAutoMode", "disableBypassPermissionsMode"},
     "policyHelper": {"path", "refreshIntervalMs", "timeoutMs"},
     "worktree": {"baseRef", "bgIsolation", "location", "sparsePaths", "symlinkDirectories"},
     # `allowNestedUserNamespaces`: "Added `sandbox.allowNestedUserNamespaces`" (Claude Code

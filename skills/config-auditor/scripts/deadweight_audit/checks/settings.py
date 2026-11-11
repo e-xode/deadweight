@@ -23,6 +23,7 @@ from ..vocabulary.settings import (
     ENV_OFF_WORDS,
     BUILTIN_OUTPUT_STYLES,
     PROJECT_SCOPE_IGNORED_MODES,
+    SETTINGS_KEYS_ALSO_FROM_FLAG,
     SETTINGS_KEYS_GLOBAL,
     SETTINGS_KEYS_IGNORED_SILENTLY,
     SETTINGS_KEYS_IGNORED_WITH_WARNING,
@@ -183,6 +184,19 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                            "no effect on current versions. Delete the line (settings-reference).",
                            str(path))
                 continue
+            if "." in key and key in SETTINGS_KNOWN_KEYS:
+                # The scope tables spell nested fields with dots (`permissions.denyInsteadOfPrompting`),
+                # so the dotted name is in SETTINGS_KNOWN_KEYS. Written as ONE top-level key it is
+                # not that field: "Every `permissions.*` key below nests under this object"
+                # (settings-reference, permissions). Without this test it was judged by the scope of
+                # the nested field and the user told to move a line that is dead in every file.
+                parent, _, field = key.rpartition(".")
+                report.add("24-settings-unknown-key", "NOTICE",
+                           f"'{key}' in '{name}' is one top-level key with a dot in its name: the "
+                           f"settings reference spells the field `{field}` of `{parent}` this way, "
+                           "and in the file it nests under that object. As written it is not a key "
+                           "the reference lists (settings-reference).", str(path))
+                continue
             if key not in SETTINGS_KNOWN_KEYS:
                 report.add("24-settings-unknown-key", "NOTICE",
                            f"'{key}' in '{name}' is not in the settings reference ({len(SETTINGS_KNOWN_KEYS)} keys, "
@@ -257,6 +271,8 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
                 where = ("managed settings" if dotted in SETTINGS_KEYS_MANAGED else
                          "~/.claude.json" if dotted in SETTINGS_KEYS_GLOBAL else
                          "user settings (~/.claude/settings.json)" if dotted in SETTINGS_KEYS_USER else
+                         "user or managed settings or `--settings`" if dotted in SETTINGS_KEYS_USER_MANAGED
+                         and dotted in SETTINGS_KEYS_ALSO_FROM_FLAG else
                          "user or managed settings" if dotted in SETTINGS_KEYS_USER_MANAGED else
                          "user settings or .claude/settings.local.json")
                 loud = (", with a warning" if dotted in SETTINGS_KEYS_IGNORED_WITH_WARNING

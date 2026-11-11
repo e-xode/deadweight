@@ -289,6 +289,17 @@
     "how": "claude -p --model claude-haiku-5-5 --setting-sources project,local --strict-mcp-config --no-session-persistence --allowedTools Bash; a project `.claude/settings.local.json` env block holding XDG_CONFIG_HOME, CLAUDE_CODE_TMPDIR, CLAUDE_CODE_PLUGIN_CACHE_DIR and a control variable; the model ran `env | grep` on the four names; second run with --debug.",
     "result": "Only the control variable reached the shell command. With --debug, one WARN line per dropped variable: \"... in .claude/settings.local.json is ignored - project-scoped settings can't set this key. Set it in ~/.claude/settings.json or managed settings instead.\" Without --debug nothing was printed (stderr empty). One run each; three variables of the listed families, not the whole list. The user-settings side and the telemetry off values were not run."
    }
+  },
+  "24-settings-deny-instead-of-prompting": {
+   "documented": "https://code.claude.com/docs/en/settings-reference (\"permissions.denyInsteadOfPrompting\"; read 2026-11-11) and https://code.claude.com/docs/en/settings (\"Exceptions to managed settings precedence\")",
+   "documented_note": "Quoted: \"Scope: User or managed, and `--settings`. A repository can't set it for you.\" and \"Requires Claude Code v2.1.319 or later\". The key is also a field of the closed `permissions` object (\"Type: object with ... denyInsteadOfPrompting ...\"). The page does not say whether the key is ignored with or without a warning. Added in 2.1.319 (Claude Code changelog); raised by the repository's drift tickets for 2.1.319 and 2.1.321..2.1.322. Id used: `24-settings-scope`.",
+   "tested": {
+    "date": "2026-11-11",
+    "claude_code": "2.1.322",
+    "system": "Linux",
+    "how": "claude -p --model haiku --setting-sources project,local --permission-mode default --strict-mcp-config --no-session-persistence --output-format stream-json --verbose; prompt: run exactly `touch probe.txt` with the Bash tool. Three arms: an empty folder; the same with --settings <file holding {\"permissions\":{\"denyInsteadOfPrompting\":true}}>; a folder whose .claude/settings.json holds that object. Fourth run: the project arm with --debug, debug log searched for the key.",
+    "result": "Empty folder and project file: the same ordinary denial (permission_denied, \"touch in '<path>' needs approval\"), no file created. --settings: permission_denied with decision_reason \"no approval surface in this session; permission request denied automatically\" and the tool result \"Permission for this tool use was denied. It requires approval, and this session has no approval surface\". The debug log of the project run holds no line naming the key. One run per arm; -p always denies a call that would prompt, so the arms differ by the denial text only; the local file and an interactive session were not run."
+   }
   }
  }
 }

@@ -232,7 +232,11 @@ A `SKILL.md` anywhere else loads nowhere — `40-skill-not-loaded`.
 
 Nested `.claude/skills/` directories below the start directory load the first time Claude reads or
 edits a file there; until then they are neither listed nor invocable. A clashing nested skill is
-offered as `/<subdir>:<name>`.
+offered as `/<subdir>:<name>`. Two exceptions are in the Claude Code changelog only (the skills page
+does not state them, read 2026-11-11; not measured here): with the Bash sandbox on, they load only if
+the session starts in that folder or moves there with /cd (2.1.319), and `.claude/skills/` folders
+inside the plugins folder of the user's Claude directory no longer load when Claude works on files
+there (2.1.321).
 
 When two skills share a name (skills § Resolve skills that share a name):
 

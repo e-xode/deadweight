@@ -83,7 +83,7 @@ configuration for contradictions and duplicates no parser sees. It sends the fil
 run, so run it when the user asks for it, never as part of a routine audit. Never counted, never in
 the floor: [references/semantic-layer.md](./references/semantic-layer.md).
 
-### Step 2 — Runtime measurement (after any listing change)
+### Step 2 — Runtime measurement (after any listing change, and whenever the user reports slowness or context cost, even if the static count is 0 or the files could not be read)
 
 `audit.py` counts characters on disk; nothing static sees what the harness injected. Confirm in a
 fresh session:
