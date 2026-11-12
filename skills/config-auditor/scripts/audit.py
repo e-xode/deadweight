@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Audit the Claude configuration of a project or of a plugin.
 
 SHIPPED AS PART OF A PLUGIN - DO NOT EDIT IN PLACE.

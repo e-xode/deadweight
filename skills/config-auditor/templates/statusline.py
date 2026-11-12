@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Status line segment: what the audit last found here. For the human only.
 
 Installed by `deadweight --setup-statusline`, which also wires the setting. You can

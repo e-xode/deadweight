@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """What a reader sees and a parser does not: contradictions and duplicates, read by a model.
 
     python3 semantic.py                                   # contradictions + duplicates between files

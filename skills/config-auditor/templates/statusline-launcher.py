@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Status line launcher, written by `deadweight --setup-statusline`. Carries no display logic.
 
 It runs the status line template of the deadweight plugin INSTALLED for this project.

@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # Two planted defects the harness ignores without a word; neither is named in the prompt.
 set -e
 git init -q .

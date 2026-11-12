@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """SessionStart hook. Measures the consuming project and writes the result where a
 status line can read it - outside the repository. Prints nothing.
 

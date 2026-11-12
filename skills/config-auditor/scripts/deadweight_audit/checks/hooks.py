@@ -216,7 +216,7 @@ def _frontmatter_flags(hooks):
     return hooks
 
 
-# The one hook `deadweight --setup-statusline` writes into a project's settings (bin/deadweight, HOOK_COMMAND;
+# The one hook `deadweight --setup-statusline` writes into a project's settings (scripts/deadweight, HOOK_COMMAND;
 # a test keeps the two strings equal). It prints nothing, so the notice below, which says that what a hook on
 # SessionStart prints is paid in tokens, would be false about the project's own status line (external audit of
 # 0.34.0, second pass, B-01). Only this exact command on SessionStart is exempt: any other handler beside it,

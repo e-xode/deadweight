@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Show the detail behind the status line, and set that status line up.
 
 THE GAP THIS FILLS. A status line that says "3W" and offers no way to see which
@@ -10,6 +9,13 @@ detail costs nothing - only a second run would.
 Python only, standard library only - the same dependency the audit already has.
 An earlier version piped through `jq`, which was a dependency the README did not
 declare and which fails silently where it is missing.
+
+HOW IT IS RUN. Since 0.36.0 this file is `scripts/deadweight`, with no `#!` line and no
+executable bit, and it is run as `python3 <plugin root>/scripts/deadweight [option]`.
+Until 0.35.0 it was `bin/deadweight`, which Claude Code puts on the Bash tool's PATH as a bare
+command; claude.ai does not install a plugin with a top-level `bin/` (plugins-reference, org-sync),
+and Anthropic's plugin directory refused 0.35.0 for that folder. Below, `deadweight` stands for
+that invocation, or for the shell function the README defines.
 
     deadweight                   cached findings for this project, errors first
     deadweight --errors          errors only
@@ -27,7 +33,7 @@ declare and which fails silently where it is missing.
                                  the terminal, or needs --yes (always with --json). Another model:
                                  environment.py --model, run directly.
     deadweight --setup-statusline  install the status line in Claude Code and/or Copilot CLI
-    deadweight --where           print this plugin's root (to alias the command)
+    deadweight --where           print this plugin's root (to define the shell function)
 """
 from __future__ import annotations
 
@@ -35,12 +41,14 @@ import contextlib
 import hashlib
 import json
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
-HERE = Path(__file__).resolve().parent
+SELF = Path(__file__).resolve()
+HERE = SELF.parent            # scripts/, one level below the plugin root as bin/ was
 PLUGIN_ROOT = HERE.parent
 AUDIT = PLUGIN_ROOT / "skills" / "config-auditor" / "scripts" / "audit.py"
 SEMANTIC = AUDIT.parent / "semantic.py"
@@ -55,6 +63,40 @@ LAUNCHER = PLUGIN_ROOT / "skills" / "config-auditor" / "templates" / "statusline
 
 RED, YEL, GRN, DIM, OFF = "\033[31m", "\033[33m", "\033[32m", "\033[2m", "\033[0m"
 HOOK = PLUGIN_ROOT / "hooks" / "session-audit.py"
+# Not executable: the launcher has no `#!` since 0.36.0, and the settings written below run it as
+# `python3 .../statusline.py`, so the bit served nothing (audit of 0.36.0, A-02). Set explicitly,
+# because the temporary file is created 0600.
+LAUNCHER_MODE = 0o644
+
+
+def command(*options: str) -> str:
+    """This command written so that it runs where the message is read.
+
+    Not `deadweight --fresh`: without `bin/` there is no bare `deadweight` on the Bash tool's
+    PATH (0.36.0), and a remedy that names a command which does not exist is not a remedy.
+    """
+    return shell_line(str(SELF), options, windows=os.name == "nt")
+
+
+def shell_line(path: str, options: tuple[str, ...] | list[str], windows: bool) -> str:
+    """`python3 <path> <options>` quoted so that the shell passes `path` unchanged.
+
+    Inside double quotes a POSIX shell still expands `$`, backticks and `\\`: under `my$plugins`
+    the printed command named `.../my/scripts/deadweight` (audit of 0.36.0, A-01). On POSIX the
+    line is quoted by `shlex`. On Windows no one quoting holds in cmd, PowerShell and Git Bash: the
+    path is written with `/`, which Python accepts there and which none of
+    them rewrites, in double quotes, which all three honour; a path with `$`, a backtick or `%`
+    (expanded in double quotes by one of them) goes in single quotes, literal in PowerShell and
+    Git Bash, when it holds no `'`.
+    """
+    if not windows:
+        return shlex.join(["python3", path, *options])
+    p = PureWindowsPath(path).as_posix()
+    if any(c in p for c in "$`%") and "'" not in p:
+        quoted = f"'{p}'"
+    else:
+        quoted = f'"{p}"'
+    return " ".join(["python3", quoted, *options])
 
 
 def statusline_module():
@@ -78,7 +120,7 @@ def remedy(root: Path, d: dict) -> str | None:
     cache = cache_path(root)
     current = audit_sha()
     if sl.config_touched_since(str(root), cache.stat().st_mtime) or d.get("audit_sha") != current:
-        return "the measurement is older than the configuration or the auditor: `deadweight --fresh`"
+        return f"the measurement is older than the configuration or the auditor: `{command('--fresh')}`"
     floor = sl.read(str(root / ".claude" / "audit" / "floor.json"))
     if floor and floor.get("audit_sha") != d.get("audit_sha"):
         return (f"the floor was set by another auditor (`{floor.get('audit_sha')}`, now "
@@ -174,7 +216,7 @@ def place_launcher(dest: Path) -> None:
         mode = dest.stat().st_mode & 0o7777 if old is not None else None
         try:
             dest.write_text(LAUNCHER.read_text(encoding="utf-8"), encoding="utf-8")
-            dest.chmod(0o755)
+            dest.chmod(LAUNCHER_MODE)
         except BaseException:
             # The launcher that was there is put back (re-audit of 0.29.0, E-00).
             with contextlib.suppress(OSError):
@@ -185,14 +227,14 @@ def place_launcher(dest: Path) -> None:
                     dest.chmod(mode)
             raise
         return
-    # Written beside the destination, made executable, then moved over it: a failure at any
+    # Written beside the destination, given its mode, then moved over it: a failure at any
     # step leaves the launcher that was there untouched (catch-up audit of 0.28.0, B-01: a
     # failing chmod came after the old file had already been replaced).
     fd, tmp = tempfile.mkstemp(prefix=".statusline-", dir=dest.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as out:
             out.write(LAUNCHER.read_text(encoding="utf-8"))
-        os.chmod(tmp, 0o755)
+        os.chmod(tmp, LAUNCHER_MODE)
         os.replace(tmp, dest)
     except BaseException:
         with contextlib.suppress(OSError):
@@ -354,7 +396,7 @@ def setup_statusline(root: Path) -> int:
     one command writes two different things.
     """
     # Without CLAUDE_PROJECT_DIR the project is the working directory, and an agent
-    # that cd's into bin/ to run this script makes the plugin its own project.
+    # that cd's into scripts/ to run this script makes the plugin its own project.
     if root == PLUGIN_ROOT or PLUGIN_ROOT in root.parents:
         print(f"{root} is inside the plugin itself; nothing written.\n"
               f"  Run the setup from the root of the project to equip.", file=sys.stderr)
@@ -420,7 +462,7 @@ def show(root: Path, only_errors: bool, as_json: bool, with_info: bool = False,
     if not src.is_file() or src.stat().st_size == 0:
         print(f"No cached measurement for {root}.\n"
               f"The SessionStart hook that --setup-statusline wrote writes it when a session opens here; "
-              f"`deadweight --fresh` measures now.")
+              f"`{command('--fresh')}` measures now.")
         return 1
     if as_json:
         print(src.read_text(encoding="utf-8"), end="")
@@ -463,9 +505,9 @@ def show(root: Path, only_errors: bool, as_json: bool, with_info: bool = False,
             print(f"      {f.get('message')}")
             print(f"      {DIM}{f.get('location')}{OFF}")
         if not show_all and len(fs) > SHOWN_PER_CHECK:
-            print(f"      {DIM}... {len(fs) - SHOWN_PER_CHECK} more: `deadweight --all`{OFF}")
+            print(f"      {DIM}... {len(fs) - SHOWN_PER_CHECK} more: `{command('--all')}`{OFF}")
     if mesures and not with_info and not only_errors:
-        print(f"\n  {DIM}{mesures} measurement(s) not shown: `deadweight --info`{OFF}")
+        print(f"\n  {DIM}{mesures} measurement(s) not shown: `{command('--info')}`{OFF}")
     return 0
 
 
@@ -504,7 +546,7 @@ def main(argv: list[str]) -> int:
     root = root.resolve()
     if both and (as_json or semantic):
         print("--both is the cached findings plus --semantic: give it alone, and for JSON run "
-              "`deadweight --json` and `deadweight --semantic --json` separately", file=sys.stderr)
+              f"`{command('--json')}` and `{command('--semantic', '--json')}` separately", file=sys.stderr)
         return 2
 
     if env_flags and not environment:
@@ -526,7 +568,7 @@ def main(argv: list[str]) -> int:
         return subprocess.call([sys.executable, str(ENVIRONMENT), "--root", str(root)]
                                + env_flags + (["--json"] if as_json else []))
     if setup:
-        # The guard looks at where the command was run too: from bin/, the walk up
+        # The guard looks at where the command was run too: from scripts/, the walk up
         # would leave the plugin and land on whatever encloses it.
         if cwd == PLUGIN_ROOT or PLUGIN_ROOT in cwd.parents:
             root = cwd

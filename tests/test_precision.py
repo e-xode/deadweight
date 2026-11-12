@@ -26,8 +26,8 @@ PRECISION = ROOT / "skills" / "config-auditor" / "precision.json"
 
 
 def command():
-    """bin/deadweight has no .py suffix: load it by path."""
-    loader = importlib.machinery.SourceFileLoader("deadweight_bin", str(ROOT / "bin" / "deadweight"))
+    """scripts/deadweight has no .py suffix: load it by path."""
+    loader = importlib.machinery.SourceFileLoader("deadweight_bin", str(ROOT / "scripts" / "deadweight"))
     spec = importlib.util.spec_from_loader("deadweight_bin", loader)
     mod = importlib.util.module_from_spec(spec)
     loader.exec_module(mod)

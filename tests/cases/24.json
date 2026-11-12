@@ -669,6 +669,39 @@
    ]
   },
   {
+   "id": "24-remote-preview-scripts-in-project",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"disableRemotePreviewScripts\": true\n}",
+    ".claude/settings.local.json": "{\n  \"disableRemotePreviewScripts\": true\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-scope",
+     "ERROR",
+     2
+    ],
+    [
+     "24-settings-unknown-key",
+     "NOTICE",
+     0
+    ]
+   ],
+   "gitignore": ".claude/settings.local.json\n",
+   "forbidden_messages": [
+    [
+     "24-settings-scope",
+     "without a word|with a warning|--settings|~/\\.claude"
+    ],
+    [
+     "24-settings-scope",
+     "^(?!.*disableRemotePreviewScripts.*from managed settings only)"
+    ]
+   ]
+  },
+  {
    "id": "24-sandbox-nested-user-namespaces-from-changelog",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",

@@ -35,7 +35,7 @@ PLUGIN = HERE.parent
 SHIPPED = sorted([*(PLUGIN / "skills" / "config-auditor" / "scripts").rglob("*.py"),
                   *(PLUGIN / "skills" / "config-auditor" / "templates").glob("*.py"),
                   *(PLUGIN / "skills" / "config-auditor" / "probes").rglob("*.py"),
-                  *(PLUGIN / "hooks").glob("*.py"), PLUGIN / "bin" / "deadweight"])
+                  *(PLUGIN / "hooks").glob("*.py"), PLUGIN / "scripts" / "deadweight"])
 # Exempt git subcommands, with the reason. `init` creates a new repository in a fresh temporary
 # folder (probes/run_probes.py): there is no configuration of anyone's to obey yet.
 EXEMPT_SUBCOMMANDS = {"init"}
@@ -158,7 +158,7 @@ class EveryGitCallIsGuarded(unittest.TestCase):
         self.assertEqual(len(unguarded_git_calls(mutated)), 4)
 
     def test_no_shipped_git_call_lacks_the_override(self):
-        self.assertIn(PLUGIN / "bin" / "deadweight", SHIPPED)
+        self.assertIn(PLUGIN / "scripts" / "deadweight", SHIPPED)
         self.assertTrue(any(f.name == "session-audit.py" for f in SHIPPED))
         found = {str(f.relative_to(PLUGIN)): unguarded_git_calls(f.read_text(encoding="utf-8"))
                  for f in SHIPPED}

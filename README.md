@@ -62,7 +62,8 @@ plugins for your user, in every project.
   the conversation.
 - Ask "run deadweight" to see the findings for this project, errors first.
 - Ask "check my agent configuration" for a review: the auditor explains each finding and its fix.
-- Run `deadweight --setup-statusline` once to see the count in your status line.
+- Run `deadweight --setup-statusline` once to see the count in your status line (`deadweight` is
+  the shell function of [Running the command](#running-the-command): it is not on your `PATH`).
 
 All commands and options: [All commands](#all-commands).
 
@@ -132,6 +133,9 @@ or **none** — a repository with no Claude Code configuration, which gets no fi
 
 ## All commands
 
+`deadweight` below is the plugin's `scripts/deadweight`, run by Python: the shell function of
+[Running the command](#running-the-command) in your terminal, the full path when Claude runs it.
+
 | You want | Do |
 | --- | --- |
 | Claude to review the configuration | ask for it — the `deadweight:config-auditor` skill loads when the task is about configuration |
@@ -146,19 +150,37 @@ or **none** — a repository with no Claude Code configuration, which gets no fi
 | to stop the configuration from getting worse | `--set-floor` once, `--check-floor` in CI — see [The ratchet](#the-ratchet) |
 | to turn it off in one project | `claude plugin disable deadweight --scope project`; if the status line was set up, also delete the `SessionStart` hook whose command ends in `statusline.py --measure` from the project's `.claude/settings.json`: the launcher finds the plugin in `installed_plugins.json` without reading which plugins are enabled, so the hook goes on measuring |
 
-`deadweight` is on the Bash tool's `PATH` while the plugin is enabled, so Claude can run it. To run
-it from your own shell, define it once:
+### Running the command
+
+Since 0.36.0 there is no bare `deadweight` command. Until 0.35.0 it was `bin/deadweight`, which Claude
+Code puts on the Bash tool's `PATH` while the plugin is enabled; claude.ai does not install a plugin
+that has a top-level `bin/` (plugins-reference, "Executables"; org-sync, "Keep executables out of the
+top-level bin directory"), and Anthropic's plugin directory refused 0.35.0 for it. The file is now
+`scripts/deadweight`, with no `#!` line and no executable bit, and it is run as
+`python3 <plugin root>/scripts/deadweight [option]`.
+
+- **Claude** runs it from the skill, which names it as `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/deadweight"`.
+  Claude Code substitutes that variable in a skill's text; it is not set in the environment of the
+  commands Claude runs through Bash (plugins-reference, "Environment variables"), so a Bash command
+  that types it literally gets an empty path.
+- **You**, from your own shell, define it once:
 
 ```bash
 # ~/.bashrc or ~/.zshrc
 deadweight() {
   local p
   p=$(claude plugin list --json | python3 -c 'import json,sys
+def key(r):
+    core, _, pre = str(r.get("version", "")).split("+")[0].partition("-")
+    return [int(x) if x.isdigit() else -1 for x in core.split(".")], not pre, pre
 rows=[r for r in json.load(sys.stdin) if r["id"].startswith("deadweight@")]
-print(sorted(rows, key=lambda r: r["version"])[-1]["installPath"])')
-  python3 "$p/bin/deadweight" "$@"
+print(max(rows, key=key)["installPath"])')
+  python3 "$p/scripts/deadweight" "$@"
 }
 ```
+
+With several installs listed (one per scope), it runs the highest version, compared number by number
+(0.36.0 above 0.9.0), a pre-release below its release.
 
 ### What your environment adds: `deadweight --environment`
 

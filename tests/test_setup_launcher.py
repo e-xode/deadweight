@@ -17,7 +17,9 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 import stat
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -28,8 +30,8 @@ MINE = "#!/usr/bin/env python3\nprint('shop-api status')\n"
 
 
 def command():
-    """bin/deadweight has no .py suffix: load it by path."""
-    loader = importlib.machinery.SourceFileLoader("deadweight_bin", str(ROOT / "bin" / "deadweight"))
+    """scripts/deadweight has no .py suffix: load it by path."""
+    loader = importlib.machinery.SourceFileLoader("deadweight_bin", str(ROOT / "scripts" / "deadweight"))
     spec = importlib.util.spec_from_loader("deadweight_bin", loader)
     mod = importlib.util.module_from_spec(spec)
     loader.exec_module(mod)
@@ -177,12 +179,13 @@ class LauncherAfterWire(Fixture):
         self.assertEqual(target.read_text(encoding="utf-8"), '{\n  "model": "sonnet"\n}\n')
 
     @unittest.skipUnless(os.name == "posix", "file modes are POSIX")
-    def test_claude_launcher_is_executable_and_replaces_atomically(self):
+    def test_claude_launcher_is_not_executable_and_replaces_atomically(self):
+        # No `#!` and run by `python3`: written 0644, an old 0755 included (audit of 0.36.0, A-02).
         root = self.project("{}\n")
         launcher = root / ".claude" / "statusline.py"
-        launcher.chmod(0o644)
+        launcher.chmod(0o755)
         self.assertEqual(self.quiet(self.mod.setup_claude, root), 0)
-        self.assertEqual(stat.S_IMODE(launcher.stat().st_mode), 0o755)
+        self.assertEqual(stat.S_IMODE(launcher.stat().st_mode), 0o644)
         self.assertNotEqual(launcher.read_text(encoding="utf-8"), MINE)
         self.assertEqual([p.name for p in (root / ".claude").iterdir() if p.name.startswith(".statusline-")], [],
                          "a temporary file was left behind")
@@ -304,7 +307,7 @@ class LauncherAfterWire(Fixture):
         finally:
             folder.chmod(stat.S_IRWXU)
         self.assertNotEqual((folder / "statusline.py").read_text(encoding="utf-8"), MINE)
-        self.assertEqual(stat.S_IMODE((folder / "statusline.py").stat().st_mode), 0o755)
+        self.assertEqual(stat.S_IMODE((folder / "statusline.py").stat().st_mode), 0o644)
 
     @unittest.skipUnless(os.name == "posix" and hasattr(os, "geteuid") and os.geteuid() != 0,
                          "read-only needs POSIX permissions and a user other than root")
@@ -540,6 +543,33 @@ class SessionStartHookInProjectSettings(Fixture):
         data = json.loads(settings.read_text(encoding="utf-8"))
         self.assertIn("statusLine", data)
         self.assertNotIn("hooks", data)
+
+
+class RemedyLine(unittest.TestCase):
+    """The command a remedy message prints passes the plugin path unchanged (audit of 0.36.0, A-01)."""
+
+    def setUp(self) -> None:
+        self.mod = command()
+
+    @unittest.skipUnless(os.name == "posix" and shutil.which("sh"), "a POSIX sh")
+    def test_a_path_with_a_dollar_a_space_and_a_backtick_reaches_python_unchanged(self):
+        for path in ("/home/u/my$plugins/x y/scripts/deadweight", "/a/`id`/b\\c/it's/scripts/deadweight",
+                     "/plain/scripts/deadweight"):
+            line = self.mod.shell_line(path, ("--fresh",), windows=False)
+            run = subprocess.run(["sh", "-c", f"set -- {line}; printf '%s\\n' \"$@\""],
+                                 capture_output=True, text=True, check=True)
+            self.assertEqual(run.stdout.splitlines(), ["python3", path, "--fresh"], line)
+
+    def test_command_uses_this_file(self):
+        self.assertIn("scripts", self.mod.command("--all"))
+        self.assertTrue(self.mod.command("--all").startswith("python3 "))
+        self.assertTrue(self.mod.command("--all").endswith(" --all"))
+
+    def test_windows_forms(self):
+        line = self.mod.shell_line(r"C:\Users\a b\scripts\deadweight", ("--fresh",), windows=True)
+        self.assertEqual(line, 'python3 "C:/Users/a b/scripts/deadweight" --fresh')
+        line = self.mod.shell_line(r"C:\my$p\scripts\deadweight", ("--json",), windows=True)
+        self.assertEqual(line, "python3 'C:/my$p/scripts/deadweight' --json")
 
 
 if __name__ == "__main__":

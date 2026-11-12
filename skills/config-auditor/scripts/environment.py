@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """What your environment adds to a session's context, beyond the project's own files.
 
     python3 environment.py                    # estimate, from file sizes, for the project in cwd

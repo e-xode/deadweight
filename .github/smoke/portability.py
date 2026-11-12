@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Portability smoke test: the three things a user runs, on the OS the runner provides.
 
 The plugin's only dependency is Python, but its hook ran through bash and GNU
@@ -48,7 +47,7 @@ def main():
                CLAUDE_CONFIG_DIR=str(claude_home), COPILOT_HOME=str(work / "no-copilot"))
 
     # 0. The setup, which writes the status line, its launcher and the hook into the project.
-    setup = subprocess.run([sys.executable, str(PLUGIN / "bin" / "deadweight"), "--setup-statusline"], env=env,
+    setup = subprocess.run([sys.executable, str(PLUGIN / "scripts" / "deadweight"), "--setup-statusline"], env=env,
                            cwd=project, capture_output=True, text=True, timeout=60)
     print(f"deadweight --setup-statusline: exit {setup.returncode}")
     if setup.returncode != 0:
@@ -83,7 +82,7 @@ def main():
              "holds, and only the identity's normalisation keeps floors comparable across machines")
 
     # 2. The command a user runs to see the detail and to measure again.
-    fresh = subprocess.run([sys.executable, str(PLUGIN / "bin" / "deadweight"), "--fresh"], env=env,
+    fresh = subprocess.run([sys.executable, str(PLUGIN / "scripts" / "deadweight"), "--fresh"], env=env,
                            cwd=project, capture_output=True, text=True, timeout=60)
     print(f"deadweight --fresh: exit {fresh.returncode}\n  {fresh.stdout.strip().splitlines()[0] if fresh.stdout.strip() else '(nothing)'}")
     if fresh.returncode != 0 or "shop-api" not in fresh.stdout:

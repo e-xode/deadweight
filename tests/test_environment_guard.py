@@ -261,7 +261,7 @@ class EnvironmentAlone(unittest.TestCase):
     def test_combinations_refused(self):
         with tempfile.TemporaryDirectory() as tmp:
             for other in ("--semantic", "--both", "--fresh", "--setup-statusline"):
-                done = subprocess.run([sys.executable, str(PLUGIN / "bin" / "deadweight"), "--environment",
+                done = subprocess.run([sys.executable, str(PLUGIN / "scripts" / "deadweight"), "--environment",
                                        other, tmp], capture_output=True, text=True, encoding="utf-8",
                                       stdin=subprocess.DEVNULL, timeout=60,
                                       env={**os.environ, "HOME": tmp, "USERPROFILE": tmp,

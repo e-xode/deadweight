@@ -97,6 +97,9 @@ SETTINGS_KEYS_MANAGED = frozenset({
     "deniedModels",
     "disableBrowserExternalNavigation", "disableCommandPluginSources",
     "disableDesktopLocalSessions", "disableMobileSimulatorTools", "disableSideloadFlags",
+    # settings-reference, read 2026-11-12: "Scope: Managed. The desktop app doesn't read the key
+    # from the remote machine or the WSL distribution."; "the terminal CLI ignores it".
+    "disableRemotePreviewScripts",
     "forceRemoteSettingsRefresh", "gatewayInternalNetworks",
     "managedMcpServers", "managedSourcesBehavior", "modelPricing", "parentSettingsBehavior",
     "pluginSuggestionMarketplaces", "pluginTrustMessage", "policyHelper", "policyHelper.path",

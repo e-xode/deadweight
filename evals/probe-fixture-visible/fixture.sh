@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # A shop repository with three planted configuration defects. None of them is in the prompt:
 # the only way to find them is to read the files.
 set -e

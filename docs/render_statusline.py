@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Render docs/statusline.svg from the REAL status line, run on a fictional project.
 
 Why generated and not a screenshot: a screenshot of a real terminal carries real

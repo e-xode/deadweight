@@ -135,7 +135,7 @@ IDE custom agents" (agents-configuration).
 
 VS Code's own fields (vscode-agent-file-reference, read 2026-10-22): `description` ("What the agent
 does and when to use it"), `tools` ("Tools available to the agent. Tool names and supported aliases depend on the
-harness"), `model` ("The model to use in the Copilot harness. An array specifies models in preference order, using the first available model").
+harness"), `model` ("Preferred model or ordered list of alternatives. Selecting the agent uses the first available model"; read 2026-11-12, an earlier wording tied it to "the Copilot harness").
 
 ## Precedence
 

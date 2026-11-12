@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # A configuration with no error and no warning, and two notices: a pair of skills
 # separated only by their descriptions, and an angle bracket in a description.
 # Neither depends on git: the eval sandbox blocks it, and a notice that needs git

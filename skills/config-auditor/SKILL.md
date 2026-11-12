@@ -72,16 +72,23 @@ check groups`). Most checks report only on failure; the budget always prints its
 five times is rolled up in the text report - `--all` or `--json` show every finding, and the
 floor always counts every one, because the ceiling is a display decision, not a detection one.
 
+The cached findings the status line counts ("run deadweight"), and the other modes:
+`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/deadweight"` with `--errors`, `--info`, `--all`, `--fresh`,
+`--json`, `--semantic`, `--both`, `--environment`, or `--setup-statusline` when the user asks for
+the status line (it writes the project's settings). Since 0.36.0 there is no bare `deadweight` on
+the Bash tool's `PATH` (the plugin has no `bin/`); the variable is substituted in this text and is
+not set in Bash's environment, so copy the path as written here.
+
 `claude plugin validate --strict <dir>` is the upstream check: it parses manifests, and since
 2.1.233 it reports `SKILL.md` frontmatter that does not parse. Run it first and do not duplicate
 it; `audit.py` covers what it does not — what the harness ignores **silently**.
 
 ### Step 1b — Semantic layer, on request only
 
-`deadweight --semantic` (or `--both`, the cached findings then this) has a model read the
-configuration for contradictions and duplicates no parser sees. It sends the files and costs per
-run, so run it when the user asks for it, never as part of a routine audit. Never counted, never in
-the floor: [references/semantic-layer.md](./references/semantic-layer.md).
+`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/deadweight" --semantic` (or `--both`, the cached findings
+then this) has a model read the configuration for contradictions and duplicates no parser sees. It
+sends the files and costs per run, so run it when the user asks for it, never as part of a routine
+audit. Never counted, never in the floor: [references/semantic-layer.md](./references/semantic-layer.md).
 
 ### Step 2 — Runtime measurement (after any listing change, and whenever the user reports slowness or context cost, even if the static count is 0 or the files could not be read)
 
@@ -144,6 +151,6 @@ ceiling of core rule 3.
 | Skill/agent runtime mechanisms available in Claude Code | [references/skill-runtime-mechanisms.md](./references/skill-runtime-mechanisms.md) |
 | Which instruction files actually load (`--runtime`)      | [references/runtime-data.md](./references/runtime-data.md) |
 | Contradictions and duplicates a reader sees (`semantic.py`) | [references/semantic-layer.md](./references/semantic-layer.md) |
-| What the account, plugins and MCP servers add (`deadweight --environment`) | [references/environment.md](./references/environment.md) |
+| What the account, plugins and MCP servers add (`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/deadweight" --environment`) | [references/environment.md](./references/environment.md) |
 | Anthropic official documentation | [references/official-links.md](./references/official-links.md) |
 | The step-by-step procedure for a given change | the project's own notes — not this skill |

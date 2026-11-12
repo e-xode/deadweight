@@ -4,8 +4,8 @@
 claude plugin eval . --allow-tools Bash -j 3
 ```
 
-**`--allow-tools Bash` is not optional.** Five of the seven cases expect the model to reach for
-`deadweight` rather than read `CLAUDE.md` by hand, and `Bash` is gated behind an operator grant:
+**`--allow-tools Bash` is not optional.** Five of the seven cases expect the model to run the
+audit (`audit.py`, which their graders look for) rather than read `CLAUDE.md` by hand, and `Bash` is gated behind an operator grant:
 without it the runner reports `not granted` and the case fails for a reason that has nothing to do
 with the skill.
 

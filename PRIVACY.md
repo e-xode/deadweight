@@ -7,7 +7,7 @@ through your own Claude Code session. The code is public: every statement below 
 
 ## Network
 
-The code that runs on your machine (`hooks/`, `bin/`, `skills/config-auditor/scripts/`,
+The code that runs on your machine (`hooks/`, `scripts/deadweight`, `skills/config-auditor/scripts/`,
 `skills/config-auditor/templates/`) imports no network library (`urllib.parse` only decodes the links
 written in your files) and starts no program other than Python itself, `git` and `claude`. Only
 `claude`, under the two commands of "What it sends", reaches a network.
@@ -38,6 +38,9 @@ must be a throwaway one. It is a billed model call, and it is not one of
 `probes/run_probes.py`'s probes, which replay what `evidence.json` records for a check.
 
 ## What it reads
+
+`deadweight` below is `python3 <plugin root>/scripts/deadweight`: since 0.36.0 it is not a bare
+command on any `PATH` (README, "Running the command").
 
 - **The audit** (`audit.py`, the `deadweight` command, the session-start hook) reads, in the project:
   `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `.claude/` (the overlay
@@ -99,7 +102,7 @@ about an imported file outside the project gives its path, never its content.
   Otherwise the whole settings file is written back as `json.dumps(indent=2)`, so its formatting changes,
   and the launcher is written, replacing a regular file already there. The launcher is first written to a
   `.statusline-*` temporary file in the same folder (the project's `.claude/`, or the Copilot folder),
-  made executable, then moved over its destination; the temporary file is removed on any failure or
+  given mode 0644 (it has no `#!` and is run by `python3`), then moved over its destination; the temporary file is removed on any failure or
   interruption, and only a kill or a power cut can leave it. In a folder that takes no new file the launcher
   is written in place, and the launcher that was there is put back if that fails. If the launcher cannot be written (its path is a folder, a symbolic link or a
   read-only file), the settings file is put back as it was (removed if there was none) and the command
