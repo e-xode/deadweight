@@ -465,7 +465,11 @@ def check_no_global_scripts(ctx: AuditContext, report: Report) -> None:
         # The other keys whose value is a command Claude Code runs (settings-reference:
         # "a shell command line" for the credential helpers, an object with `command` for
         # fileSuggestion and the two status lines) run a script outside any skill too
-        # (external audit 4, 2026-10-08).
+        # (external audit 4, 2026-10-08). `subagentStatusLine` is a removed key since Claude Code
+        # 2.1.323 (SETTINGS_KEYS_REMOVED: a file that holds it loads as before, the line is no
+        # longer drawn), yet it stays in the tuple: a script it names is still not reported as
+        # unreferenced, and the removed-key NOTICE of check 24 is what tells the user.
+        # (external audit 5, 2026-11-14).
         runs = [data.get(key) for key in _SETTINGS_COMMAND_STRINGS]
         runs += [data[key].get("command") for key in _SETTINGS_COMMAND_OBJECTS
                  if isinstance(data.get(key), dict)]

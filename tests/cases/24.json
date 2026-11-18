@@ -933,6 +933,58 @@
    ]
   },
   {
+   "id": "24-subagent-status-line-removed",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"subagentStatusLine\": {\n    \"type\": \"command\",\n    \"command\": \"echo subagents\"\n  }\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-key",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "24-settings-unknown-key",
+     "a typo, or a key newer"
+    ],
+    [
+     "24-settings-unknown-key",
+     "^(?!.*was removed in v2\\.1\\.323, subagent rows now always use the default look: it has no effect on current versions.*Claude Code changelog of the version named)"
+    ]
+   ]
+  },
+  {
+   "id": "24-subagent-status-line-witnesses",
+   "files": {
+    "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",
+    ".claude/skills/shop-refunds/SKILL.md": "---\nname: shop-refunds\ndescription: Handle refund requests in the shop checkout: partial refunds, chargebacks, refund windows and receipts for customers. Do not use for invoicing.\n---\n\nSee `README.md`.\n",
+    ".claude/settings.json": "{\n  \"statusLine\": {\n    \"type\": \"command\",\n    \"command\": \"echo status\"\n  },\n  \"subagentStatusLines\": true\n}"
+   },
+   "git": true,
+   "expected": [
+    [
+     "24-settings-unknown-key",
+     "NOTICE",
+     1
+    ]
+   ],
+   "forbidden_messages": [
+    [
+     "24-settings-unknown-key",
+     "was removed in"
+    ],
+    [
+     "24-settings-unknown-key",
+     "^(?!.*\\(251 keys, 2026-11-14\\): a typo, or a key newer)"
+    ]
+   ]
+  },
+  {
    "id": "24-taskoutputmaxchars-removed",
    "files": {
     "CLAUDE.md": "# shop-api\n\nRun `make test` before any change.\n",

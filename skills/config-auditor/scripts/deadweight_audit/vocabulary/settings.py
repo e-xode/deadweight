@@ -47,7 +47,7 @@ SETTINGS_KEYS_ANY = frozenset({
     "showClearContextOnPlanAccept", "showThinkingSummaries", "showTurnDuration",
     "skillListingBudgetFraction", "skillListingMaxDescChars", "skillOverrides",
     "skipWebFetchPreflight", "spinnerTipsEnabled", "spinnerTipsOverride", "spinnerVerbs",
-    "statusLine", "subagentPromptCacheTtl", "subagentStatusLine", "switchModelsOnFlag",
+    "statusLine", "subagentPromptCacheTtl", "switchModelsOnFlag",
     "syntaxHighlightingDisabled", "taskOutputMaxChars", "teammateMode",
     "terminalProgressBarEnabled", "terminalTitleFromRename", "theme", "timeFormat", "timeZone",
     "tui", "ultracode", "verbose", "viewMode", "voice", "voiceEnabled",
@@ -122,14 +122,26 @@ SETTINGS_KEYS_GLOBAL = frozenset({
 })
 
 
-# Keys the settings reference still lists, as removed: "Setting it has no effect on current
-# versions" (settings-reference, taskOutputMaxChars, read 2026-10-17).
-SETTINGS_KEYS_REMOVED = {"taskOutputMaxChars": "v2.1.277, together with the TaskOutput tool it sized"}
+# Keys that no longer do anything. `taskOutputMaxChars`: the settings reference still lists it,
+# as removed, "Setting it has no effect on current versions" (read 2026-10-17). `subagentStatusLine`:
+# the settings reference no longer lists it at all (read 2026-11-14, so it is out of the known
+# keys above, which derive.py compares to that page); the Claude Code changelog for 2.1.323 says
+# "Removed the `subagentStatusLine` setting: subagent rows always use the default look, and
+# settings files that still hold the key load as before".
+SETTINGS_KEYS_REMOVED = {
+    "taskOutputMaxChars": "v2.1.277, together with the TaskOutput tool it sized",
+    "subagentStatusLine": "v2.1.323, subagent rows now always use the default look",
+}
 
 
 SETTINGS_KNOWN_KEYS = (SETTINGS_KEYS_ANY | SETTINGS_KEYS_USER_LOCAL_MANAGED
                        | SETTINGS_KEYS_USER_MANAGED | SETTINGS_KEYS_USER | SETTINGS_KEYS_MANAGED
                        | SETTINGS_KEYS_GLOBAL)
+
+# The day derive.py last found SETTINGS_KNOWN_KEYS in step with the settings reference (251 keys).
+# The unknown-key NOTICE prints it next to the count: a count with an older date would claim a
+# reading nobody made. Move it with the keys, never alone.
+SETTINGS_KNOWN_KEYS_READ = "2026-11-14"
 
 
 # Objects whose fields the settings reference lists as a closed set ("Type: object
@@ -154,7 +166,6 @@ SETTINGS_OBJECT_FIELDS = {
                 "failIfUnavailable", "filesystem", "ignoreViolations", "network", "ripgrep",
                 "socatPath"},
     "statusLine": {"command", "hideVimModeIndicator", "padding", "refreshInterval", "type"},
-    "subagentStatusLine": {"command", "type"},
     "fileSuggestion": {"command", "type"},
     "spinnerVerbs": {"mode", "verbs"},
     "voice": {"autoSubmit", "enabled", "mode"},

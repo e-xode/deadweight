@@ -310,8 +310,12 @@ does not stop `git -C . push`. Read/Edit denies cover built-in tools and recogni
 For enforcement that does not depend on spelling, the doc points to **sandboxing** (OS-level,
 filesystem and network, Bash and its children) and to a `PreToolUse` hook for custom inspection
 (`permissions § How permissions interact with sandboxing`). With the sandbox on and
-`autoAllowBashIfSandboxed` at its default, a bare `Bash` ask rule no longer prompts for sandboxed
-commands; content-scoped ask rules and explicit denies still apply. [house] A deny list guards the
+`autoAllowBashIfSandboxed` set to `true`, a bare `Bash` ask rule no longer prompts for sandboxed
+commands; content-scoped ask rules and explicit denies still apply. The default of that key is
+`false` since v2.1.324 ("Before v2.1.324, the default was `true`", settings-reference; the Claude Code
+changelog lists the change in its 2.1.325 section and has no 2.1.324 one): where no settings file (managed,
+user, project or local; the key is "Any file") sets it to `true`, sandboxed commands go through the regular
+permission flow, a bare ask rule included. [house] A deny list guards the
 model's usual spelling; "secrets protected by `Read(./.env)`" is only true together with the sandbox.
 
 - **`50-security-sandbox-weakened`** (NOTICE) — `true`, in the project or local file, for a key that weakens the sandbox ("Each one weakens the sandbox", sandboxing; what each does, settings-reference):

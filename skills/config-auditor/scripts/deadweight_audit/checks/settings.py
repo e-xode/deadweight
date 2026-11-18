@@ -32,6 +32,7 @@ from ..vocabulary.settings import (
     SETTINGS_KEYS_USER_LOCAL_MANAGED,
     SETTINGS_KEYS_USER_MANAGED,
     SETTINGS_KEYS_REMOVED,
+    SETTINGS_KNOWN_KEYS_READ,
     SETTINGS_KNOWN_KEYS,
     SETTINGS_OBJECT_FIELDS,
     SETTINGS_MAP_FIELDS,
@@ -181,7 +182,8 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
             if key in SETTINGS_KEYS_REMOVED:
                 report.add("24-settings-unknown-key", "NOTICE",
                            f"'{key}' in '{name}' was removed in {SETTINGS_KEYS_REMOVED[key]}: it has "
-                           "no effect on current versions. Delete the line (settings-reference).",
+                           "no effect on current versions. Delete the line (the settings reference, "
+                           "or the Claude Code changelog of the version named).",
                            str(path))
                 continue
             if "." in key and key in SETTINGS_KNOWN_KEYS:
@@ -200,7 +202,7 @@ def check_settings_semantics(ctx: AuditContext, report: Report) -> None:
             if key not in SETTINGS_KNOWN_KEYS:
                 report.add("24-settings-unknown-key", "NOTICE",
                            f"'{key}' in '{name}' is not in the settings reference ({len(SETTINGS_KNOWN_KEYS)} keys, "
-                           "2026-09-30): a typo, or a key newer than this auditor.", str(path))
+                           f"{SETTINGS_KNOWN_KEYS_READ}): a typo, or a key newer than this auditor.", str(path))
                 continue
             fields = SETTINGS_OBJECT_FIELDS.get(key)
             if fields and isinstance(data[key], dict):

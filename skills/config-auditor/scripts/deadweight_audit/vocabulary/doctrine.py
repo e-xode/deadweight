@@ -1,6 +1,6 @@
 """The doctrine check 46 compares against: this plugin's reference names and code terms, frozen.
 
-GENERATED on 2026-11-11 from skills/config-auditor/references/ by a maintainer script that is not part of this repository - do not edit by hand.
+GENERATED on 2026-11-14 from skills/config-auditor/references/ by a maintainer script that is not part of this repository - do not edit by hand.
 Frozen rather than read at run time: a reference page added to the plugin changed findings in
 consuming projects while the auditor's sha stayed the same. Regenerating it is a deliberate change
 of the auditor, and moves its sha.
@@ -28,7 +28,7 @@ DOCTRINE_REFERENCE_NAMES = frozenset({
     'skill-runtime-mechanisms.md',
 })
 
-# 1421 code terms (text between backticks, 2 to 60 characters; generic repository folders,
+# 1425 code terms (text between backticks, 2 to 60 characters; generic repository folders,
 # extension globs, credential env names and fragments between two code spans left out).
 DOCTRINE_CODE_TERMS = frozenset({
     '!~/…',
@@ -406,6 +406,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     '<your-project-root>/.gemini/commands/',
     '=== SEMANTIC … not counted ===',
     '>=1.4',
+    '>=99.0.0',
     '@../AGENTS.md',
     '@../file.md',
     '@./docs/x.md',
@@ -855,6 +856,8 @@ DOCTRINE_CODE_TERMS = frozenset({
     'claude --safe-mode',
     'claude -p',
     'claude -p "<prompt>" --output-format stream-json --verbose',
+    'claude -p --model haiku --plugin-dir',
+    'claude -p --plugin-dir',
     'claude doctor',
     'claude mcp add',
     'claude mcp add --transport ws',
@@ -975,6 +978,7 @@ DOCTRINE_CODE_TERMS = frozenset({
     'enabledMcpServers',
     'enabledMcpjsonServers',
     'enabledPlugins',
+    'engines["claude-code"]',
     'env',
     'errors',
     'evals/',
